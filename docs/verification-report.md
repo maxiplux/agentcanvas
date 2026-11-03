@@ -2,6 +2,21 @@
 
 Build: `make test` (go vet + go test, all packages green) and `make release`. Walked on 2026-11-02 with fresh seed projects. Rows 1–33 were re-run in one scripted Chrome session against the production binary, resetting to the seed before each row; rows 38, 41 and 44 against the same server with a second window and the CLI acting from outside the page. The script drives the real UI (clicks, pointer drags, key events, inspector inputs) and reads the result from the DOM and `/api/state`.
 
+## 0. Final-build re-verification (commit 8cea0d0, binary `v0.1.0-1-g8cea0d0`)
+
+After the security hardening and the `--help` fix, every row below was re-run against a binary built from the clean `main` tree at commit 8cea0d0. CI passed on GitHub for that commit (Linux and macOS tests, six-target build, Linux smoke test).
+
+| Rows / steps | How | Result |
+|---|---|---|
+| §17 1–6, 8, 28, 29 (exports), 30–33 | One scripted Chrome session driving the real UI on a freshly reset seed | 13/13 pass |
+| §17 7, 9–23 | Same session; each row reset to the seed. Row 13: 51 inspector edits → exactly 50 ⌘Z steps, oldest "Edit 1", redo works, a Story undo leaves Web untouched | All pass |
+| §17 24–29 | Pins on page, screen, storyboard and draw; drag, resolve, delete, Review filter and jump; browser reload | All pass; the moved pin re-renders at its saved fractions |
+| §17 38, 41, 44 | MCP `update_block` from outside the browser; a second window; CLI install and remove with the drawer open | Canvas updated 36 ms after the MCP call, with the agent pill; windows in sync; `get_node` and MCP `undo`; the skill appeared in the drawer ≤2.5 s after install |
+| §17 34–37, 39, 40, 42, 43 | Final binary from the shell: port scan and exit 2, exit 3, independent projects, view restore, raw curl, `serve --stdio`, `attach` (including no-server exit 1), go-sdk client over HTTP and through `attach`, skills install/refuse/export | All pass |
+| §17 34 / §18 13 | Separate headless Chrome with all non-loopback traffic blocked (an external fetch fails) | Full studio loads from 127.0.0.1 only, with Inter and Fraunces |
+| §18 1–15 | Steps 1 and 3 re-run in the browser (undo ×2 / redo ×2 sequence `md/4/ink → md/4/muted → md/2/muted → md/4/muted → md/4/ink`); exports opened standalone (Home → Cart → Confirm → Home; Welcome → … → Account Home); the remaining steps are covered by the rows above | All pass |
+| §18 9 Console | Fresh tab, UI-only click-through of every tab, Storyboard, Preview, Play, draw, pin, Skills drawer and undo | 0 errors; only the two vendor warnings listed in §4 |
+
 ## 1. Acceptance criteria (§17)
 
 | # | Result | Evidence |
