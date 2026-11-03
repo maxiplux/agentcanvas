@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -103,38 +104,74 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /guide", s.guide)
 	mux.HandleFunc("GET /mcp.json", s.mcpJSON)
 
-	mux.Handle("GET /api/state", guard(http.HandlerFunc(s.state)))
-	mux.Handle("POST /api/act", guard(http.HandlerFunc(s.act)))
-	mux.Handle("GET /api/events", guard(http.HandlerFunc(s.events)))
-	mux.Handle("GET /api/export/{kind}", guard(http.HandlerFunc(s.exportFile)))
+	api := s.sameOrigin
+	mux.Handle("GET /api/state", api(http.HandlerFunc(s.state)))
+	mux.Handle("POST /api/act", api(http.HandlerFunc(s.act)))
+	mux.Handle("GET /api/events", api(http.HandlerFunc(s.events)))
+	mux.Handle("GET /api/export/{kind}", api(http.HandlerFunc(s.exportFile)))
 	// SPEC: the Export menu's "Save DESIGN.md to project" needs a write endpoint; §12.2 lists none.
-	mux.Handle("POST /api/export/{kind}/write", guard(http.HandlerFunc(s.exportWrite)))
-	mux.Handle("GET /api/skills", guard(http.HandlerFunc(s.skillList)))
-	mux.Handle("GET /api/skills/{name}", guard(http.HandlerFunc(s.skillGet)))
+	mux.Handle("POST /api/export/{kind}/write", api(http.HandlerFunc(s.exportWrite)))
+	mux.Handle("GET /api/skills", api(http.HandlerFunc(s.skillList)))
+	mux.Handle("GET /api/skills/{name}", api(http.HandlerFunc(s.skillGet)))
 
 	if s.c.MCP != nil {
-		mux.Handle("/mcp", guard(cors(s.c.MCP)))
+		// SPEC: §4.5 accepts any loopback Origin on /mcp and sends CORS to it, so browser-based
+		// MCP clients served from other local ports can connect; /api is limited to our own origin.
+		mux.Handle("/mcp", loopbackOnly(cors(s.c.MCP)))
 	}
-	return mux
+	return hostGuard(mux)
 }
 
 // ---- guards ----
+
+func loopbackHost(h string) bool { return h == "127.0.0.1" || h == "localhost" || h == "::1" }
 
 func loopbackOrigin(origin string) bool {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "http" {
 		return false
 	}
-	h := u.Hostname()
-	return h == "127.0.0.1" || h == "localhost" || h == "::1"
+	return loopbackHost(u.Hostname())
 }
 
-// guard rejects requests carrying a non-loopback Origin (DNS-rebinding guard, §4.5).
-func guard(h http.Handler) http.Handler {
+// hostGuard rejects every request whose Host is not a loopback name. A DNS-rebinding
+// page reaches 127.0.0.1 with its own hostname in Host, and same-origin GETs carry
+// no Origin header, so the Host check is what keeps it from reading the project (§4.5).
+func hostGuard(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if hn, _, err := net.SplitHostPort(host); err == nil {
+			host = hn
+		}
+		if !loopbackHost(strings.Trim(host, "[]")) {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// loopbackOnly rejects requests carrying a non-loopback Origin (§4.5).
+func loopbackOnly(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if o := r.Header.Get("Origin"); o != "" && !loopbackOrigin(o) {
 			http.Error(w, "forbidden origin", http.StatusForbidden)
 			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// sameOrigin allows /api requests only from the studio page this server serves:
+// no Origin header, or http://{127.0.0.1|localhost|[::1]}:<bound port>.
+func (s *Server) sameOrigin(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if o := r.Header.Get("Origin"); o != "" {
+			u, err := url.Parse(o)
+			if err != nil || u.Scheme != "http" || !loopbackHost(u.Hostname()) || u.Port() != strconv.Itoa(s.c.Port) {
+				http.Error(w, "forbidden origin", http.StatusForbidden)
+				return
+			}
 		}
 		h.ServeHTTP(w, r)
 	})

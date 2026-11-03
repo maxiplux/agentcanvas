@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -81,6 +82,13 @@ func Write(projectDir, kind string, f *File) (string, error) {
 		name = filepath.Base(f.Name)
 		if name == "." || name == string(filepath.Separator) || name == "" {
 			return "", fmt.Errorf("export has no file name")
+		}
+	}
+	// Refuse symlinked data/export directories (and a symlinked DESIGN.md) so a
+	// checked-out link cannot redirect writes outside the project directory.
+	for _, p := range []string{filepath.Join(abs, ".agentcanvas"), filepath.Join(abs, ".agentcanvas", "exports"), filepath.Join(dir, name)} {
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("%s is a symbolic link; refusing to write through it", p)
 		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -189,8 +197,13 @@ func nodeSlugs(p *studio.Project, ch string) map[string]string {
 
 func num(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }
 
+var hexColor = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
+// color resolves a token key to its hex. Values are interpolated into HTML and CSS,
+// so anything that is not a plain #RRGGBB falls back to black (defense in depth; the
+// Store already refuses such tokens on load and on update_tokens).
 func color(p *studio.Project, key string) string {
-	if c, ok := p.Tokens.Colors[key]; ok {
+	if c, ok := p.Tokens.Colors[key]; ok && hexColor.MatchString(c) {
 		return c
 	}
 	return "#000000"

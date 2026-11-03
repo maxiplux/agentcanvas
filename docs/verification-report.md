@@ -112,6 +112,9 @@ Summary of that run: initialize instructions = §13.2 text; 42 tools; get_canvas
 | `internal/skills/skills.go` | AGENT_CANVAS_SKILLS_DIR overrides the skills folder (tests never touch the real config dir). |
 | `web/index.html` | §9.3 edge hit test uses a 12 px transparent stroke (same 6 px tolerance); text shape (x, y) is the baseline, like the SVG export. |
 
+| `internal/server/server.go` | Security hardening (post-review): every request must carry a loopback `Host` (DNS-rebinding guard); `/api/*` accepts only the server's own origin; `/mcp` keeps §4.5's any-loopback-origin rule and CORS for browser-based MCP clients. Tests: `internal/server/server_test.go`. |
+| `internal/studio/validate.go` | `project.json` is validated field by field on load (ids, enums, `#RRGGBB` tokens, §6.1 invariants) and quarantined if anything is off, because exports interpolate those values into HTML/CSS; the exporter also refuses non-hex colors. A symlinked `.agentcanvas` or `.agentcanvas/exports` is refused. Tests: `TestInjectedProjectQuarantined`, `TestSymlinkedDataDirRefused`, `TestWriteRefusesSymlinkedExportDir`, `TestColorSanitized`. |
+
 ## 4. Known deviations
 
 - `ed_w11` (confirmed by the project owner on 2026-11-02: keep `cross`) follows the spec's own conflict rule. §0 says: "When two sections seem to conflict, the more specific one wins (a table of values beats prose)." So it is not a deviation: the §7.1 table and §17 row 6 (9 vermillion) both say cross, while the §6.1 prose implies primary (both pages are in Checkout). The seed keeps the table value; the reducer still applies §6.1 on every create/retarget (Go test `TestEdW11RecomputedOnRetarget`: relabel/retarget makes it primary, a requested cross on a same-flow edge is refused, new same-flow edges are primary).

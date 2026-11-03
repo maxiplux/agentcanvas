@@ -114,6 +114,9 @@ func Open(dir string, o Options) (*Store, error) {
 		s.project = MakeSeed()
 		return s, nil
 	}
+	if err := noSymlink(s.data); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(s.data, 0o755); err != nil {
 		return nil, err
 	}
@@ -192,7 +195,11 @@ func parseProject(b []byte) (*Project, error) {
 		return nil, fmt.Errorf("version %d, want 1", p.Version)
 	}
 	p.normalize()
-	return migrate(&p), nil
+	q := migrate(&p)
+	if err := Validate(q); err != nil {
+		return nil, fmt.Errorf("invalid project: %w", err)
+	}
+	return q, nil
 }
 
 func (s *Store) loadProject() *Project {

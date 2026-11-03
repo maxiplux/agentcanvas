@@ -571,3 +571,53 @@ func TestEdW11RecomputedOnRetarget(t *testing.T) {
 		t.Fatalf("relinked edge = %+v, want primary", e)
 	}
 }
+
+func TestSeedValidates(t *testing.T) {
+	if err := Validate(MakeSeed()); err != nil {
+		t.Fatalf("seed fails Validate: %v", err)
+	}
+}
+
+// A hostile project.json (values that would land in exported HTML/CSS) is quarantined.
+func TestInjectedProjectQuarantined(t *testing.T) {
+	for name, mutate := range map[string]func(p *Project){
+		"color":     func(p *Project) { p.Tokens.Colors["accent"] = `red;}</style><script>alert(1)</script>` },
+		"blockType": func(p *Project) { p.Nodes[0].Blocks[0].Type = `nav"><script>x</script>` },
+		"role":      func(p *Project) { p.Nodes[0].Blocks[1].BodyRole = `md" onmouseover="x` },
+		"id":        func(p *Project) { p.Nodes[0].Blocks[0].ID = `bk"><img src=x>` },
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			data := filepath.Join(dir, ".agentcanvas")
+			os.MkdirAll(data, 0o755)
+			p := MakeSeed()
+			mutate(p)
+			b, _ := json.Marshal(map[string]any{"key": "agentcanvas.project.v1", "project": p})
+			os.WriteFile(filepath.Join(data, "project.json"), b, 0o644)
+			var log strings.Builder
+			s, err := Open(dir, Options{Log: &log})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.project.Tokens.Colors["accent"] != "#D8432A" || s.project.Nodes[0].Blocks[0].ID != "bk_home_nav" {
+				t.Fatal("hostile project was loaded instead of the seed")
+			}
+			if m, _ := filepath.Glob(filepath.Join(data, "project.json.bad-*")); len(m) != 1 {
+				t.Fatalf("not quarantined: %q", log.String())
+			}
+		})
+	}
+}
+
+func TestSymlinkedDataDirRefused(t *testing.T) {
+	dir, elsewhere := t.TempDir(), t.TempDir()
+	if err := os.Symlink(elsewhere, filepath.Join(dir, ".agentcanvas")); err != nil {
+		t.Skip("symlinks unavailable:", err)
+	}
+	if _, err := Open(dir, Options{}); err == nil || !strings.Contains(err.Error(), "symbolic link") {
+		t.Fatalf("want symlink refusal, got %v", err)
+	}
+	if m, _ := filepath.Glob(filepath.Join(elsewhere, "*")); len(m) != 0 {
+		t.Fatalf("wrote through the symlink: %v", m)
+	}
+}
