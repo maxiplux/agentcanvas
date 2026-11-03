@@ -173,7 +173,19 @@ func alive(si *ServerInfo, projectDir string) bool {
 	if json.NewDecoder(res.Body).Decode(&h) != nil || !h.OK {
 		return false
 	}
-	return h.Project == "" || h.Project == projectDir
+	return h.Project == projectDir
+}
+
+// runningServer returns the live server for projectDir. server.json is only a
+// hint (a repository could ship a hostile one): the port must answer /healthz
+// for this project on loopback, and the URLs are rebuilt from that port.
+func runningServer(projectDir string) (*ServerInfo, bool) {
+	si, err := ReadServerInfo(projectDir)
+	if err != nil || si.Port <= 0 || si.Port > 65535 || !alive(si, projectDir) {
+		return nil, false
+	}
+	si.UIURL, si.MCPURL = server.UIURL(si.Port), server.MCPURL(si.Port)
+	return si, true
 }
 
 func absDir(d string) (string, error) {
@@ -242,7 +254,7 @@ func serve(env Env, args []string) int {
 		fmt.Fprintln(env.Stderr, "agent-canvas:", err)
 		return ExitErr
 	}
-	if si, err := ReadServerInfo(dir); err == nil && alive(si, dir) {
+	if si, ok := runningServer(dir); ok {
 		fmt.Fprintf(env.Stderr, "agent-canvas: a server is already running for %s\n", dir)
 		fmt.Fprintln(logw, "UI:  "+si.UIURL)
 		fmt.Fprintln(logw, "MCP: "+si.MCPURL)

@@ -133,6 +133,14 @@ Next:
 
 // setup exports every skill into the agent's skills folder and writes its MCP entry.
 func (a agentTarget) setup(sk *skills.Store, dir string, names []string, command string) error {
+	for _, rel := range []string{filepath.Dir(a.skillsDir), a.skillsDir, filepath.Dir(a.config), a.config} {
+		if rel == "." {
+			continue
+		}
+		if err := refuseSymlink(filepath.Join(dir, rel)); err != nil {
+			return err
+		}
+	}
 	for _, n := range names {
 		if _, err := sk.Export(n, filepath.Join(dir, a.skillsDir), true); err != nil {
 			return fmt.Errorf("exporting skill %s: %w", n, err)
@@ -188,7 +196,7 @@ func pickAgents(list string) ([]agentTarget, error) {
 
 // initProject seeds .agentcanvas/project.json unless the project already exists.
 func initProject(env Env, dir string) (string, error) {
-	if si, err := ReadServerInfo(dir); err == nil && alive(si, dir) {
+	if si, ok := runningServer(dir); ok {
 		return "studio already running at " + si.UIURL, nil
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".agentcanvas", "project.json")); err == nil {
@@ -314,6 +322,9 @@ func tomlString(s string) string {
 // the project is a git repository (or already has a .gitignore).
 func ensureGitignore(dir string) ([]string, error) {
 	path := filepath.Join(dir, ".gitignore")
+	if err := refuseSymlink(path); err != nil {
+		return nil, err
+	}
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		if _, gerr := os.Stat(filepath.Join(dir, ".git")); gerr != nil {

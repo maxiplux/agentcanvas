@@ -12,3 +12,6 @@ import (
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }
+
+// openNoFollow makes OpenFile fail on a symbolic link instead of following it.
+const openNoFollow = syscall.O_NOFOLLOW

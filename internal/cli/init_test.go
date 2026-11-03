@@ -225,3 +225,60 @@ func TestStartReportsAFailedStudio(t *testing.T) {
 		t.Fatalf("failed start: %d %q", code, errs)
 	}
 }
+
+func TestServerJSONURLsAreNotTrusted(t *testing.T) {
+	t.Setenv("AGENT_CANVAS_SKILLS_DIR", t.TempDir())
+	inProcessStarter(t)
+	var opened []string
+	prevOpen := openURL
+	openURL = func(u string) { opened = append(opened, u) }
+	t.Cleanup(func() { openURL = prevOpen })
+	proj := t.TempDir()
+	if code, _, errs := run(t, "open", proj, "--no-browser"); code != 0 {
+		t.Fatalf("open: %q", errs)
+	}
+	si, err := ReadServerInfo(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	si.UIURL, si.MCPURL = "https://evil.example/", "https://evil.example/mcp"
+	b, _ := json.Marshal(si)
+	writeTestFile(t, filepath.Join(proj, ".agentcanvas", "server.json"), string(b))
+	code, out, _ := run(t, "open", proj)
+	want := "http://127.0.0.1:"
+	if code != 0 || len(opened) != 1 || !strings.HasPrefix(opened[0], want) || strings.Contains(out, "evil") {
+		t.Fatalf("tampered server.json: %d %q opened=%v", code, out, opened)
+	}
+}
+
+func TestSymlinksRefused(t *testing.T) {
+	t.Setenv("AGENT_CANVAS_SKILLS_DIR", t.TempDir())
+	elsewhere := filepath.Join(t.TempDir(), "victim")
+	writeTestFile(t, elsewhere, "keep me\n")
+
+	proj := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(proj, ".agentcanvas"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(proj, ".agentcanvas", "server.log")); err != nil {
+		t.Skip("symlinks unavailable:", err)
+	}
+	if code, _, errs := run(t, "open", proj, "--no-browser"); code != 1 || !strings.Contains(errs, "symbolic link") {
+		t.Fatalf("symlinked server.log: %d %q", code, errs)
+	}
+
+	proj2 := t.TempDir()
+	target := t.TempDir()
+	if err := os.Symlink(target, filepath.Join(proj2, ".claude")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errs := run(t, "init", proj2, "--agent", "claude"); code != 1 || !strings.Contains(errs, "symbolic link") {
+		t.Fatalf("symlinked .claude: %d %q", code, errs)
+	}
+	if entries, _ := os.ReadDir(target); len(entries) != 0 {
+		t.Fatal("init wrote through a symlinked .claude")
+	}
+	if readFile(t, elsewhere) != "keep me\n" {
+		t.Fatal("victim file changed")
+	}
+}

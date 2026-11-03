@@ -24,7 +24,7 @@ var startServer = func(dir, logPath string) (<-chan struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	logf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND|openNoFollow, 0o644)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +43,15 @@ var startServer = func(dir, logPath string) (<-chan struct{}, error) {
 
 // ensureServer returns the running server for dir, starting one if needed.
 func ensureServer(env Env, dir string) (*ServerInfo, error) {
-	if si, err := ReadServerInfo(dir); err == nil && alive(si, dir) {
+	if si, ok := runningServer(dir); ok {
 		return si, nil
 	}
 	data := filepath.Join(dir, ".agentcanvas")
+	for _, p := range []string{data, filepath.Join(data, "server.log"), filepath.Join(data, "start.lock")} {
+		if err := refuseSymlink(p); err != nil {
+			return nil, err
+		}
+	}
 	if err := os.MkdirAll(data, 0o755); err != nil {
 		return nil, err
 	}
@@ -67,7 +72,7 @@ func ensureServer(env Env, dir string) (*ServerInfo, error) {
 	}
 	deadline := time.Now().Add(startTimeout)
 	for time.Now().Before(deadline) {
-		if si, err := ReadServerInfo(dir); err == nil && alive(si, dir) {
+		if si, ok := runningServer(dir); ok {
 			if exited != nil {
 				fmt.Fprintf(env.Stderr, "agent-canvas: studio started — UI: %s (log: %s)\n", si.UIURL, logPath)
 			}
@@ -82,6 +87,22 @@ func ensureServer(env Env, dir string) (*ServerInfo, error) {
 		}
 	}
 	return nil, errors.New("timed out waiting for the studio to start; see " + logPath)
+}
+
+// refuseSymlink fails when path exists and is a symbolic link, so a cloned
+// repository cannot redirect a write to a file elsewhere on the machine.
+func refuseSymlink(path string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symbolic link; refusing to write through it", path)
+	}
+	return nil
 }
 
 func lastLines(path string, n int) string {

@@ -100,8 +100,8 @@ func attachEndpoint(env Env, project, rawURL string, start bool) (string, bool) 
 		}
 		return si.MCPURL, true
 	}
-	si, err := ReadServerInfo(dir)
-	if err != nil || !alive(si, dir) {
+	si, ok := runningServer(dir)
+	if !ok {
 		fmt.Fprintf(env.Stderr, noServer, dir)
 		return "", false
 	}

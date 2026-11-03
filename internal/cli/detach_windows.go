@@ -13,3 +13,6 @@ func detach(cmd *exec.Cmd) {
 	const detachedProcess, newProcessGroup = 0x00000008, 0x00000200
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: detachedProcess | newProcessGroup, HideWindow: true}
 }
+
+// openNoFollow: Windows has no O_NOFOLLOW; callers Lstat the path first.
+const openNoFollow = 0
