@@ -2779,7 +2779,11 @@ function App() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
+        const h = st.history[v.tab] || {};
+        const canDo = e.shiftKey ? h.canRedo : h.canUndo;
         const el = typing ? active : null;
+        // nothing to do: say so locally instead of sending a request the server would refuse
+        if (!canDo && !el) { studio.showToast(e.shiftKey ? 'Nothing to redo in this tab.' : 'Nothing to undo in this tab.'); return; }
         if (el) el.blur(); // flush the open text draft so undo reverts the whole burst
         act(e.shiftKey ? 'redo' : 'undo', { tab: v.tab }).then(() => { if (el && document.contains(el)) el.focus(); });
         return;
@@ -2840,7 +2844,7 @@ function App() {
     window.addEventListener('keyup', onUp);
     window.addEventListener('blur', onBlur);
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); };
-  }, [act, setDrawView, stRef, uiRef]);
+  }, [act, setDrawView, stRef, uiRef, studio.showToast]);
 
   if (!state) {
     return <div className="h-full flex items-center justify-center font-ui text-[#6B665C]">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
