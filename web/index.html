@@ -768,25 +768,89 @@ function HotspotBox({ h, mode, selected, onSelect, onTap, onEdit }) {
 }
 
 // ===== Section 5: Chrome =====
-function TabSwitch() {
-  const { state, act } = useS();
-  const tabs = [['web', 'Web'], ['story', 'Story'], ['draw', 'Draw'], ['doc', 'Doc']];
+// ---- Top bar (§8.1): wordmark, project menu, Canvas | DESIGN.md, agent pill, undo/redo, preview, export, skills ----
+function useOutsideClose(open, setOpen) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    window.addEventListener('pointerdown', down);
+    return () => window.removeEventListener('pointerdown', down);
+  }, [open, setOpen]);
+  return ref;
+}
+
+function BarButton({ title, onClick, children, active, disabled, className }) {
   return (
-    <div className="inline-flex rounded overflow-hidden border border-white/15">
-      {tabs.map(([t, l]) => (
-        <button key={t} type="button" onClick={() => act('set_tab', { tab: t })}
-          className={'px-3 h-7 text-[12px] ' + (state.view.tab === t ? 'bg-[#F4EFE6] text-[#232220] font-semibold' : 'text-[#F4EFE6] hover:bg-white/10')}>{l}</button>
-      ))}
+    <button type="button" title={title} disabled={disabled} onClick={onClick}
+      className={'h-[30px] px-2.5 rounded-lg text-[12px] inline-flex items-center gap-1.5 whitespace-nowrap ' + (active ? 'bg-[#F4F2EC] text-ink' : 'text-[#F4F2EC] hover:bg-white/10') + ' ' + (className || '')}>
+      {children}
+    </button>
+  );
+}
+
+function ProjectMenu() {
+  const { state, act } = useS();
+  const [open, setOpen] = useState(false);
+  const ref = useOutsideClose(open, setOpen);
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)} title="Project" className="h-[30px] px-2.5 rounded-lg inline-flex items-center gap-2 text-[13px] text-[#D8D4CA] hover:bg-white/10">
+        <span className="opacity-50">/</span><span className="text-[#F4F2EC] font-medium">{state.name || 'project'}</span><span className="opacity-50 text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-9 w-64 ac-float py-1 z-[60] text-ink">
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F3F2EF] text-[12px]"
+            onClick={() => { setOpen(false); if (window.confirm('Replace the whole project with the Hearth sample? Your current project and every undo history are cleared.')) act('reset_project', { template: 'sample' }); }}>
+            Load the Hearth sample…
+          </button>
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#FBE8E3] text-[12px] text-warn"
+            onClick={() => { setOpen(false); if (window.confirm('Start over with a blank project? Your current project and every undo history are cleared.')) act('reset_project', {}); }}>
+            Start over (blank)…
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function TopBar() {
+  const { state, act, agent, ui, setUi } = useS();
+  const v = state.view, tab = v.tab, p = state.project;
+  const h = state.history[tab] || {};
+  const lastCanvasTab = useRef('web');
+  useEffect(() => { if (tab !== 'doc') lastCanvasTab.current = tab; }, [tab]);
+  const cur = findNode(p, v.entered) || (v.selection && v.selection.nodeId ? findNode(p, v.selection.nodeId) : null) || findNode(p, tab === 'story' ? v.currentNodeId.mobile : v.currentNodeId.web);
+  const play = !!(cur && cur.kind === 'screen');
+  return (
+    <header className="h-11 flex-none flex items-center gap-2 px-3 bg-bar text-[#F4F2EC] select-none relative z-[50]">
+      <span className="font-serif text-[15px] font-semibold tracking-tight pl-1">AgentCanvas</span>
+      <ProjectMenu />
+      <DarkSeg value={tab === 'doc' ? 'doc' : 'canvas'} onChange={x => act('set_tab', { tab: x === 'doc' ? 'doc' : lastCanvasTab.current })}
+        options={[{ value: 'canvas', label: 'Canvas' }, { value: 'doc', label: 'DESIGN.md' }]} />
+      <div className="flex-1" />
+      {agent && (
+        <span className="inline-flex items-center gap-2 h-7 px-2.5 rounded-full bg-white/[.08] text-[#D8D4CA] text-[12px] max-w-[360px]" title={agent}>
+          <span className="w-[7px] h-[7px] rounded-full flex-none" style={{ background: '#5FB37A', boxShadow: '0 0 0 3px rgba(95,179,122,.25)' }} />
+          <span className="truncate">{agent}</span>
+        </span>
+      )}
+      <IssueBadge />
+      <BarButton title={`Undo (${MOD}Z)`} disabled={!h.canUndo} onClick={() => act('undo', { tab })}>↶</BarButton>
+      <BarButton title={`Redo (${MOD}⇧Z)`} disabled={!h.canRedo} onClick={() => act('redo', { tab })}>↷</BarButton>
+      {tab !== 'doc' && <BarButton title={play ? 'Play the current flow (Esc exits)' : 'Preview the current page (Esc exits)'} onClick={() => act('set_preview', { on: true })}>▶ {play ? 'Play' : 'Preview'}</BarButton>}
+      <ExportMenu />
+      <BarButton active={ui.skillsOpen} title="Installed skills" onClick={() => setUi(u => ({ ...u, skillsOpen: !u.skillsOpen }))}>Skills · {state.skills.length}</BarButton>
+    </header>
   );
 }
 
 function DarkSeg({ options, value, onChange }) {
   return (
-    <div className="inline-flex rounded overflow-hidden border border-white/15">
+    <div className="inline-flex rounded-lg bg-white/[.06] p-0.5">
       {options.map(o => (
         <button key={o.value} type="button" title={o.title} onClick={() => onChange(o.value)}
-          className={'px-2 h-7 text-[12px] ' + (value === o.value ? 'bg-[#F4EFE6] text-[#232220]' : 'text-[#F4EFE6] hover:bg-white/10')}>{o.label}</button>
+          className={'px-2.5 h-[26px] text-[12px] rounded-md font-medium ' + (value === o.value ? 'bg-[#F4F2EC] text-ink' : 'text-[#B9B5AB] hover:text-[#F4F2EC]')}>{o.label}</button>
       ))}
     </div>
   );
@@ -798,102 +862,18 @@ function IssueBadge() {
   const n = state.openIssues;
   return (
     <button type="button" title="Open issues — show in Review"
-      onClick={() => setUi(u => ({ ...u, inspectorTab: 'review', reviewFilter: { kind: 'issue', status: 'open' }, skillsOpen: false }))}
-      className="h-7 px-2 rounded inline-flex items-center gap-1.5 text-[12px] text-[#F4EFE6] hover:bg-white/10">
+      onClick={() => setUi(u => ({ ...u, leftOpen: true, leftTab: 'review', reviewFilter: { kind: 'issue', status: 'open' }, skillsOpen: false }))}
+      className="h-[30px] px-2 rounded-lg inline-flex items-center gap-1.5 text-[12px] text-[#F4F2EC] hover:bg-white/10">
       <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F4EFE6' }}>{n}</span>
       <span>open {n === 1 ? 'issue' : 'issues'}</span>
     </button>
   );
 }
 
-function AnnotateControls() {
-  const { state, act, ui, setUi } = useS();
-  return (
-    <>
-      <IconButton dark active={ui.tool === 'pin'} title="Pin: click to place a note (Esc to stop)" onClick={() => setUi(u => ({ ...u, tool: u.tool === 'pin' ? 'select' : 'pin' }))}>Annotate</IconButton>
-      {ui.tool === 'pin' && (
-        <DarkSeg value={ui.pinKind} onChange={k => setUi(u => ({ ...u, pinKind: k }))}
-          options={PIN_KINDS.map(k => ({ value: k, label: PIN_GLYPH[k] + ' ' + PIN_NAME[k] }))} />
-      )}
-      <IconButton dark active={state.view.showPins} title="Show pins while designing" onClick={() => act('set_toggles', { showPins: !state.view.showPins })}>Show pins</IconButton>
-    </>
-  );
-}
-
-function TopBar() {
-  const { state, act, agent, ui, setUi, viewport } = useS();
-  const v = state.view, tab = v.tab;
-  const h = state.history[tab] || {};
-  const sep = <span className="w-px h-5 bg-white/15 mx-1" />;
-  let ctx = null;
-  if (tab === 'web' || tab === 'story') {
-    const vt = tab === 'web' ? v.view.web : v.view.story;
-    ctx = (
-      <>
-        <DarkSeg value={vt} onChange={x => act('set_view', { tab, view: x })} options={[{ value: 'page', label: 'Page' }, { value: 'board', label: 'Storyboard' }]} />
-        {tab === 'web' && <DarkSeg value={v.breakpoint} onChange={b => act('set_breakpoint', { breakpoint: b })}
-          options={[{ value: 'desktop', label: '1280', title: 'Desktop 1280' }, { value: 'tablet', label: '768', title: 'Tablet 768' }, { value: 'phone', label: '390', title: 'Phone 390' }]} />}
-        {tab === 'web' && <IconButton dark active={v.showGrid} title="12-column grid overlay" onClick={() => act('set_toggles', { showGrid: !v.showGrid })}>Grid</IconButton>}
-        <IconButton dark active={v.showSpecs} title="Specs overlay (px sizes on the selection)" onClick={() => act('set_toggles', { showSpecs: !v.showSpecs })}>Specs</IconButton>
-        <IconButton dark title={tab === 'web' ? 'Preview the current page (Esc exits)' : 'Play the current flow (Esc exits)'} onClick={() => act('set_preview', { on: true })}>
-          {tab === 'web' ? '▶ Preview' : '▶ Play'}
-        </IconButton>
-        {sep}
-        <AnnotateControls />
-      </>
-    );
-  } else if (tab === 'draw') {
-    const tools = [['select', 'Select', 'V'], ['hand', 'Hand', 'H'], ['rect', 'Rect', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['arrow', 'Arrow', 'A'], ['text', 'Text', 'T'], ['pen', 'Pen', 'P']];
-    ctx = (
-      <>
-        <DarkSeg value={ui.tool} onChange={t => setUi(u => ({ ...u, tool: t }))} options={tools.map(([value, label, k]) => ({ value, label, title: label + ' (' + k + ')' }))} />
-        {sep}
-        <IconButton dark title="Zoom out" onClick={() => viewport.zoomBy(1 / 1.25)}>−</IconButton>
-        <span className="text-[12px] text-[#F4EFE6] w-12 tabular-nums text-center">{Math.round(viewport.view.zoom * 100)}%</span>
-        <IconButton dark title="Zoom in" onClick={() => viewport.zoomBy(1.25)}>+</IconButton>
-        {sep}
-        <AnnotateControls />
-      </>
-    );
-  } else {
-    ctx = (
-      <>
-        <span className="text-[12px] text-[#F4EFE6]/80 px-1 tabular-nums">{wordCount(state.project.doc.markdown)} words</span>
-        <IconButton dark title="Download DESIGN.md with generated appendices" onClick={() => downloadExport('design-md')}>Export DESIGN.md</IconButton>
-      </>
-    );
-  }
-  return (
-    <header className="h-12 flex-none flex items-center gap-2 px-3 bg-[#232220] text-[#F4EFE6] select-none relative z-[50]">
-      <span className="font-serif text-[15px] font-semibold mr-1 tracking-tight">AgentCanvas</span>
-      <TabSwitch />
-      {sep}
-      <div className="flex items-center gap-1.5 min-w-0">{ctx}<IssueBadge /></div>
-      <div className="flex-1" />
-      {agent && (
-        <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#3A3835] text-[#F4EFE6] text-[11px] max-w-[360px]" title={agent}>
-          <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: V }} />
-          <span className="truncate">Agent · {agent}</span>
-        </span>
-      )}
-      <IconButton dark title={`Undo (${MOD}Z)`} disabled={!h.canUndo} onClick={() => act('undo', { tab })}>⟲</IconButton>
-      <IconButton dark title={`Redo (${MOD}⇧Z)`} disabled={!h.canRedo} onClick={() => act('redo', { tab })}>⟳</IconButton>
-      <ExportMenu />
-      <IconButton dark active={ui.skillsOpen} title="Installed skills" onClick={() => setUi(u => ({ ...u, skillsOpen: !u.skillsOpen }))}>Skills · {state.skills.length}</IconButton>
-    </header>
-  );
-}
-
 function ExportMenu() {
-  const { state, act, showToast } = useS();
+  const { state, showToast } = useS();
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    window.addEventListener('pointerdown', down);
-    return () => window.removeEventListener('pointerdown', down);
-  }, [open]);
+  const ref = useOutsideClose(open, setOpen);
   const p = state.project, v = state.view;
   const mnode = findNode(p, v.currentNodeId.mobile);
   const items = [
@@ -912,21 +892,12 @@ function ExportMenu() {
   ];
   return (
     <div className="relative" ref={ref}>
-      <IconButton dark active={open} title="Export" onClick={() => setOpen(o => !o)}>Export ▾</IconButton>
+      <BarButton active={open} title="Export" onClick={() => setOpen(o => !o)}>Export ▾</BarButton>
       {open && (
-        <div className="absolute right-0 top-9 w-64 bg-[#FBF8F2] text-[#232220] border border-[#DDD5C4] rounded shadow-lg py-1 z-[60]">
+        <div className="absolute right-0 top-9 w-64 ac-float text-ink py-1 z-[60]">
           {items.map(([label, fn]) => (
-            <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#EFE8DB] text-[12px]">{label}</button>
+            <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#F3F2EF] text-[12px]">{label}</button>
           ))}
-          <div className="h-px bg-[#DDD5C4] my-1" />
-          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#EFE8DB] text-[12px]"
-            onClick={() => { setOpen(false); if (window.confirm('Replace the whole project with the Hearth sample? Your current project and every undo history are cleared.')) act('reset_project', { template: 'sample' }); }}>
-            Load the Hearth sample…
-          </button>
-          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F7DDD7] text-[12px] text-[#9A2C19]"
-            onClick={() => { setOpen(false); if (window.confirm('Start over with a blank project? Your current project and every undo history are cleared.')) act('reset_project', {}); }}>
-            Start over (blank)…
-          </button>
         </div>
       )}
     </div>
