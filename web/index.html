@@ -674,10 +674,10 @@ function renderScreen(screen, ctx) {
   const s = ctx.selection;
   return <ScreenView key={screen.id} screen={screen} tokens={ctx.tokens} mode={ctx.mode}
     selHotspot={s && s.kind === 'hotspot' && s.nodeId === screen.id ? s.hotspotId : null}
-    onSelect={ctx.onSelect} onTap={ctx.onTap} onHotspotEdit={ctx.onHotspotEdit} />;
+    onSelect={ctx.onSelect} onTap={ctx.onTap} onHotspotEdit={ctx.onHotspotEdit} pxScale={ctx.pxScale || 1} />;
 }
 
-const ScreenView = memo(function ScreenView({ screen, tokens, mode, selHotspot, onSelect, onTap, onHotspotEdit }) {
+const ScreenView = memo(function ScreenView({ screen, tokens, mode, selHotspot, onSelect, onTap, onHotspotEdit, pxScale = 1 }) {
   const edit = mode === 'edit', play = mode === 'preview';
   const pad = SPACE[screen.pad] ?? 24, gap = SPACE[screen.gap] ?? 16;
   const fill = col(tokens, screen.fill), ink = col(tokens, screen.ink);
@@ -726,7 +726,7 @@ const ScreenView = memo(function ScreenView({ screen, tokens, mode, selHotspot, 
       )}
       {content}
       {screen.hotspots.map(h => (
-        <HotspotBox key={h.id} h={h} mode={mode} selected={selHotspot === h.id}
+        <HotspotBox key={h.id} h={h} mode={mode} selected={selHotspot === h.id} pxScale={pxScale}
           onSelect={() => onSelect && onSelect(screen.id, h.id)} onTap={() => onTap && onTap(h.toId)}
           onEdit={g => onHotspotEdit && onHotspotEdit(screen.id, h.id, g)} />
       ))}
@@ -734,7 +734,7 @@ const ScreenView = memo(function ScreenView({ screen, tokens, mode, selHotspot, 
   );
 });
 
-function HotspotBox({ h, mode, selected, onSelect, onTap, onEdit }) {
+function HotspotBox({ h, mode, selected, onSelect, onTap, onEdit, pxScale = 1 }) {
   const [drag, setDrag] = useState(null); // {x,y,w,h}
   const g = drag || h;
   if (mode === 'thumb') return null;
@@ -748,7 +748,7 @@ function HotspotBox({ h, mode, selected, onSelect, onTap, onEdit }) {
     const sx = e.clientX, sy = e.clientY, o = { x: h.x, y: h.y, w: h.w, h: h.h };
     let cur = o, moved = false;
     const move = ev => {
-      const dx = Math.round(ev.clientX - sx), dy = Math.round(ev.clientY - sy);
+      const dx = Math.round((ev.clientX - sx) * pxScale), dy = Math.round((ev.clientY - sy) * pxScale);
       if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
       cur = resize
         ? { ...o, w: clamp(o.w + dx, 8, PHONE_W - o.x), h: clamp(o.h + dy, 8, PHONE_H - o.y) }
@@ -1208,7 +1208,7 @@ function Layers() {
                     <LayerRow depth={1} on={isSel} dataAttr={{ 'data-layer-node': n.id }}
                       draggable onDragStart={() => setDragId(n.id)} onDragEnd={() => setDragId(null)} onDragOver={e => e.preventDefault()}
                       onDrop={e => { e.preventDefault(); if (dragId && p.nodes.find(x => x.id === dragId).flowId === f.id) reorder(f, nodes, dragId, n.id); setDragId(null); }}
-                      onClick={() => go(n, { kind: 'node', nodeId: n.id })} onDoubleClick={e => { e.stopPropagation(); act('set_entered', { nodeId: n.id }); if (canvasApi.current.fitNode) canvasApi.current.fitNode(n.id); }}>
+                      onClick={() => go(n, { kind: 'node', nodeId: n.id })} onDoubleClick={e => { e.stopPropagation(); act('set_entered', { nodeId: n.id }); }}>
                       <button type="button" className="w-3 text-[10px] text-faint" onClick={e => { e.stopPropagation(); setExpanded(x => ({ ...x, [n.id]: !open })); }}>{kids.length ? (open ? '▾' : '▸') : ''}</button>
                       <span className={'inline-block flex-none border-[1.5px] border-current rounded-[3px] opacity-60 ' + (n.kind === 'screen' ? 'w-[9px] h-[13px]' : 'w-[13px] h-[11px]')} />
                       <button type="button" title={f.startId === n.id ? 'Start of flow' : 'Set as start'} className={f.startId === n.id ? 'text-accent text-[11px]' : 'opacity-0 group-hover:opacity-100 text-faint hover:text-accent text-[11px]'}
@@ -2463,13 +2463,17 @@ function useViewport(ref, serverView, commit) {
 }
 
 // ---- Artboards (§8.2): one per node, real renderer, levels of detail, drag to place ----
-const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected, entered, dimmed, isStart, onDown, onDbl, onPortDown, children }) {
+const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected, entered, dimmed, isStart, onDown, onDbl, onPortDown, pinMode, sel, showGrid, showSpecs, children }) {
+  const { act } = useS();
   const k = 1 / zoom;
-  const flat = zoom < LOD_FLAT;
+  const flat = zoom < LOD_FLAT && !entered;
   const screen = node.kind === 'screen';
   const portY = Math.min(box.h, 400) / 2;
   let body;
-  if (flat) body = <div data-art-body={screen ? undefined : node.id} style={{ width: box.w, height: box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CH.muted, fontSize: 24 * k, fontFamily: SERIF }}>{node.name}</div>;
+  if (entered) body = screen
+    ? <EditScreen node={node} tokens={tokens} sel={sel} zoom={zoom} showSpecs={showSpecs} />
+    : <EditPage node={node} bp={bp} tokens={tokens} sel={sel} zoom={zoom} showGrid={showGrid} showSpecs={showSpecs} />;
+  else if (flat) body = <div data-art-body={screen ? undefined : node.id} style={{ width: box.w, height: box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CH.muted, fontSize: 24 * k, fontFamily: SERIF }}>{node.name}</div>;
   else if (screen) body = <div data-art-body={undefined} style={{ width: PHONE_W, height: PHONE_H, position: 'relative', overflow: 'hidden', borderRadius: 18, background: tokens.colors.paper }}>{renderScreen(node, { tokens, mode: entered ? 'edit' : 'thumb' })}</div>;
   else body = (
     <div data-art-body={node.id} style={{ width: box.w, background: tokens.colors.paper, minHeight: 240 }}>
@@ -2479,8 +2483,10 @@ const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected,
   );
   return (
     <div data-art-id={node.id} className={'ac-art' + (dimmed ? ' ac-dim' : '')} onPointerDown={onDown} onDoubleClick={onDbl}
+      onClickCapture={pinMode ? e => e.stopPropagation() : undefined}
+      onClick={entered ? e => { e.stopPropagation(); if (!e.target.closest('[data-block-id], [data-hotspot-id], [data-cta], .ac-pin, .ac-pop')) act('set_selection', { selection: { kind: 'node', nodeId: node.id } }); } : undefined}
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: screen ? 18 : 0, overflow: screen ? 'hidden' : 'visible', cursor: entered ? 'default' : 'pointer',
-        outline: selected ? `${2 * k}px solid ${V}` : undefined, zIndex: entered ? 3 : 2 }}>
+        outline: selected && !entered ? `${2 * k}px solid ${V}` : undefined, zIndex: entered ? 5 : 2 }}>
       {/* name label: anchored 6 screen px above the artboard, counter-scaled */}
       <div style={{ position: 'absolute', left: 0, top: -6 * k, height: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${k})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', font: '500 12px/16px Inter, sans-serif', color: selected ? V : CH.ink, display: 'flex', gap: 6, alignItems: 'baseline' }}>
@@ -2489,7 +2495,7 @@ const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected,
           {!screen && <span style={{ color: CH.faint, fontSize: 11 }}>{box.w}</span>}
         </div>
       </div>
-      <div style={{ pointerEvents: entered ? 'auto' : 'none', overflow: screen ? 'visible' : 'hidden', height: screen ? undefined : box.h }}>{body}</div>
+      <div style={{ pointerEvents: entered ? 'auto' : 'none', overflow: screen || entered ? 'visible' : 'hidden', height: screen || entered ? undefined : box.h }}>{body}</div>
       {children}
       <span data-port="in" title="Input" style={{ position: 'absolute', left: -5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: '#fff', border: `${1.5 * k}px solid ${CH.edge}`, zIndex: 4 }} />
       <span data-port="out" title="Drag to connect" onPointerDown={e => onPortDown && onPortDown(e, node, portY)} style={{ position: 'absolute', left: box.w - 5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: V, border: `${1.5 * k}px solid #fff`, boxShadow: `0 0 0 ${1 * k}px ${V}`, zIndex: 4, cursor: 'crosshair' }} />
@@ -2520,7 +2526,7 @@ function useArtboardHeights(worldRef, idsKey) {
   return heights;
 }
 
-function Artboards({ layout, zoom, bp, tokens, nodes, flows, sel, entered, tool, annotateDown, pinsFor, onPortDown }) {
+function Artboards({ layout, zoom, bp, tokens, nodes, flows, sel, entered, tool, annotateDown, pinsFor, onPortDown, showGrid, showSpecs }) {
   const { act, viewport } = useS();
   const [drag, setDrag] = useState(null); // {id, x, y}
   const startByFlow = useMemo(() => Object.fromEntries(flows.map(f => [f.id, f.startId])), [flows]);
@@ -2554,7 +2560,7 @@ function Artboards({ layout, zoom, bp, tokens, nodes, flows, sel, entered, tool,
     return (
       <Artboard key={n.id} node={n} box={box} zoom={zoom} bp={bp} tokens={tokens} isStart={startByFlow[n.flowId] === n.id}
         selected={!!(sel && sel.nodeId === n.id && (sel.kind === 'node' || sel.kind === 'block' || sel.kind === 'hotspot'))}
-        entered={entered === n.id} dimmed={!!entered && entered !== n.id}
+        entered={entered === n.id} dimmed={!!entered && entered !== n.id} pinMode={tool === 'pin'} sel={entered === n.id ? sel : null} showGrid={showGrid} showSpecs={showSpecs}
         onDown={e => onDown(e, n)} onDbl={e => { e.stopPropagation(); if (entered !== n.id) act('set_entered', { nodeId: n.id }); }} onPortDown={onPortDown}>
         {pinsFor ? pinsFor(n, box) : null}
       </Artboard>
@@ -2827,6 +2833,126 @@ function ArtboardPins({ node, box, zoom, entered }) {
   return <div ref={ref} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><PinsLayer items={items} scale={1 / zoom} /></div>;
 }
 
+// ---- Edit in place (§8.3, §8.4): the entered artboard renders the real editors ----
+function EditPage({ node, bp, tokens, sel, zoom, showGrid, showSpecs }) {
+  const { act, state } = useS();
+  const frameRef = useRef(null);
+  const stRef = useLatest(state);
+  const [drop, setDrop] = useState(null); // {index, y} in artboard px
+  const onSelect = useCallback((nodeId, blockId, childId) => {
+    const s = stRef.current.view.selection;
+    if (childId && s && s.kind === 'block' && s.blockId === blockId && s.childId === childId) childId = null;
+    act('set_selection', { selection: childId ? { kind: 'block', nodeId, blockId, childId } : { kind: 'block', nodeId, blockId } });
+  }, [act, stRef]);
+  // drag the block chip to reorder (one history step on release); screen px are divided by zoom for the drop line
+  const onChipDown = useCallback((e, blockId) => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const n = findNode(stRef.current.project, node.id);
+    const ids = n.blocks.map(b => b.id);
+    const from = ids.indexOf(blockId);
+    const z = zoom;
+    let index = from;
+    const move = ev => {
+      const fr = frame.getBoundingClientRect();
+      const secs = [...frame.querySelectorAll('section[data-block-id]')];
+      let i = secs.length, y = 0;
+      for (let k = 0; k < secs.length; k++) { const r = secs[k].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { i = k; break; } }
+      if (i < secs.length) y = (secs[i].getBoundingClientRect().top - fr.top) / z; else if (secs.length) y = (secs[secs.length - 1].getBoundingClientRect().bottom - fr.top) / z;
+      index = i;
+      setDrop({ index: i, y });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      setDrop(null);
+      const to = index > from ? index - 1 : index;
+      if (to !== from && to >= 0) { const next = ids.filter(x => x !== blockId); next.splice(to, 0, blockId); act('reorder_blocks', { nodeId: node.id, blockIds: next }); }
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }, [act, node.id, stRef, zoom]);
+  const ctx = { tokens, bp, mode: 'edit', nodeId: node.id, selection: sel, onSelect, showSpecs, onChipDown };
+  return (
+    <div ref={frameRef} data-art-body={node.id} className="ac-edit" style={{ width: BREAKPOINTS[bp], background: tokens.colors.paper, minHeight: 240, position: 'relative' }}>
+      {node.blocks.map(b => renderBlock(b, ctx))}
+      {!node.blocks.length && <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', font: '13px Inter, sans-serif', color: CH.muted }}>Empty page — use + Add block above, or ask your agent to design it.</div>}
+      {showGrid && <GridOverlay bp={bp} />}
+      {drop && <div style={{ position: 'absolute', left: 0, right: 0, top: drop.y - 1, height: 2, background: V, zIndex: 35 }} />}
+    </div>
+  );
+}
+
+function EditScreen({ node, tokens, sel, zoom, showSpecs }) {
+  const { act } = useS();
+  const screenRef = useRef(null);
+  const onSelect = useCallback((nodeId, hotspotId) => act('set_selection', { selection: hotspotId ? { kind: 'hotspot', nodeId, hotspotId } : { kind: 'node', nodeId } }), [act]);
+  const onHotspotEdit = useCallback((nodeId, hotspotId, g) => act('upsert_hotspot', { nodeId, hotspotId, ...g }), [act]);
+  const mine = sel && sel.nodeId === node.id && (sel.kind === 'node' || sel.kind === 'hotspot');
+  return (
+    <div ref={screenRef} className="ac-edit" style={{ width: PHONE_W, height: PHONE_H, position: 'relative', overflow: 'hidden', borderRadius: 18, background: tokens.colors.paper }}>
+      {renderScreen(node, { tokens, mode: 'edit', selection: sel, onSelect, onHotspotEdit, pxScale: 1 / zoom })}
+      {mine && <div style={{ position: 'absolute', inset: 0, boxShadow: `inset 0 0 0 ${2 / zoom}px ${V}`, pointerEvents: 'none', zIndex: 12, borderRadius: 18 }} />}
+      {showSpecs && <SpecsOverlay containerRef={screenRef} childId={null} padTop={SPACE[node.pad]} padLeft={SPACE[node.pad]} gap={SPACE[node.gap]} sig={JSON.stringify([node, tokens.type])} />}
+    </div>
+  );
+}
+
+// Floating toolbar above the selected or entered artboard (screen space).
+function ContextToolbar({ node, box, view, canvasW }) {
+  const { state, act, setUi } = useS();
+  const v = state.view, p = state.project;
+  const [menu, setMenu] = useState(null); // 'add' | 'more'
+  const ref = useOutsideClose(!!menu, () => setMenu(null));
+  const page = node.kind === 'page';
+  const flow = findFlow(p, node.flowId);
+  const selBlock = v.selection && v.selection.kind === 'block' && v.selection.nodeId === node.id ? v.selection.blockId : null;
+  const cx = view.x + (box.x + box.w / 2) * view.zoom;
+  const top = Math.max(8, view.y + box.y * view.zoom - 46);
+  const W = 520;
+  const left = clamp(cx - W / 2, 8, Math.max(8, canvasW - W - 8));
+  const Btn = ({ title, onClick, on, children }) => <button type="button" title={title} onClick={onClick} className={'h-[26px] px-2 rounded-md text-[12px] font-medium inline-flex items-center gap-1 whitespace-nowrap ' + (on ? 'bg-ink text-white' : 'text-muted hover:bg-[#F3F2EF] hover:text-ink')}>{children}</button>;
+  const Sep = () => <span className="w-px h-[18px] bg-hair mx-0.5" />;
+  const MenuBox = ({ children }) => <div className="ac-float py-1 text-ink" style={{ position: 'absolute', left: 0, top: 36, minWidth: 180, zIndex: 5 }}>{children}</div>;
+  const Item = ({ onClick, children, danger }) => <button type="button" onClick={() => { setMenu(null); onClick(); }} className={'w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F3F2EF] ' + (danger ? 'text-warn' : '')}>{children}</button>;
+  const delNode = () => {
+    const pins = p.pins.filter(x => x.target.nodeId === node.id).length;
+    const has = (page ? node.blocks.length : 1) + pins;
+    if (!has || window.confirm(`Delete "${node.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) act('delete_node', { nodeId: node.id });
+  };
+  return (
+    <div ref={ref} data-context-toolbar="1" className="ac-float font-ui" style={{ position: 'absolute', left, top, height: 34, display: 'flex', alignItems: 'center', gap: 2, padding: '0 4px', zIndex: 32, width: 'max-content', maxWidth: W }}>
+      {page && <Seg small value={v.breakpoint} onChange={b => act('set_breakpoint', { breakpoint: b })} options={[{ value: 'desktop', label: '1280' }, { value: 'tablet', label: '768' }, { value: 'phone', label: '390' }]} />}
+      {page && <Sep />}
+      {page && <Btn title="12-column grid overlay" on={v.showGrid} onClick={() => act('set_toggles', { showGrid: !v.showGrid })}>Grid</Btn>}
+      <Btn title="Specs overlay (px sizes on the selection)" on={v.showSpecs} onClick={() => act('set_toggles', { showSpecs: !v.showSpecs })}>Specs</Btn>
+      <Sep />
+      <Btn title={page ? 'Preview this page (Esc exits)' : 'Play this flow (Esc exits)'} onClick={() => act('set_selection', { selection: { kind: 'node', nodeId: node.id } }).then(() => act('set_preview', { on: true }))}>▶ {page ? 'Preview' : 'Play'}</Btn>
+      <div className="relative">
+        <Btn title={page ? 'Insert a block after the selection' : 'Add a screen after this one'} on={menu === 'add'} onClick={() => setMenu(m => (m === 'add' ? null : 'add'))}>+ {page ? 'Add block' : 'Add screen'} ▾</Btn>
+        {menu === 'add' && (
+          <MenuBox>
+            {page
+              ? BLOCK_TYPES.map(t => <Item key={t} onClick={() => act('insert_block', { nodeId: node.id, type: t, afterBlockId: selBlock || undefined })}>{BLOCK_LABEL[t]}</Item>)
+              : ARCHETYPES.map(a => <Item key={a} onClick={() => act('upsert_node', { flowId: node.flowId, archetype: a, afterId: node.id })}>{ARCH_LABEL[a]}</Item>)}
+          </MenuBox>
+        )}
+      </div>
+      {page && selBlock && <Btn title={`Duplicate the selected block (${MOD}D)`} onClick={() => act('duplicate_block', { nodeId: node.id, blockId: selBlock })}>Duplicate</Btn>}
+      {!page && <Btn title="Add a hotspot" onClick={() => act('upsert_hotspot', { nodeId: node.id })}>+ Hotspot</Btn>}
+      <div className="relative">
+        <Btn title="More" on={menu === 'more'} onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}>⋯</Btn>
+        {menu === 'more' && (
+          <MenuBox>
+            <Item onClick={() => { setUi(u => ({ ...u, inspectorOpen: true, inspectorTab: 'content' })); requestAnimationFrame(() => { const el = document.querySelector('aside[style*="right"] input'); if (el) { el.focus(); el.select(); } }); }}>Rename…</Item>
+            {flow && flow.startId !== node.id && <Item onClick={() => act('upsert_flow', { id: flow.id, startId: node.id })}>Set as start of {flow.name}</Item>}
+            {v.entered === node.id ? <Item onClick={() => act('set_entered', { nodeId: '' })}>Leave (Esc)</Item> : <Item onClick={() => act('set_entered', { nodeId: node.id })}>Enter (Enter)</Item>}
+            <Item danger onClick={delNode}>Delete {page ? 'page' : 'screen'}</Item>
+          </MenuBox>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // The infinite canvas: dot grid, world transform, groups and artboards.
 function Canvas({ spaceHeld }) {
   const { state, act, ui, setUi, viewport, canvasRef, canvasApi } = useS();
@@ -2854,6 +2980,19 @@ function Canvas({ spaceHeld }) {
   }, [viewport.onWheel]); // eslint-disable-line
   const sel = v.selection, entered = v.entered;
   const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
+  // entering fits the artboard and remembers the view; leaving restores it (also when an agent enters or leaves)
+  const prevViewRef = useRef(null), enteredRef = useRef(entered);
+  useEffect(() => {
+    const was = enteredRef.current; enteredRef.current = entered;
+    if (entered && layout.pos[entered]) {
+      if (!was) prevViewRef.current = { ...viewport.ref.current };
+      autoFit.current = false;
+      viewport.fitTo(layout.pos[entered], 100, true);
+    } else if (!entered && was && prevViewRef.current) {
+      const pv = prevViewRef.current; prevViewRef.current = null;
+      viewport.animate(); viewport.set(() => pv, true);
+    }
+  }, [entered]); // eslint-disable-line
   useEffect(() => {
     canvasApi.current.fitAll = () => { autoFit.current = false; viewport.fitTo(layout.bounds, 80, true); };
     canvasApi.current.fitNode = id => { const b = layout.pos[id]; if (b) { autoFit.current = false; viewport.fitTo(b, 120, true); } };
@@ -2912,7 +3051,7 @@ function Canvas({ spaceHeld }) {
       const sx = e.clientX, sy = e.clientY, o = viewport.ref.current;
       let moved = false;
       const move = ev => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return; moved = true; autoFit.current = false; viewport.set(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy }), false); };
-      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); if (moved) viewport.set(x => x, true); else if (bg && v.selection && tool === 'select') act('set_selection', { selection: null }); };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); if (moved) viewport.set(x => x, true); else if (bg && tool === 'select') { if (entered) act('set_entered', { nodeId: '' }); else if (v.selection) act('set_selection', { selection: null }); } };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
     }
   };
@@ -2931,8 +3070,9 @@ function Canvas({ spaceHeld }) {
         <div style={{ position: 'absolute', left: layout.diagram.x, top: layout.diagram.y, width: 0, height: 0, zIndex: 40 }}><PinsLayer items={drawPinItems} scale={1 / view.zoom} /></div>
         <Connectors layout={layout} edges={p.edges} zoom={view.zoom} sel={sel} drag={edgeDrag} />
         <Artboards layout={layout} zoom={view.zoom} bp={bp} tokens={tokens} nodes={p.nodes} flows={p.flows} sel={sel} entered={entered} tool={tool} annotateDown={annotateDown}
-          pinsFor={(n, box) => <ArtboardPins node={n} box={box} zoom={view.zoom} entered={entered === n.id} />} onPortDown={onPortDown} />
+          pinsFor={(n, box) => <ArtboardPins node={n} box={box} zoom={view.zoom} entered={entered === n.id} />} onPortDown={onPortDown} showGrid={v.showGrid} showSpecs={v.showSpecs} />
       </div>
+      {(() => { const id = entered || (sel && sel.nodeId && (sel.kind === 'node' || sel.kind === 'block' || sel.kind === 'hotspot') ? sel.nodeId : null); const n = id && findNode(p, id); const b = n && layout.pos[n.id]; return n && b && tool === 'select' && !edgeDrag ? <ContextToolbar node={n} box={b} view={view} canvasW={canvasRef.current ? canvasRef.current.clientWidth : window.innerWidth} /> : null; })()}
       {/* pin being placed: screen space so it keeps its size */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 45 }}><PinsLayer items={[]} draft={draft} onDraftDone={() => setDraft(null)} /></div>
       {pending && (
@@ -2944,168 +3084,6 @@ function Canvas({ spaceHeld }) {
   );
 }
 window.__ac = Object.assign(window.__ac || {}, { layoutCanvas, laneOrder });
-
-function WebPage({ node }) {
-  const { state, act, ui } = useS();
-  const p = state.project, v = state.view, bp = v.breakpoint;
-  const frameRef = useRef(null), scrollRef = useRef(null);
-  const stRef = useLatest(state);
-  const [drop, setDrop] = useState(null); // {index, y}
-  const [draft, setDraft] = useState(null);
-  const [rects] = useRects(frameRef, 'data-block-id', JSON.stringify([node, bp, p.tokens]));
-  const sel = v.selection;
-
-  const onSelect = useCallback((nodeId, blockId, childId) => {
-    const s = stRef.current.view.selection;
-    if (childId && s && s.kind === 'block' && s.blockId === blockId && s.childId === childId) childId = null;
-    act('set_selection', { selection: childId ? { kind: 'block', nodeId, blockId, childId } : { kind: 'block', nodeId, blockId } });
-  }, [act, stRef]);
-
-  // drag the block chip to reorder (one history step on release)
-  const onChipDown = useCallback((e, blockId) => {
-    const frame = frameRef.current;
-    if (!frame) return;
-    const n = findNode(stRef.current.project, node.id);
-    const ids = n.blocks.map(b => b.id);
-    const from = ids.indexOf(blockId);
-    let index = from;
-    const move = ev => {
-      const fr = frame.getBoundingClientRect();
-      const secs = [...frame.querySelectorAll('section[data-block-id]')];
-      let i = secs.length, y = 0;
-      for (let k = 0; k < secs.length; k++) { const r = secs[k].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { i = k; break; } }
-      if (i < secs.length) y = secs[i].getBoundingClientRect().top - fr.top; else if (secs.length) y = secs[secs.length - 1].getBoundingClientRect().bottom - fr.top;
-      index = i;
-      setDrop({ index: i, y });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
-      setDrop(null);
-      let to = index > from ? index - 1 : index;
-      if (to !== from && to >= 0) {
-        const next = ids.filter(x => x !== blockId);
-        next.splice(to, 0, blockId);
-        act('reorder_blocks', { nodeId: node.id, blockIds: next });
-      }
-    };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
-  }, [act, node.id, stRef]);
-
-  useEffect(() => {
-    if (sel && sel.kind === 'block' && sel.nodeId === node.id && frameRef.current) {
-      const el = frameRef.current.querySelector(`[data-block-id="${sel.blockId}"]`);
-      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [sel && sel.blockId, node.id]); // eslint-disable-line
-
-  const onAnnotate = e => {
-    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
-    e.stopPropagation(); e.preventDefault();
-    const fr = frameRef.current.getBoundingClientRect();
-    const sec = e.target.closest('[data-block-id]');
-    const box = (sec || frameRef.current).getBoundingClientRect();
-    const target = sec ? { type: 'node', nodeId: node.id, blockId: sec.getAttribute('data-block-id') } : { type: 'node', nodeId: node.id };
-    setDraft({ left: e.clientX - fr.left, top: e.clientY - fr.top, target, x: (e.clientX - box.left) / box.width, y: (e.clientY - box.top) / box.height });
-  };
-
-  const frameW = frameRef.current ? frameRef.current.offsetWidth : BREAKPOINTS[bp];
-  const frameH = frameRef.current ? frameRef.current.offsetHeight : 0;
-  const pinItems = p.pins.filter(x => x.target.type === 'node' && x.target.nodeId === node.id && pinVisible(x, state, ui)).map(x => {
-    const r = x.target.blockId && rects[x.target.blockId];
-    const box = r || { x: 0, y: 0, w: frameW, h: frameH };
-    return {
-      pin: x, left: box.x + x.x * box.w, top: box.y + x.y * box.h,
-      coords: (cx, cy) => {
-        const fr = frameRef.current.getBoundingClientRect();
-        const rr = (x.target.blockId && rects[x.target.blockId]) || { x: 0, y: 0, w: fr.width, h: fr.height };
-        return { x: clamp((cx - fr.left - rr.x) / rr.w, 0, 1), y: clamp((cy - fr.top - rr.y) / rr.h, 0, 1) };
-      },
-    };
-  }).filter(it => it.pin.target.blockId ? rects[it.pin.target.blockId] : true);
-
-  const ctx = { tokens: p.tokens, bp, mode: 'edit', nodeId: node.id, selection: sel, onSelect, showSpecs: v.showSpecs, onChipDown };
-  return (
-    <div ref={scrollRef} className="absolute inset-0 overflow-auto ac-scroll" onClick={() => { if (sel && !ui.annotate) act('set_selection', { selection: null }); }}>
-      <div className="py-8 px-6 min-w-max">
-        <div className="text-[11px] text-[#6B665C] mb-2 mx-auto flex justify-between" style={{ width: BREAKPOINTS[bp] }}>
-          <span>{(findFlow(p, node.flowId) || {}).name} › <b className="text-[#232220]">{node.name}</b></span><span>{BREAKPOINTS[bp]}px</span>
-        </div>
-        <div ref={frameRef} className={'ac-frame ac-edit relative mx-auto shadow-[0_10px_40px_rgba(28,27,25,.18)] ' + (ui.annotate ? 'ac-annotate' : '')}
-          style={{ width: BREAKPOINTS[bp], background: p.tokens.colors.paper, minHeight: 240 }}
-          onClickCapture={onAnnotate} onClick={e => { e.stopPropagation(); if (!ui.annotate) act('set_selection', { selection: { kind: 'node', nodeId: node.id } }); }}>
-          {node.blocks.map(b => renderBlock(b, ctx))}
-          {!node.blocks.length && <div className="h-60 flex items-center justify-center text-[13px] font-ui text-[#6B665C]">Empty page — add blocks from the Palette, or ask your agent to design it.</div>}
-          {v.showGrid && <GridOverlay bp={bp} />}
-          {drop && <div style={{ position: 'absolute', left: 0, right: 0, top: drop.y - 1, height: 2, background: V, zIndex: 35 }} />}
-          <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StoryPage({ node }) {
-  const { state, act, ui } = useS();
-  const p = state.project, v = state.view, sel = v.selection;
-  const flow = findFlow(p, node.flowId);
-  const fnodes = flow ? laneOrder(flow, p.nodes, p.edges) : [node];
-  const screenRef = useRef(null);
-  const [draft, setDraft] = useState(null);
-  const [dragId, setDragId] = useState(null);
-  const onSelect = useCallback((nodeId, hotspotId) => {
-    act('set_selection', { selection: hotspotId ? { kind: 'hotspot', nodeId, hotspotId } : { kind: 'node', nodeId } });
-  }, [act]);
-  const onHotspotEdit = useCallback((nodeId, hotspotId, g) => act('upsert_hotspot', { nodeId, hotspotId, ...g }), [act]);
-  const onAnnotate = e => {
-    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
-    e.stopPropagation(); e.preventDefault();
-    const r = screenRef.current.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    if (x < 0 || y < 0 || x > 1 || y > 1) return;
-    setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target: { type: 'node', nodeId: node.id }, x, y });
-  };
-  const pinItems = p.pins.filter(x => x.target.type === 'node' && x.target.nodeId === node.id && pinVisible(x, state, ui)).map(x => ({
-    pin: x, left: x.x * PHONE_W, top: x.y * PHONE_H,
-    coords: (cx, cy) => { const r = screenRef.current.getBoundingClientRect(); return { x: clamp((cx - r.left) / r.width, 0, 1), y: clamp((cy - r.top) / r.height, 0, 1) }; },
-  }));
-  const specsSig = JSON.stringify([node, p.tokens.type]);
-  const reorder = (fromId, toId) => {
-    if (!flow || fromId === toId) return;
-    const ids = fnodes.map(n => n.id).filter(id => id !== fromId);
-    ids.splice(ids.indexOf(toId), 0, fromId);
-    act('reorder_nodes', { flowId: flow.id, nodeIds: ids });
-  };
-  return (
-    <div className="absolute inset-0 overflow-auto ac-scroll" onClick={() => { if (sel && !ui.annotate) act('set_selection', { selection: null }); }}>
-      <div className="py-6 flex flex-col items-center gap-5 min-w-max px-6">
-        <div className="text-[11px] text-[#6B665C]">{flow ? flow.name : ''} › <b className="text-[#232220]">{node.name}</b></div>
-        <Bezel flowNodes={fnodes} currentId={node.id}>
-          <div ref={screenRef} className={'ac-edit ' + (ui.annotate ? 'ac-annotate' : '')} style={{ position: 'absolute', inset: 0 }} onClickCapture={onAnnotate}>
-            {renderScreen(node, { tokens: p.tokens, mode: 'edit', selection: sel, onSelect, onHotspotEdit })}
-            {sel && sel.nodeId === node.id && (sel.kind === 'node' || sel.kind === 'hotspot') && <div style={{ position: 'absolute', inset: 0, boxShadow: `inset 0 0 0 2px ${V}`, pointerEvents: 'none', zIndex: 12, borderRadius: 40 }} />}
-            {v.showSpecs && <SpecsOverlay containerRef={screenRef} childId={null} padTop={SPACE[node.pad]} padLeft={SPACE[node.pad]} gap={SPACE[node.gap]} sig={specsSig} />}
-            <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
-          </div>
-        </Bezel>
-        <div className="flex items-start gap-2 pb-6" onClick={e => e.stopPropagation()}>
-          {fnodes.map(n => (
-            <div key={n.id} draggable onDragStart={() => setDragId(n.id)} onDragEnd={() => setDragId(null)}
-              onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragId) reorder(dragId, n.id); setDragId(null); }}
-              onClick={() => act('set_selection', { selection: { kind: 'node', nodeId: n.id } })} title={n.name}
-              className="flex flex-col items-center gap-1 cursor-pointer">
-              <div style={{ width: 60, height: 130, overflow: 'hidden', borderRadius: 6, boxShadow: n.id === node.id ? `0 0 0 2px ${V}` : '0 0 0 1px #CFC6B5', opacity: dragId === n.id ? 0.4 : 1, background: '#000' }}>
-                <div style={{ transform: `scale(${60 / PHONE_W})`, transformOrigin: '0 0', width: PHONE_W, pointerEvents: 'none' }}>{renderScreen(n, { tokens: p.tokens, mode: 'thumb' })}</div>
-              </div>
-              <span className="text-[10px] max-w-[64px] truncate">{flow && flow.startId === n.id ? '★ ' : ''}{n.name}</span>
-            </div>
-          ))}
-          <button type="button" title="Add a screen to this flow" onClick={() => flow && act('upsert_node', { flowId: flow.id })}
-            className="w-[60px] h-[130px] rounded-md border-2 border-dashed border-[#CFC6B5] text-[22px] text-[#6B665C] hover:border-[#232220] hover:text-[#232220]">+</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ---- Draw (§8.5) ----
 function shapeBox(s, tokens) {
@@ -3260,6 +3238,7 @@ function App() {
         if (typing) { active.blur(); return; }
         if (u.skillsOpen) { setUi(x => ({ ...x, skillsOpen: false })); return; }
         if (u.tool !== 'select') { setUi(x => ({ ...x, tool: 'select' })); return; }
+        if (v.entered) { act('set_entered', { nodeId: '' }); return; }
         if (u.flowId) { setUi(x => ({ ...x, flowId: null })); return; }
         if (sel) act('set_selection', { selection: null });
         return;
@@ -3277,8 +3256,8 @@ function App() {
         if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, tool: keyTool })); return; }
         if ((e.key === 'n' || e.key === 'm') && !mod && !e.altKey) { e.preventDefault(); addNodeRef.current(e.key === 'n' ? 'web' : 'mobile'); return; }
         if (e.key === 'T' && e.shiftKey && !mod) { e.preventDefault(); const rail = document.querySelector('[data-tool="tidy"]'); if (rail) rail.click(); return; }
-        if (mod && e.key === '1') { e.preventDefault(); const c = canvasApi.current; if (sel && sel.nodeId) { if (v.entered !== sel.nodeId) act('set_entered', { nodeId: sel.nodeId }); if (c.fitNode) c.fitNode(sel.nodeId); } else if (sel && sel.kind === 'shape' && c.fitDiagram) c.fitDiagram(); else if (c.fitAll) c.fitAll(); return; }
-        if (e.key === 'Enter' && sel && sel.kind === 'node' && v.entered !== sel.nodeId) { e.preventDefault(); act('set_entered', { nodeId: sel.nodeId }); if (canvasApi.current.fitNode) canvasApi.current.fitNode(sel.nodeId); return; }
+        if (mod && e.key === '1') { e.preventDefault(); const c = canvasApi.current; if (sel && sel.nodeId) { if (v.entered !== sel.nodeId) act('set_entered', { nodeId: sel.nodeId }); else if (c.fitNode) c.fitNode(sel.nodeId); } else if (sel && sel.kind === 'shape' && c.fitDiagram) c.fitDiagram(); else if (c.fitAll) c.fitAll(); return; }
+        if (e.key === 'Enter' && sel && sel.kind === 'node' && v.entered !== sel.nodeId) { e.preventDefault(); act('set_entered', { nodeId: sel.nodeId }); return; }
       }
       if (mod && e.key === '.') { e.preventDefault(); setUi(x => ({ ...x, inspectorOpen: x.inspectorOpen === false })); return; }
       if (mod && e.key === '\\') { e.preventDefault(); setUi(x => ({ ...x, leftOpen: !x.leftOpen })); return; }
@@ -3305,8 +3284,7 @@ function App() {
         else if (sel.kind === 'pin') act('delete_pin', { pinId: sel.pinId });
         else if (sel.kind === 'node') {
           const n = findNode(p, sel.nodeId);
-          const onBoard = (v.tab === 'web' && v.view.web === 'board') || (v.tab === 'story' && v.view.story === 'board');
-          if (!n || !onBoard) return;
+          if (!n) return;
           const pins = p.pins.filter(x => x.target.nodeId === n.id).length;
           const has = (n.kind === 'page' ? n.blocks.length : 1) + pins;
           if (!has || window.confirm(`Delete "${n.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) act('delete_node', { nodeId: n.id });
