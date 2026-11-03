@@ -54,8 +54,10 @@ tailwind.config = {
   .ac-art { position: absolute; background: var(--ac-panel); border: 1px solid #E6E3DC; box-shadow: var(--ac-shadow-art); }
   .ac-art.sel { outline: 2px solid var(--ac-accent); outline-offset: 0; }
   .ac-dim { opacity: .6; transition: opacity 180ms; }
+  .ac-slide-in { animation: acslide 180ms ease-out; }
+  @keyframes acslide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
   .ac-zoomanim { transition: transform 220ms cubic-bezier(.2,.7,.2,1); }
-  @media (prefers-reduced-motion: reduce) { .ac-zoomanim, .ac-dim, .ac-tip, .ac-frame { transition: none !important; } .ac-fade { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .ac-zoomanim, .ac-dim, .ac-tip, .ac-frame { transition: none !important; } .ac-fade, .ac-slide-in { animation: none !important; } }
   .ac-group-act { font: 500 11px/16px 'Inter', sans-serif; letter-spacing: 0; text-transform: none; color: var(--ac-muted); background: #fff; border: 1px solid var(--ac-hair); border-radius: 6px; padding: 0 6px; opacity: 0; transition: opacity 120ms; }
   .ac-group-head:hover .ac-group-act { opacity: 1; }
   .ac-group-act:hover { color: var(--ac-ink); border-color: var(--ac-ink); }
@@ -837,6 +839,7 @@ function TopBar() {
           <span className="truncate">{agent}</span>
         </span>
       )}
+      <BarButton active={!!ui.tokensOpen} title="Project tokens: colors and type" onClick={() => setUi(u => ({ ...u, tokensOpen: !u.tokensOpen, inspectorOpen: true }))}>Tokens</BarButton>
       <IssueBadge />
       <BarButton title={`Undo (${MOD}Z)`} disabled={!h.canUndo} onClick={() => act('undo', { tab })}>↶</BarButton>
       <BarButton title={`Redo (${MOD}⇧Z)`} disabled={!h.canRedo} onClick={() => act('redo', { tab })}>↷</BarButton>
@@ -1394,74 +1397,132 @@ function DocRail() {
 }
 
 // ---- Inspector ----
+// ---- Inspector (§8.1): floating, contextual; panels follow the selection, never the tab ----
+// inspectorTarget: what the inspector shows. kind ∈ page | screen | block | hotspot | shape | edge | flow | doc | tokens | null
+function inspectorTarget(state, ui) {
+  const p = state.project, v = state.view, sel = v.selection;
+  if (v.tab === 'doc') return { kind: 'doc' };
+  if (sel) {
+    if (sel.kind === 'edge') { const e = p.edges.find(x => x.id === sel.edgeId); if (e) return { kind: 'edge', edge: e }; }
+    if (sel.kind === 'shape') { const s = p.draw.shapes.find(x => x.id === sel.shapeId); if (s) return { kind: 'shape', shape: s }; }
+    if (sel.kind === 'pin') return null; // the pin popover is the editor
+    const n = sel.nodeId ? findNode(p, sel.nodeId) : null;
+    if (n) {
+      if (sel.kind === 'block') { const b = n.blocks.find(x => x.id === sel.blockId); if (b) return { kind: 'block', node: n, block: b, childId: sel.childId || null }; }
+      if (sel.kind === 'hotspot') return { kind: 'hotspot', node: n, hotspotId: sel.hotspotId };
+      return { kind: n.kind, node: n };
+    }
+  }
+  if (v.entered) { const n = findNode(p, v.entered); if (n) return { kind: n.kind, node: n }; }
+  if (ui.flowId) { const f = findFlow(p, ui.flowId); if (f) return { kind: 'flow', flow: f }; }
+  if (ui.tokensOpen) return { kind: 'tokens' };
+  return null;
+}
+
 function Inspector() {
   const { state, ui, setUi } = useS();
-  const sel = state.view.selection;
-  const edge = sel && sel.kind === 'edge' ? state.project.edges.find(e => e.id === sel.edgeId) : null;
-  const tabs = [['content', 'Content'], ['design', 'Design'], ['review', 'Review']];
+  const t = inspectorTarget(state, ui);
+  if (!t || ui.inspectorOpen === false) return null;
+  const simple = t.kind === 'edge' || t.kind === 'flow' || t.kind === 'doc' || t.kind === 'tokens';
+  const tabs = [['content', 'Content'], ['design', 'Design']];
+  const tab = simple ? 'content' : ui.inspectorTab === 'design' ? 'design' : 'content';
+  const right = state.view.tab === 'doc' ? 14 : 72;
+  let body;
+  if (t.kind === 'doc') body = <DocContent />;
+  else if (t.kind === 'tokens') body = <ProjectTokens />;
+  else if (t.kind === 'edge') body = <EdgePanel edge={t.edge} />;
+  else if (t.kind === 'flow') body = <FlowContent flow={t.flow} />;
+  else if (tab === 'design') body = <DesignPanel t={t} />;
+  else body = <ContentPanel t={t} />;
   return (
-    <aside className="w-[300px] flex-none bg-[#FBF8F2] border-l border-[#DDD5C4] flex flex-col min-h-0">
-      <div className="h-10 flex-none flex items-end gap-4 px-3 border-b border-[#DDD5C4]">
-        {tabs.map(([k, l]) => (
-          <button key={k} type="button" onClick={() => setUi(u => ({ ...u, inspectorTab: k }))}
-            className={'h-10 text-[12px] border-b-2 -mb-px ' + (ui.inspectorTab === k ? 'border-[#D8432A] font-semibold' : 'border-transparent text-[#6B665C] hover:text-[#232220]')}>
-            {l}{k === 'review' && state.openIssues ? ` · ${state.openIssues}` : ''}
-          </button>
-        ))}
-      </div>
-      <div className="flex-1 min-h-0 overflow-auto ac-scroll">
-        {ui.inspectorTab === 'review' ? <ReviewPanel /> : edge ? <EdgePanel edge={edge} /> : ui.inspectorTab === 'design' ? <DesignPanel /> : <ContentPanel />}
-      </div>
+    <aside key={t.kind} className="ac-float ac-slide-in font-ui" style={{ position: 'absolute', right, top: 14, width: 292, maxHeight: 'calc(100% - 140px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 31 }}>
+      {!simple && (
+        <div className="flex items-end gap-0.5 px-2 pt-1.5 border-b border-hair flex-none">
+          {tabs.map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setUi(u => ({ ...u, inspectorTab: k }))}
+              className={'relative px-2.5 h-8 text-[12px] font-medium ' + (tab === k ? 'text-ink' : 'text-muted hover:text-ink')}>
+              {l}{tab === k && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded" />}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <button type="button" className="ac-ibtn mb-0.5" style={{ width: 26, height: 26 }} title={`Hide the inspector (${MOD}.)`} onClick={() => setUi(u => ({ ...u, inspectorOpen: false }))}>×</button>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 overflow-auto ac-scroll">{body}</div>
     </aside>
   );
 }
 
-function ContentPanel() {
-  const { state } = useS();
-  const p = state.project, v = state.view, sel = v.selection, tab = v.tab;
-  if (tab === 'web') {
-    if (sel && sel.kind === 'block') {
-      const n = findNode(p, sel.nodeId), b = n && n.blocks.find(x => x.id === sel.blockId);
-      if (b) return <BlockContent node={n} block={b} childId={sel.childId} />;
-    }
-    const n = findNode(p, (sel && sel.kind === 'node' && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'page') ? sel.nodeId : v.currentNodeId.web);
-    return n ? <NodeContent node={n} /> : <Empty text="No page yet. Add one from the Outline." />;
-  }
-  if (tab === 'story') {
-    const id = sel && (sel.kind === 'hotspot' || sel.kind === 'node') && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'screen' ? sel.nodeId : v.currentNodeId.mobile;
-    const n = findNode(p, id);
-    return n ? <ScreenContent node={n} hotspotId={sel && sel.kind === 'hotspot' ? sel.hotspotId : null} /> : <Empty text="No screen yet." />;
-  }
-  if (tab === 'draw') {
-    const s = sel && sel.kind === 'shape' ? p.draw.shapes.find(x => x.id === sel.shapeId) : null;
-    return s ? <ShapeContent shape={s} /> : <Empty text="Select a shape, or pick a tool in the top bar and drag on the canvas." />;
-  }
-  return <DocContent />;
+function ContentPanel({ t }) {
+  if (t.kind === 'block') return <BlockContent node={t.node} block={t.block} childId={t.childId} />;
+  if (t.kind === 'screen' || t.kind === 'hotspot') return <ScreenContent node={t.node} hotspotId={t.kind === 'hotspot' ? t.hotspotId : null} />;
+  if (t.kind === 'page') return <NodeContent node={t.node} />;
+  if (t.kind === 'shape') return <ShapeContent shape={t.shape} />;
+  return null;
+}
+
+function DesignPanel({ t }) {
+  if (t.kind === 'block') return <div><BlockDesign node={t.node} block={t.block} /><ProjectTokens /></div>;
+  if (t.kind === 'screen' || t.kind === 'hotspot') return <div><ScreenDesign node={t.node} /><ProjectTokens /></div>;
+  if (t.kind === 'page') return <div><Empty text="Select a block on the page to style it. Project tokens below are global." /><ProjectTokens /></div>;
+  if (t.kind === 'shape') return <ShapeDesign shape={t.shape} />;
+  return null;
+}
+
+// Breakpoint (pages) and start-of-flow, shared by page and screen content.
+function NodeMeta({ node }) {
+  const { state, act } = useS();
+  const v = state.view, f = findFlow(state.project, node.flowId);
+  const isStart = !!(f && f.startId === node.id);
+  return (
+    <>
+      {node.kind === 'page' && (
+        <Field label="Breakpoint">
+          <Seg value={v.breakpoint} onChange={b => act('set_breakpoint', { breakpoint: b })} options={[{ value: 'desktop', label: '1280' }, { value: 'tablet', label: '768' }, { value: 'phone', label: '390' }]} />
+        </Field>
+      )}
+      <Field label="Start of flow">
+        <Seg value={isStart ? 'yes' : 'no'} onChange={x => { if (x === 'yes' && f && !isStart) act('upsert_flow', { id: f.id, startId: node.id }); }} options={[{ value: 'yes', label: isStart ? '★ Yes' : 'Make start' }, { value: 'no', label: 'No', title: isStart ? 'Pick another node as the start' : undefined }]} />
+      </Field>
+    </>
+  );
+}
+
+function FlowContent({ flow }) {
+  const { state, act, setUi } = useS();
+  const p = state.project;
+  const nodes = laneOrder(flow, p.nodes, p.edges);
+  const siblings = p.flows.filter(f => f.channel === flow.channel);
+  return (
+    <div>
+      <div className="px-3 pt-3 pb-2 border-b border-hair">
+        <div className="text-[11px] text-faint">{flow.channel === 'web' ? 'Web' : 'Mobile'} › Flow</div>
+        <div className="font-semibold text-[14px] mt-0.5 flex items-center justify-between gap-2"><span className="truncate">{flow.name}</span><button type="button" className="ac-ibtn" style={{ width: 24, height: 24 }} title="Close" onClick={() => setUi(u => ({ ...u, flowId: null }))}>×</button></div>
+      </div>
+      <Section title="Flow">
+        <Field label="Name"><TextInput value={flow.name} coalesce={`text:${flow.id}.name`} onSend={(val, o) => val.trim() && act('upsert_flow', { id: flow.id, name: val }, o)} /></Field>
+        <Field label="Start">
+          <select value={flow.startId || ''} onChange={e => e.target.value && act('upsert_flow', { id: flow.id, startId: e.target.value })} className={inputCls}>
+            {!flow.startId && <option value="">No start yet</option>}
+            {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+          </select>
+        </Field>
+        <div className="text-[11px] text-muted">{nodes.length} {flow.channel === 'web' ? 'page' : 'screen'}{nodes.length === 1 ? '' : 's'} · {flow.channel} flow</div>
+      </Section>
+      <Section>
+        <div className="flex gap-1.5">
+          <button type="button" className="flex-1 h-8 rounded-lg bg-ink text-white text-[12px]" onClick={() => act('upsert_node', { flowId: flow.id })}>+ Add a {flow.channel === 'web' ? 'page' : 'screen'}</button>
+          <button type="button" disabled={siblings.length <= 1} title={siblings.length <= 1 ? 'A channel keeps at least one flow' : 'Delete the flow and its nodes'} className="h-8 px-3 rounded-lg border border-hair text-[12px] hover:text-accent hover:border-accent"
+            onClick={() => { if (window.confirm(`Delete flow "${flow.name}" and its ${nodes.length} node(s)?`)) { setUi(u => ({ ...u, flowId: null })); act('delete_flow', { flowId: flow.id }); } }}>Delete</button>
+        </div>
+      </Section>
+    </div>
+  );
 }
 
 function Empty({ text }) { return <div className="px-3 py-6 text-[12px] text-[#6B665C] leading-5">{text}</div>; }
 
 // Shown when a channel has no page or screen yet (a blank project's App flow starts empty).
-function StartChannel({ channel }) {
-  const { state, act } = useS();
-  const flow = state.project.flows.find(f => f.channel === channel);
-  const what = channel === 'web' ? 'page' : 'screen';
-  return (
-    <div className="h-full flex items-center justify-center">
-      <div className="max-w-[360px] text-center font-ui">
-        <div className="font-serif text-[22px] text-[#232220] mb-2">No {what}s yet</div>
-        <p className="text-[13px] leading-5 text-[#6B665C] mb-4">
-          Add the first {what}{flow ? <> to <b className="font-semibold text-[#232220]">{flow.name}</b></> : null}, or ask your agent to design one.
-        </p>
-        <button type="button" className="h-8 px-3 rounded bg-[#232220] text-[#F4EFE6] text-[12px]"
-          onClick={() => flow ? act('upsert_node', { flowId: flow.id }) : act('upsert_flow', { channel })}>
-          + Add a {what}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function NodeHeader({ node, children }) {
   const { state } = useS();
   const f = findFlow(state.project, node.flowId);
@@ -1482,7 +1543,8 @@ function NodeContent({ node }) {
       <NodeHeader node={node} />
       <Section title="Page">
         <Field label="Name"><TextInput value={node.name} coalesce={`text:${node.id}.name`} onSend={(val, o) => val.trim() && act('upsert_node', { id: node.id, name: val }, o)} /></Field>
-        <div className="text-[11px] text-[#6B665C]">{node.blocks.length} blocks. Click a block on the canvas or in the Outline to edit it.</div>
+        <NodeMeta node={node} />
+        <div className="text-[11px] text-muted">{node.blocks.length} block{node.blocks.length === 1 ? '' : 's'}. Enter the page (double-click) and click a block, or pick one in Layers.</div>
       </Section>
       <EdgeList title="Outbound" edges={out} dir="to" />
       <EdgeList title="Inbound" edges={inn} dir="from" />
@@ -1663,6 +1725,7 @@ function ScreenContent({ node, hotspotId }) {
       {hs && <Section title="Selected hotspot">{hotspotRow(hs)}</Section>}
       <Section title="Screen">
         <Field label="Name"><TextInput value={n.name} coalesce={`text:${n.id}.name`} onSend={(val, o) => val.trim() && act('update_screen', { nodeId: n.id, patch: { name: val } }, o)} /></Field>
+        <NodeMeta node={node} />
         <Field label="Title"><TextInput value={n.title} coalesce={`text:${n.id}.title`} onSend={set('title')} /></Field>
         <Field label="Body"><TextInput multiline rows={3} value={n.body} coalesce={`text:${n.id}.body`} onSend={set('body')} /></Field>
       </Section>
@@ -1738,25 +1801,6 @@ function ContrastReadout({ items }) {
       ))}
     </Section>
   );
-}
-
-function DesignPanel() {
-  const { state } = useS();
-  const p = state.project, v = state.view, sel = v.selection, tab = v.tab;
-  if (tab === 'web') {
-    const n = sel && sel.kind === 'block' ? findNode(p, sel.nodeId) : null;
-    const b = n && n.blocks.find(x => x.id === sel.blockId);
-    return <div>{b ? <BlockDesign node={n} block={b} /> : <Empty text="Select a block to style it. Project tokens below are global." />}<ProjectTokens /></div>;
-  }
-  if (tab === 'story') {
-    const n = findNode(p, sel && (sel.kind === 'node' || sel.kind === 'hotspot') && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'screen' ? sel.nodeId : v.currentNodeId.mobile);
-    return <div>{n ? <ScreenDesign node={n} /> : <Empty text="No screen." />}<ProjectTokens /></div>;
-  }
-  if (tab === 'draw') {
-    const s = sel && sel.kind === 'shape' ? p.draw.shapes.find(x => x.id === sel.shapeId) : null;
-    return s ? <ShapeDesign shape={s} /> : <Empty text="Select a shape to style it." />;
-  }
-  return <ProjectTokens />;
 }
 
 function BlockDesign({ node, block }) {
@@ -3184,6 +3228,10 @@ function App() {
   const commitView = useCallback(next => act('set_canvas_view', next), [act]);
   const viewport = useViewport(canvasRef, state ? state.project.canvas.view : null, commitView);
 
+  // a new selection closes the flow and tokens views so the inspector follows it
+  const selKey = state && state.view.selection ? JSON.stringify(state.view.selection) : '';
+  useEffect(() => { if (selKey) setUi(u => (u.flowId || u.tokensOpen ? { ...u, flowId: null, tokensOpen: false } : u)); }, [selKey]);
+
   // leaving the draw tab or a mode resets transient local UI
   const tab = state ? state.view.tab : 'web';
   useEffect(() => { setUi(u => (u.tool !== 'select' ? { ...u, tool: 'select' } : u)); }, [tab]);
@@ -3290,12 +3338,10 @@ function App() {
             {v.tab !== 'doc' && isUntouched(state.project) && <EmptyCanvas />}
             <LeftPanel />
             {v.tab !== 'doc' && <><ToolRail /><ZoomPill /><HintStrip /></>}
-            {toast && <Toast msg={toast.msg} />}
-          </main>
-          <div className="relative flex-none flex">
             <Inspector />
             {ui.skillsOpen && <SkillsDrawer />}
-          </div>
+            {toast && <Toast msg={toast.msg} />}
+          </main>
           {conn !== 'live' && <div title="Reconnecting… editing is paused" className="absolute inset-0 z-[80] cursor-not-allowed" style={{ background: 'rgba(231,224,210,.45)' }} />}
         </div>
         {v.preview && <PreviewStage navRef={navRef} />}
