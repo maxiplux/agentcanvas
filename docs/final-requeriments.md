@@ -634,7 +634,7 @@ Full viewport, no page scroll. One infinite canvas fills the window under a 44px
 
 Footer: **Ask your agent** composer (`Cmd/Ctrl+K`): typing a request and pressing `Copy prompt` copies `Project "<name>" in AgentCanvas (MCP: <origin>/mcp). Selected: <label>. Open issues: <n>. Request: <text>` to the clipboard and toasts `Copied. Paste it into Claude Code or Codex.` The studio calls no model and sends nothing anywhere.
 
-**Right tool rail (floating, 44px wide, vertically centered).** `Select V` · `Hand H` · `Add web page P` · `Add mobile screen M` · `Rect R` · `Ellipse O` · `Line L` · `Arrow A` · `Pen` · `Text T` · `Pin C` · `Tidy layout ⇧T`. Every button shows a tooltip with its shortcut after 300 ms. Drawing tools act on the diagram group of the canvas (§8.5); `Pin` replaces `Annotate` (§10).
+**Right tool rail (floating, 44px wide, vertically centered).** `Select V` · `Hand H` · `Add web page N` · `Add mobile screen M` · `Rect R` · `Ellipse O` · `Line L` · `Arrow A` · `Pen P` · `Text T` · `Pin C` · `Tidy layout ⇧T`. Every button shows a tooltip with its shortcut after 300 ms. Drawing tools act on the diagram group of the canvas (§8.5); `Pin` replaces `Annotate` (§10).
 
 **Inspector (floating, 292px, contextual, `Cmd/Ctrl+.` hides it).** Appears only when something is selected, a node is entered, or a flow is being inspected. Tabs `Content | Design`. Panels are chosen by what is selected, never by tab: block → block content/design; page → page content (name, breakpoint `1280 / 768 / 390`, start-of-flow); screen or hotspot → screen content/design; shape → shape content/design; edge → the Edge panel; flow → name, start node, delete. **Project tokens** sit under Design for pages, screens and blocks, and in a `Project` popover from the top bar when nothing is selected.
 
@@ -668,7 +668,7 @@ Radii: 12 px panels, 8 px controls and rows, 6 px chips, 999 pills; artboards 0 
 
 **The canvas** is one infinite surface holding every web page, mobile screen, diagram shape, connector and pin. Pan by dragging empty canvas, by `Space`+drag anywhere, or by two-finger scroll; zoom with pinch, `Cmd/Ctrl`+wheel, `Cmd/Ctrl +/−`, between `0.1` and `4`, always around the cursor. `Cmd/Ctrl+0` fits everything with 80 px padding; `Cmd/Ctrl+1` fits the selection. The viewport is persisted in `project.canvas.view {x, y, zoom}` (`zoom: 0` means "fit all on open") through `set_canvas_view`, never undoable, so reopening the studio returns to the same place and an agent can focus the canvas. The world transform is one `translate(x, y) scale(zoom)` on the world layer; every world-space label, port, pin and handle counter-scales so it keeps its screen size.
 
-**Artboards.** Each node is an artboard at its real size in world units: a web page at its breakpoint width (`1280 / 768 / 390`) and natural height, rendered by the same block renderer as editing; a mobile screen at `390×844` inside a 1 px `hair` frame with an 18 px radius (the dark bezel appears only in Play). White fill, hairline border, soft shadow. The name label sits above the artboard (★ for the flow start, the breakpoint for pages) and stays 12 px at any zoom. Below 25 % zoom an artboard renders as a flat card with its name only. Click selects the node (2 px `accent` outline); double-click, `Enter` or `Cmd/Ctrl+1` enters it (§8.3).
+**Artboards.** Each node is an artboard at its real size in world units: a web page at its breakpoint width (`1280 / 768 / 390`) and natural height, rendered by the same block renderer as editing; a mobile screen at `390×844` inside a 1 px `hair` frame with an 18 px radius (the dark bezel appears only in Play). White fill, hairline border, soft shadow. The name label sits above the artboard (★ for the flow start, the breakpoint for pages) and stays 12 px at any zoom. Below 12 % zoom an artboard renders as a flat card with its name only. Edge labels show from 30 % zoom, or when the edge is hovered or selected. Click selects the node (2 px `accent` outline); double-click, `Enter` or `Cmd/Ctrl+1` enters it (§8.3).
 
 **Flow groups.** One rounded dashed group per flow, computed (never stored) as the bounding box of its nodes plus 40 px, labeled `Name · N pages · web`. Clicking the label inspects the flow; double-click renames; hover shows `+ page/screen` and `Tidy`. Web groups stack from `(0, 0)` with 160 px between them; mobile groups stack in a column 400 px to the right of the widest web group; the diagram group (§8.5) sits 200 px below the last web group.
 
@@ -869,7 +869,7 @@ function laneOrder(flow, nodes, edges) {
 | `Cmd/Ctrl+Shift+Z` | any | redo |
 | `Space` (hold) | canvas | temporary Hand |
 | `Alt` (hold) | canvas | disable 8 px snap (shapes and artboards) |
-| `V` `H` `P` `M` `R` `O` `L` `A` `T` `C` | canvas, not typing | Select, Hand, Add page, Add screen, Rect, Ellipse, Line, Arrow, Text, Pin |
+| `V` `H` `N` `M` `R` `O` `L` `A` `P` `T` `C` | canvas, not typing | Select, Hand, Add page, Add screen, Rect, Ellipse, Line, Arrow, Pen, Text, Pin |
 | `Cmd/Ctrl+0` | canvas | fit all |
 | `Cmd/Ctrl+1` | canvas | fit the selection; enter it when it is a node |
 | `Enter` | node selected | enter it |

@@ -56,6 +56,9 @@ tailwind.config = {
   .ac-dim { opacity: .6; transition: opacity 180ms; }
   .ac-zoomanim { transition: transform 220ms cubic-bezier(.2,.7,.2,1); }
   @media (prefers-reduced-motion: reduce) { .ac-zoomanim, .ac-dim, .ac-tip, .ac-frame { transition: none !important; } .ac-fade { animation: none !important; } }
+  .ac-group-act { font: 500 11px/16px 'Inter', sans-serif; letter-spacing: 0; text-transform: none; color: var(--ac-muted); background: #fff; border: 1px solid var(--ac-hair); border-radius: 6px; padding: 0 6px; opacity: 0; transition: opacity 120ms; }
+  .ac-group-head:hover .ac-group-act { opacity: 1; }
+  .ac-group-act:hover { color: var(--ac-ink); border-color: var(--ac-ink); }
   .ac-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ac-muted); font-weight: 600; }
   .ac-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
   .ac-scroll::-webkit-scrollbar-thumb { background: #CFC6B5; border-radius: 4px; }
@@ -807,8 +810,8 @@ function AnnotateControls() {
   const { state, act, ui, setUi } = useS();
   return (
     <>
-      <IconButton dark active={ui.annotate} title="Annotate: click to place a pin (Esc to stop)" onClick={() => setUi(u => ({ ...u, annotate: !u.annotate }))}>Annotate</IconButton>
-      {ui.annotate && (
+      <IconButton dark active={ui.tool === 'pin'} title="Pin: click to place a note (Esc to stop)" onClick={() => setUi(u => ({ ...u, tool: u.tool === 'pin' ? 'select' : 'pin' }))}>Annotate</IconButton>
+      {ui.tool === 'pin' && (
         <DarkSeg value={ui.pinKind} onChange={k => setUi(u => ({ ...u, pinKind: k }))}
           options={PIN_KINDS.map(k => ({ value: k, label: PIN_GLYPH[k] + ' ' + PIN_NAME[k] }))} />
       )}
@@ -818,7 +821,7 @@ function AnnotateControls() {
 }
 
 function TopBar() {
-  const { state, act, agent, ui, setUi, drawView, setDrawView } = useS();
+  const { state, act, agent, ui, setUi, viewport } = useS();
   const v = state.view, tab = v.tab;
   const h = state.history[tab] || {};
   const sep = <span className="w-px h-5 bg-white/15 mx-1" />;
@@ -840,15 +843,14 @@ function TopBar() {
       </>
     );
   } else if (tab === 'draw') {
-    const tools = [['select', 'Select', 'V'], ['pan', 'Pan', 'Space'], ['rect', 'Rect', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['arrow', 'Arrow', 'A'], ['text', 'Text', 'T'], ['pen', 'Pen', 'P']];
-    const zoomTo = z => setDrawView(dv => ({ ...dv, zoom: clamp(z, 0.25, 4) }), true);
+    const tools = [['select', 'Select', 'V'], ['hand', 'Hand', 'H'], ['rect', 'Rect', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['arrow', 'Arrow', 'A'], ['text', 'Text', 'T'], ['pen', 'Pen', 'P']];
     ctx = (
       <>
-        <DarkSeg value={ui.drawTool} onChange={t => setUi(u => ({ ...u, drawTool: t }))} options={tools.map(([value, label, k]) => ({ value, label, title: label + ' (' + k + ')' }))} />
+        <DarkSeg value={ui.tool} onChange={t => setUi(u => ({ ...u, tool: t }))} options={tools.map(([value, label, k]) => ({ value, label, title: label + ' (' + k + ')' }))} />
         {sep}
-        <IconButton dark title="Zoom out" onClick={() => zoomTo(drawView.zoom / 1.25)}>−</IconButton>
-        <button type="button" title={`Reset zoom (${MOD}0)`} onClick={() => setDrawView(() => ({ x: 0, y: 0, zoom: 1 }), true)} className="text-[12px] text-[#F4EFE6] w-12 tabular-nums">{Math.round(drawView.zoom * 100)}%</button>
-        <IconButton dark title="Zoom in" onClick={() => zoomTo(drawView.zoom * 1.25)}>+</IconButton>
+        <IconButton dark title="Zoom out" onClick={() => viewport.zoomBy(1 / 1.25)}>−</IconButton>
+        <span className="text-[12px] text-[#F4EFE6] w-12 tabular-nums text-center">{Math.round(viewport.view.zoom * 100)}%</span>
+        <IconButton dark title="Zoom in" onClick={() => viewport.zoomBy(1.25)}>+</IconButton>
         {sep}
         <AnnotateControls />
       </>
@@ -972,7 +974,6 @@ function LeftPanel() {
   return (
     <aside className="w-[260px] flex-none bg-[#FBF8F2] border-r border-[#DDD5C4] flex flex-col min-h-0 select-none">
       {(tab === 'web' || tab === 'story') && <><Palette /><div className="flex-1 min-h-0 overflow-auto ac-scroll"><Outline channel={TAB_CHANNEL[tab]} /></div></>}
-      {tab === 'draw' && <DrawPanel />}
       {tab === 'doc' && <DocRail />}
     </aside>
   );
@@ -1140,40 +1141,6 @@ function Outline({ channel }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function DrawPanel() {
-  const { state, act, ui, setUi } = useS();
-  const shapes = state.project.draw.shapes;
-  const sel = state.view.selection;
-  const label = s => s.type === 'text' ? `Text “${s.text}”` : s.type[0].toUpperCase() + s.type.slice(1);
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Palette</div>
-      <div className="grid grid-cols-2 gap-1 px-2 pb-2 border-b border-[#DDD5C4]">
-        {DRAW_TOOLS.map(t => (
-          <button key={t} type="button" onClick={() => setUi(u => ({ ...u, drawTool: t }))}
-            className={'h-8 rounded border text-[12px] text-left px-2 ' + (ui.drawTool === t ? 'bg-[#232220] text-[#F4EFE6] border-[#232220]' : 'bg-white border-[#DDD5C4] hover:border-[#232220]')}>
-            {t[0].toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
-      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Shapes · {shapes.length}</div>
-      <div className="flex-1 overflow-auto ac-scroll pb-4">
-        {shapes.map(s => {
-          const on = sel && sel.kind === 'shape' && sel.shapeId === s.id;
-          return (
-            <div key={s.id} onClick={() => act('set_selection', { selection: { kind: 'shape', shapeId: s.id } })}
-              className={'flex items-center gap-2 h-7 px-3 cursor-pointer text-[12px] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'hover:bg-[#EFE8DB]')}>
-              <span className="w-2.5 h-2.5 rounded-sm border" style={{ borderColor: state.project.tokens.colors[s.stroke || s.ink] }} />
-              <span className="truncate">{label(s)}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="px-3 py-2 border-t border-[#DDD5C4] text-[11px] text-[#6B665C] leading-4">Snaps to 8px — hold Alt to place freely. Hold Space to pan, scroll to zoom.</div>
     </div>
   );
 }
@@ -1817,22 +1784,21 @@ function SpecLabel({ x, y, text }) {
 }
 
 // items: [{pin, left, top, coords(clientX, clientY) -> {x, y}}] in container px
-function PinsLayer({ items, draft, onDraftDone }) {
+function PinsLayer({ items, draft, onDraftDone, scale }) {
   const { state } = useS();
   const sel = state.view.selection;
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 40 }}>
-      {items.map(it => <PinMarker key={it.pin.id} {...it} selected={!!(sel && sel.kind === 'pin' && sel.pinId === it.pin.id)} />)}
+      {items.map(it => <PinMarker key={it.pin.id} {...it} scale={scale || 1} selected={!!(sel && sel.kind === 'pin' && sel.pinId === it.pin.id)} />)}
       {draft && <DraftPin draft={draft} onDone={onDraftDone} />}
     </div>
   );
 }
 
-function PinMarker({ pin, left, top, coords, selected }) {
+function PinMarker({ pin, left, top, coords, selected, scale = 1 }) {
   const { act } = useS();
   const [drag, setDrag] = useState(null);
   const ref = useRef(null);
-  useEffect(() => { if (selected && ref.current) ref.current.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected]);
   const down = e => {
     if (e.button !== 0) return;
     e.stopPropagation(); e.preventDefault();
@@ -1842,7 +1808,7 @@ function PinMarker({ pin, left, top, coords, selected }) {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
       if (!moved && Math.hypot(dx, dy) < 3) return;
       moved = true;
-      setDrag({ left: left + dx, top: top + dy });
+      setDrag({ left: left + dx * scale, top: top + dy * scale }); // deltas are screen px; the marker sits in a scaled layer
     };
     const up = ev => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
@@ -1858,7 +1824,7 @@ function PinMarker({ pin, left, top, coords, selected }) {
     <>
       <div ref={ref} data-pin-id={pin.id} title={`${PIN_NAME[pin.kind]} #${pin.n}: ${firstLine(pin.body)}`}
         className={'ac-pin' + (pin.resolved ? ' resolved' : '') + (selected ? ' selected' : '')}
-        style={{ left: pos.left, top: pos.top, pointerEvents: 'auto' }} onPointerDown={down} onClick={e => e.stopPropagation()}>
+        style={{ left: pos.left, top: pos.top, pointerEvents: 'auto', transform: scale !== 1 ? `scale(${scale})` : undefined }} onPointerDown={down} onClick={e => e.stopPropagation()}>
         {pin.resolved ? '✓' : <><span className="ac-pin-n">{pin.n}</span><span className="ac-pin-kind">{PIN_GLYPH[pin.kind]}</span></>}
       </div>
       {selected && !drag && <PinPopover pin={pin} anchorRef={ref} />}
@@ -2050,199 +2016,9 @@ function Bezel({ children, flowNodes, currentId, onScreenClick }) {
 }
 
 // ---- Storyboard (§8.2) ----
-const Thumb = memo(function Thumb({ node, tokens, channel, selected, current, pins, showPins, onDown, onDbl, ui }) {
-  const T = THUMB[channel];
-  const ref = useRef(null);
-  const [rects] = useRects(ref, 'data-block-id', node);
-  const k = channel === 'web' ? T.w / 1280 : T.h / PHONE_H;
-  const inner = channel === 'web'
-    ? <div style={{ width: 1280, transform: `scale(${k})`, transformOrigin: '0 0', pointerEvents: 'none' }}>{node.blocks.map(b => renderBlock(b, { tokens, bp: 'desktop', mode: 'thumb', nodeId: node.id }))}{!node.blocks.length && <div style={{ height: 800, background: tokens.colors.paper }} />}</div>
-    : <div style={{ width: PHONE_W, transform: `scale(${k})`, transformOrigin: '0 0', marginLeft: (T.w - PHONE_W * k) / 2, pointerEvents: 'none' }}>{renderScreen(node, { tokens, mode: 'thumb' })}</div>;
-  return (
-    <div ref={ref} data-thumb-id={node.id} onPointerDown={onDown} onDoubleClick={onDbl}
-      style={{ position: 'relative', width: T.w, height: T.h, overflow: 'hidden', background: channel === 'web' ? tokens.colors.paper : '#1A1917', cursor: 'pointer',
-        boxShadow: selected ? `0 0 0 2px ${V}` : current ? '0 0 0 2px #232220' : '0 1px 3px rgba(28,27,25,.18), 0 0 0 1px rgba(28,27,25,.08)' }}>
-      {inner}
-      {pins && pins(rects)}
-    </div>
-  );
-});
-
 function cubicAt(p0, p1, p2, p3, t) {
   const u = 1 - t;
   return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
-}
-
-function StoryboardView({ channel }) {
-  const { state, act, ui } = useS();
-  const p = state.project, tokens = p.tokens, v = state.view;
-  const T = THUMB[channel];
-  const boardRef = useRef(null);
-  const [drag, setDrag] = useState(null);     // {fromId, x1, y1, x2, y2}
-  const [pending, setPending] = useState(null); // {fromId, toId, x, y}
-  const [draft, setDraft] = useState(null);
-  const sel = v.selection;
-  const flows = p.flows.filter(f => f.channel === channel);
-  const lanes = [];
-  const pos = {};
-  const MARGIN = 96; // room left of the lanes for curves that enter the first column
-  const HEAD = LANE.head + 22;
-  let y = 16, maxX = 400;
-  flows.forEach(f => {
-    const nodes = laneOrder(f, p.nodes, p.edges);
-    lanes.push({ flow: f, nodes, y });
-    nodes.forEach((n, i) => { pos[n.id] = { x: MARGIN + LANE.left + i * (T.w + LANE.gap), y: y + HEAD, lane: lanes.length - 1 }; });
-    maxX = Math.max(maxX, MARGIN + LANE.left + nodes.length * (T.w + LANE.gap) + 160);
-    y += HEAD + T.h + LANE.laneGap;
-  });
-  const height = y + 20;
-  const edges = p.edges.filter(e => pos[e.fromId] && pos[e.toId]);
-  const groups = {};
-  edges.forEach(e => { const k = e.fromId + '>' + e.toId; (groups[k] = groups[k] || []).push(e.id); });
-  const geom = e => {
-    const a = pos[e.fromId], b = pos[e.toId];
-    const g = groups[e.fromId + '>' + e.toId];
-    const off = (g.indexOf(e.id) - (g.length - 1) / 2) * 14;
-    const x1 = a.x + T.w + 6, y1 = a.y + T.h / 2 + off, x2 = b.x - 6, y2 = b.y + T.h / 2 + off;
-    let c;
-    if (e.kind === 'back' || x2 < x1 + 24) {
-      // back edges and leftward edges bow through the channel below the source lane
-      // (or between the two lanes when they differ), so they read as returns.
-      const lo = Math.max(a.y, b.y), hi = Math.min(a.y, b.y);
-      const chan = a.lane === b.lane || e.kind === 'back' ? lo + T.h + LANE.laneGap * 0.55 + off : (hi + T.h + lo - HEAD) / 2 + 8 + off;
-      const reach = Math.min(110, Math.max(56, Math.abs(x2 - x1) / 3));
-      c = [x1 + reach, chan, x2 - reach, chan];
-    } else {
-      const dx = Math.max(40, (x2 - x1) / 2);
-      c = [x1 + dx, y1, x2 - dx, y2];
-    }
-    const mx = cubicAt(x1, c[0], c[2], x2, 0.5), my = cubicAt(y1, c[1], c[3], y2, 0.5);
-    return { d: `M${x1},${y1} C${c[0]},${c[1]} ${c[2]},${c[3]} ${x2},${y2}`, mx, my };
-  };
-  const toBoard = (cx, cy) => { const r = boardRef.current.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
-
-  const startConnect = (e, fromId) => {
-    e.stopPropagation(); e.preventDefault();
-    const a = pos[fromId];
-    const start = { fromId, x1: a.x + T.w, y1: a.y + T.h / 2 };
-    setDrag({ ...start, x2: start.x1, y2: start.y1 });
-    const move = ev => { const q = toBoard(ev.clientX, ev.clientY); setDrag(d => d && { ...d, x2: q.x, y2: q.y }); };
-    const up = ev => {
-      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
-      setDrag(null);
-      const hit = document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest && el.closest('[data-thumb-id]')).find(Boolean);
-      const toId = hit && hit.getAttribute('data-thumb-id');
-      if (toId && toId !== fromId && pos[toId]) { const q = toBoard(ev.clientX, ev.clientY); setPending({ fromId, toId, x: q.x, y: q.y }); }
-    };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
-  };
-
-  const onThumbDown = (e, n) => {
-    if (ui.annotate) return;
-    e.stopPropagation();
-    if (e.detail === 1) act('set_selection', { selection: { kind: 'node', nodeId: n.id } });
-  };
-  const open = n => { act('set_selection', { selection: { kind: 'node', nodeId: n.id } }).then(() => act('set_view', { tab: CHANNEL_TAB[channel], view: 'page' })); };
-
-  const onAnnotate = e => {
-    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
-    e.stopPropagation(); e.preventDefault();
-    const th = e.target.closest('[data-thumb-id]');
-    if (!th) return;
-    const r = th.getBoundingClientRect();
-    const id = th.getAttribute('data-thumb-id');
-    const q = toBoard(e.clientX, e.clientY);
-    setDraft({ left: q.x, top: q.y, target: { type: 'board', nodeId: id }, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
-  };
-
-  // pins on a thumbnail: board pins (fractions of the thumbnail) and node pins on their blocks
-  const thumbPins = n => rects => {
-    const items = p.pins.filter(x => (x.target.type === 'board' || x.target.type === 'node') && x.target.nodeId === n.id && pinVisible(x, state, ui));
-    if (!items.length) return null;
-    const k = channel === 'web' ? T.w / 1280 : T.h / PHONE_H;
-    const screenLeft = channel === 'web' ? 0 : (T.w - PHONE_W * k) / 2;
-    return items.map(x => {
-      let left, top;
-      if (x.target.type === 'board') { left = x.x * T.w; top = x.y * T.h; }
-      else if (x.target.blockId && rects[x.target.blockId]) { const r = rects[x.target.blockId]; left = r.x + x.x * r.w; top = r.y + x.y * r.h; }
-      else if (channel === 'web') { left = x.x * T.w; top = x.y * T.h; }
-      else { left = screenLeft + x.x * PHONE_W * k; top = x.y * T.h; }
-      return <span key={x.id} className={'ac-pin' + (x.resolved ? ' resolved' : '')} data-pin-id={x.id} title={firstLine(x.body)}
-        style={{ left: clamp(left, 11, T.w - 11), top: clamp(top, 11, T.h - 11), width: 18, height: 18, margin: '-9px 0 0 -9px', lineHeight: '18px', fontSize: 10, zIndex: 6 }}
-        onPointerDown={e => { e.stopPropagation(); act('set_selection', { selection: { kind: 'pin', pinId: x.id } }); }}>{x.resolved ? '✓' : x.n}</span>;
-    });
-  };
-
-  // board pin (selected) popovers render via an overlay marker at the same spot
-  const selPin = sel && sel.kind === 'pin' ? p.pins.find(x => x.id === sel.pinId) : null;
-  const selPinItems = selPin && selPin.target.type === 'board' && pos[selPin.target.nodeId] ? [{
-    pin: selPin, left: pos[selPin.target.nodeId].x + selPin.x * T.w, top: pos[selPin.target.nodeId].y + selPin.y * T.h,
-    coords: (cx, cy) => { const q = toBoard(cx, cy); const a = pos[selPin.target.nodeId]; return { x: clamp((q.x - a.x) / T.w, 0, 1), y: clamp((q.y - a.y) / T.h, 0, 1) }; },
-  }] : [];
-
-  return (
-    <div className="absolute inset-0 overflow-auto ac-scroll" onPointerDown={() => { if (!ui.annotate && sel && sel.kind !== 'pin') act('set_selection', { selection: null }); }}>
-      <div ref={boardRef} className={'relative ' + (ui.annotate ? 'ac-annotate' : '')} style={{ width: maxX, height, minWidth: '100%' }} onClickCapture={onAnnotate}>
-        {lanes.map(l => (
-          <div key={l.flow.id} style={{ position: 'absolute', left: 0, right: 0, top: l.y - 8, height: HEAD + T.h + 24, borderTop: '1px dashed #CFC6B5' }}>
-            <div style={{ position: 'absolute', left: MARGIN + LANE.left, top: 10, font: '600 12px/16px Inter, sans-serif', color: '#232220' }}>
-              {l.flow.name} <span style={{ fontWeight: 400, color: CH.muted }}>· {l.nodes.length} {(channel === 'web' ? 'page' : 'screen') + (l.nodes.length === 1 ? '' : 's')}</span>
-            </div>
-          </div>
-        ))}
-        <svg style={{ position: 'absolute', left: 0, top: 0, width: maxX, height, overflow: 'visible', zIndex: 3, pointerEvents: 'none' }}>
-          <defs>
-            {[['ink', tokens.colors.ink], ['v', V]].map(([k, c]) => (
-              <marker key={k} id={'sb-arrow-' + k} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>
-            ))}
-          </defs>
-          {edges.map(e => {
-            const g = geom(e);
-            const cross = e.kind === 'cross';
-            const on = sel && sel.kind === 'edge' && sel.edgeId === e.id;
-            const color = cross ? V : tokens.colors.ink;
-            return (
-              <g key={e.id} data-edge-id={e.id}>
-                {on && <path d={g.d} fill="none" stroke={V} strokeOpacity=".25" strokeWidth="7" />}
-                <path d={g.d} fill="none" stroke={color} strokeWidth={cross ? 2 : 1.5} strokeDasharray={e.kind === 'alt' ? '6 4' : e.kind === 'back' ? '2 4' : undefined} markerEnd={`url(#sb-arrow-${cross ? 'v' : 'ink'})`} />
-                {/* SPEC: §9.3 edge hit test — a 12px transparent stroke gives the same 6px tolerance natively */}
-                <path d={g.d} fill="none" stroke="transparent" strokeWidth="12" style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                  onPointerDown={ev => { ev.stopPropagation(); act('set_selection', { selection: { kind: 'edge', edgeId: e.id } }); }} />
-                <g transform={`translate(${g.mx},${g.my})`} style={{ pointerEvents: 'all', cursor: 'pointer' }} onPointerDown={ev => { ev.stopPropagation(); act('set_selection', { selection: { kind: 'edge', edgeId: e.id } }); }}>
-                  <rect x={-(e.label.length * 3.1 + 7)} y="-8" width={e.label.length * 6.2 + 14} height="16" rx="8" fill={on ? V : '#FBF8F2'} stroke={cross ? V : '#CFC6B5'} />
-                  <text textAnchor="middle" y="3.5" style={{ font: '500 10px Inter, sans-serif' }} fill={on ? '#F4EFE6' : cross ? V : '#232220'}>{e.label}</text>
-                </g>
-              </g>
-            );
-          })}
-          {drag && <path d={`M${drag.x1},${drag.y1} C${drag.x1 + 60},${drag.y1} ${drag.x2 - 60},${drag.y2} ${drag.x2},${drag.y2}`} fill="none" stroke={V} strokeWidth="2" strokeDasharray="5 4" />}
-        </svg>
-        {lanes.map(l => l.nodes.map(n => {
-          const a = pos[n.id];
-          const isStart = l.flow.startId === n.id;
-          return (
-            <div key={n.id} style={{ position: 'absolute', left: a.x, top: a.y, zIndex: 2 }}>
-              <div style={{ position: 'absolute', left: 0, top: -17, font: '500 11px/14px Inter, sans-serif', color: '#232220', whiteSpace: 'nowrap', maxWidth: T.w, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {isStart && <span style={{ color: V }} title="Start">★ </span>}{n.name}
-              </div>
-              <Thumb node={n} tokens={tokens} channel={channel} ui={ui}
-                selected={!!(sel && sel.kind === 'node' && sel.nodeId === n.id)} current={v.currentNodeId[channel] === n.id}
-                onDown={e => onThumbDown(e, n)} onDbl={() => open(n)} pins={thumbPins(n)} />
-              <span title="Input" style={{ position: 'absolute', left: -6, top: T.h / 2 - 6, width: 12, height: 12, borderRadius: 6, background: '#FBF8F2', border: '2px solid #232220', zIndex: 4 }} />
-              <span title="Drag to connect" onPointerDown={e => startConnect(e, n.id)}
-                style={{ position: 'absolute', right: -7, top: T.h / 2 - 7, width: 14, height: 14, borderRadius: 7, background: V, border: '2px solid #FBF8F2', zIndex: 4, cursor: 'crosshair', boxShadow: '0 0 0 1px ' + V }} />
-            </div>
-          );
-        }))}
-        {pending && (
-          <div style={{ position: 'absolute', left: pending.x, top: pending.y, zIndex: 50 }} onPointerDown={e => e.stopPropagation()}>
-            <EdgeLabelInput onDone={label => { const pd = pending; setPending(null); if (label != null) act('upsert_edge', { fromId: pd.fromId, toId: pd.toId, label }); }} />
-          </div>
-        )}
-        <PinsLayer items={selPinItems} draft={draft} onDraftDone={() => setDraft(null)} />
-      </div>
-    </div>
-  );
 }
 
 function EdgeLabelInput({ onDone }) {
@@ -2549,7 +2325,7 @@ function Connectors({ layout, edges, zoom, sel, drag }) {
   const select = (ev, e) => { ev.stopPropagation(); act('set_selection', { selection: { kind: 'edge', edgeId: e.id } }); };
   const m = 8 * k; // arrowheads keep their screen size
   return (
-    <svg style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 1 }}>
+    <svg style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 3 }}>
       <defs>
         {[['edge', CH.edge], ['v', V]].map(([id, c]) => (
           <marker key={id} id={'ac-arrow-' + id} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth={m} markerHeight={m} orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>
@@ -2573,11 +2349,11 @@ function Connectors({ layout, edges, zoom, sel, drag }) {
             {/* SPEC: §9.3 edge hit test — a 12px transparent stroke gives the same 6px tolerance natively */}
             <path d={geo.d} fill="none" stroke="transparent" strokeWidth="12" vectorEffect="non-scaling-stroke" style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
               onPointerEnter={() => setHover(e.id)} onPointerLeave={() => setHover(h => (h === e.id ? null : h))} onPointerDown={ev => select(ev, e)} />
-            <g transform={`translate(${geo.mx},${geo.my}) scale(${k})`} style={{ pointerEvents: 'all', cursor: 'pointer' }}
+            {(zoom >= 0.3 || on || hot) && <g transform={`translate(${geo.mx},${geo.my}) scale(${k})`} style={{ pointerEvents: 'all', cursor: 'pointer' }}
               onPointerEnter={() => setHover(e.id)} onPointerLeave={() => setHover(h => (h === e.id ? null : h))} onPointerDown={ev => select(ev, e)}>
               <rect x={-(e.label.length * 3.2 + 8)} y="-9" width={e.label.length * 6.4 + 16} height="18" rx="9" fill={on ? V : '#fff'} stroke={on ? V : cross ? V : '#E6E3DC'} />
               <text textAnchor="middle" y="3.5" style={{ font: '500 11px Inter, sans-serif' }} fill={on ? '#fff' : cross ? V : CH.ink}>{e.label}</text>
-            </g>
+            </g>}
           </g>
         );
       })}
@@ -2586,9 +2362,210 @@ function Connectors({ layout, edges, zoom, sel, drag }) {
   );
 }
 
+// ---- Flow groups (§8.2) ----
+function Groups({ layout, zoom, flowId }) {
+  const { act, setUi } = useS();
+  const [renaming, setRenaming] = useState(null);
+  const k = 1 / zoom;
+  return layout.groups.map(g => {
+    const unit = g.flow.channel === 'web' ? 'page' : 'screen';
+    const n = g.nodes.length;
+    const on = flowId === g.flow.id;
+    const placed = g.nodes.some(x => x.pos);
+    return (
+      <div key={g.flow.id} data-canvas-bg="1" data-group-id={g.flow.id} className="ac-group" style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `${1 * k}px dashed ${on ? V : '#D2CFC7'}`, borderRadius: 16 * k, background: 'rgba(255,255,255,.28)' }}>
+        <div style={{ position: 'absolute', left: 14 * k, top: -9 * k, height: 0 }}>
+          <div className="ac-group-head" style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${k})`, transformOrigin: '0 50%', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: on ? V : CH.muted }}
+            onPointerDown={e => e.stopPropagation()} onDoubleClick={e => { e.stopPropagation(); setRenaming(g.flow.id); }}>
+            {renaming === g.flow.id
+              ? <span style={{ textTransform: 'none', letterSpacing: 0, display: 'inline-flex', width: 160 }}><InlineRename value={g.flow.name} onDone={name => { setRenaming(null); act('upsert_flow', { id: g.flow.id, name }); }} onCancel={() => setRenaming(null)} /></span>
+              : <button type="button" title="Inspect the flow (double-click to rename)" onClick={() => setUi(u => ({ ...u, flowId: g.flow.id }))} style={{ font: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit', color: 'inherit', background: 'none', border: 0, padding: 0 }}>{g.flow.name}</button>}
+            <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {n} {unit}{n === 1 ? '' : 's'} · {g.flow.channel}</span>
+            <button type="button" className="ac-group-act" title={`Add a ${unit}`} onClick={() => act('upsert_node', { flowId: g.flow.id })}>+ {unit}</button>
+            {placed && <button type="button" className="ac-group-act" title="Tidy: return to the automatic layout (⇧T)" onClick={() => act('tidy_flow', { flowId: g.flow.id })}>Tidy</button>}
+          </div>
+        </div>
+      </div>
+    );
+  });
+}
+
+// ---- Diagram layer (§8.5): the draw shapes live in the diagram group of the canvas ----
+const DRAW_SHAPE_TOOLS = ['rect', 'ellipse', 'line', 'arrow', 'text', 'pen'];
+
+// useDrawTools: creation, move and resize gestures for shapes, in diagram coordinates (world minus origin).
+function useDrawTools({ tool, origin, tokens, shapes, sel }) {
+  const { act, viewport } = useS();
+  const [creating, setCreating] = useState(null);
+  const [override, setOverride] = useState(null); // shape being moved/resized (local until release)
+  const [textAt, setTextAt] = useState(null);
+  const originRef = useLatest(origin);
+  const toDiagram = useCallback((cx, cy) => { const w = viewport.toWorld(cx, cy); const o = originRef.current; return { x: w.x - o.x, y: w.y - o.y }; }, [viewport, originRef]);
+  const track = (onMove, onUp) => {
+    const move = ev => onMove(ev);
+    const up = ev => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onUp(ev); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  // pointer down on empty canvas with a shape tool
+  const onCanvasDown = e => {
+    if (e.button !== 0 || textAt || !DRAW_SHAPE_TOOLS.includes(tool)) return false;
+    e.preventDefault();
+    const w = toDiagram(e.clientX, e.clientY);
+    const snapOn = !e.altKey;
+    const sx = snap(w.x, snapOn), sy = snap(w.y, snapOn);
+    if (tool === 'text') { setTextAt({ x: sx, y: sy }); return true; }
+    if (tool === 'pen') {
+      let pts = [[Math.round(w.x * 10) / 10, Math.round(w.y * 10) / 10]];
+      let lastScreen = [e.clientX, e.clientY];
+      setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
+      track(ev => {
+        if (Math.hypot(ev.clientX - lastScreen[0], ev.clientY - lastScreen[1]) < 2) return;
+        lastScreen = [ev.clientX, ev.clientY];
+        const q = toDiagram(ev.clientX, ev.clientY);
+        pts = [...pts, [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10]];
+        setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
+      }, () => {
+        const simp = pts.filter((q, i) => i === 0 || i === pts.length - 1 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) >= 1.5);
+        setCreating(null);
+        if (simp.length >= 2) act('add_shape', { shape: { type: 'pen', points: simp, stroke: 'ink', sw: 2 } });
+      });
+      return true;
+    }
+    const make = (ev, alt) => {
+      const q = toDiagram(ev.clientX, ev.clientY);
+      const ex = snap(q.x, !alt), ey = snap(q.y, !alt);
+      if (tool === 'line' || tool === 'arrow') return { type: tool, x1: sx, y1: sy, x2: ex, y2: ey, stroke: 'ink', sw: 1.5 };
+      return { type: tool, x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy), stroke: 'ink', fill: 'none', sw: 1.5 };
+    };
+    let last = make(e, e.altKey);
+    setCreating(last);
+    track(ev => { last = make(ev, ev.altKey); setCreating(last); }, () => {
+      setCreating(null);
+      const big = last.type === 'line' || last.type === 'arrow' ? Math.hypot(last.x2 - last.x1, last.y2 - last.y1) > 2 : last.w > 2 && last.h > 2;
+      if (big) act('add_shape', { shape: last });
+    });
+    return true;
+  };
+  const onShapeDown = (e, s) => {
+    if (tool !== 'select' || e.button !== 0) return;
+    e.stopPropagation();
+    if (!sel || sel.shapeId !== s.id) act('set_selection', { selection: { kind: 'shape', shapeId: s.id } });
+    const start = toDiagram(e.clientX, e.clientY);
+    let cur = s, moved = false;
+    track(ev => {
+      const q = toDiagram(ev.clientX, ev.clientY);
+      const dx = q.x - start.x, dy = q.y - start.y;
+      if (!moved && Math.hypot(dx, dy) * viewport.ref.current.zoom < 3) return;
+      moved = true;
+      cur = moveShape(s, dx, dy, !ev.altKey);
+      setOverride(cur);
+    }, () => {
+      if (moved) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null));
+      else setOverride(null);
+    });
+  };
+  const onHandleDown = (e, s, h) => {
+    e.stopPropagation();
+    let cur = s;
+    track(ev => {
+      const q = toDiagram(ev.clientX, ev.clientY);
+      const x = snap(q.x, !ev.altKey), y = snap(q.y, !ev.altKey);
+      if (s.type === 'line' || s.type === 'arrow') cur = h === 'p1' ? { ...s, x1: x, y1: y } : { ...s, x2: x, y2: y };
+      else {
+        let x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+        if (h.includes('w')) x1 = x; if (h.includes('e')) x2 = x; if (h.includes('n')) y1 = y; if (h.includes('s')) y2 = y;
+        cur = { ...s, x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.max(1, Math.abs(x2 - x1)), h: Math.max(1, Math.abs(y2 - y1)) };
+      }
+      setOverride(cur);
+    }, () => { if (cur !== s) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null)); else setOverride(null); });
+  };
+  return { creating, override, textAt, setTextAt, onCanvasDown, onShapeDown, onHandleDown, toDiagram };
+}
+
+function DrawLayer({ origin, zoom, tokens, shapes, sel, tool, draw }) {
+  const { act } = useS();
+  const { creating, override, textAt, setTextAt, onShapeDown, onHandleDown } = draw;
+  const shown = sel && sel.kind === 'shape' ? shapes.find(s => s.id === sel.shapeId) : null;
+  const list = shapes.map(s => (override && override.id === s.id ? override : s));
+  const selShape = shown ? (override && override.id === shown.id ? override : shown) : null;
+  const hs = 8 / zoom, sw = 1.5 / zoom;
+  const handles = [];
+  if (selShape && tool === 'select') {
+    if (selShape.type === 'rect' || selShape.type === 'ellipse') {
+      const { x, y, w, h } = selShape;
+      [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2]]
+        .forEach(([k, hx, hy]) => handles.push(<rect key={k} x={hx - hs / 2} y={hy - hs / 2} width={hs} height={hs} fill="#fff" stroke={V} strokeWidth={sw} style={{ cursor: k.length === 2 ? (k === 'nw' || k === 'se' ? 'nwse-resize' : 'nesw-resize') : k === 'n' || k === 's' ? 'ns-resize' : 'ew-resize' }} onPointerDown={e => onHandleDown(e, selShape, k)} />));
+    } else if (selShape.type === 'line' || selShape.type === 'arrow') {
+      [['p1', selShape.x1, selShape.y1], ['p2', selShape.x2, selShape.y2]].forEach(([k, hx, hy]) => handles.push(<circle key={k} cx={hx} cy={hy} r={hs / 2 + 1 / zoom} fill="#fff" stroke={V} strokeWidth={sw} style={{ cursor: 'move' }} onPointerDown={e => onHandleDown(e, selShape, k)} />));
+    }
+  }
+  const box = selShape && shapeBox(selShape, tokens);
+  return (
+    <svg data-draw-layer="1" style={{ position: 'absolute', left: origin.x, top: origin.y, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none', zIndex: 2 }}>
+      <defs>
+        {COLOR_KEYS.map(k => (
+          <marker key={k} id={'ah-' + k} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={tokens.colors[k]} /></marker>
+        ))}
+      </defs>
+      {list.map(s => (
+        <g key={s.id} data-shape-id={s.id} onPointerDown={e => onShapeDown(e, s)} style={{ pointerEvents: tool === 'select' ? 'auto' : 'none', cursor: tool === 'select' ? 'move' : undefined }}>
+          <DrawShape s={s} tokens={tokens} />
+          {(s.type === 'line' || s.type === 'arrow' || s.type === 'pen') && (
+            s.type === 'pen'
+              ? <polyline points={s.points.map(q => q.join(',')).join(' ')} fill="none" stroke="transparent" strokeWidth={10 / zoom} />
+              : <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth={10 / zoom} />
+          )}
+          {s.type === 'text' && (() => { const b = shapeBox(s, tokens); return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />; })()}
+          {(s.type === 'rect' || s.type === 'ellipse') && s.fill === 'none' && <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="transparent" stroke="none" />}
+        </g>
+      ))}
+      {creating && <g opacity=".85"><DrawShape s={creating} tokens={tokens} /></g>}
+      {box && <rect x={box.x - 4 / zoom} y={box.y - 4 / zoom} width={box.w + 8 / zoom} height={box.h + 8 / zoom} fill="none" stroke={V} strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} pointerEvents="none" />}
+      <g style={{ pointerEvents: 'auto' }}>{handles}</g>
+      {textAt && (
+        <foreignObject x={textAt.x} y={textAt.y - tokens.type.md.lh} width={420} height={tokens.type.md.lh + 8} style={{ pointerEvents: 'auto' }}>
+          <TextPlacer onDone={text => { const at = textAt; setTextAt(null); if (text) act('add_shape', { shape: { type: 'text', x: at.x, y: at.y, text, role: 'md', ink: 'ink' } }); }} tokens={tokens} />
+        </foreignObject>
+      )}
+    </svg>
+  );
+}
+
+// ---- Pins on the canvas (§10): board pins on artboards, draw pins in the diagram, node pins inside entered artboards ----
+// Measures block rects inside an artboard in its own (unscaled) px via offset geometry, so a world transform does not matter.
+function useOffsetRects(ref, attr, sig) {
+  const [rects, setRects] = useState({});
+  useLayoutEffect(() => {
+    const c = ref.current && ref.current.closest('[data-art-id]');
+    if (!c) return;
+    const out = {};
+    c.querySelectorAll(`[${attr}]`).forEach(el => { out[el.getAttribute(attr)] = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }; });
+    setRects(prev => (JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
+  }, [ref, attr, sig]);
+  return rects;
+}
+
+// Pins that live on one artboard: board pins (fractions of the artboard) and node pins (fractions of a block or of the frame).
+function ArtboardPins({ node, box, zoom, entered }) {
+  const { state, ui, viewport } = useS();
+  const p = state.project;
+  const ref = useRef(null);
+  const rects = useOffsetRects(ref, 'data-block-id', JSON.stringify([node, state.view.breakpoint, p.tokens]));
+  const items = p.pins.filter(x => (x.target.type === 'board' || x.target.type === 'node') && x.target.nodeId === node.id && pinVisible(x, state, ui)).map(x => {
+    const r = x.target.blockId ? rects[x.target.blockId] : null;
+    const frame = x.target.type === 'board' ? { x: 0, y: 0, w: box.w, h: box.h } : (r || { x: 0, y: 0, w: box.w, h: node.kind === 'screen' ? PHONE_H : box.h });
+    if (x.target.blockId && !r) return null;
+    return {
+      pin: x, left: frame.x + x.x * frame.w, top: frame.y + x.y * frame.h,
+      coords: (cx, cy) => { const w = viewport.toWorld(cx, cy); return { x: clamp((w.x - box.x - frame.x) / frame.w, 0, 1), y: clamp((w.y - box.y - frame.y) / frame.h, 0, 1) }; },
+    };
+  }).filter(Boolean);
+  return <div ref={ref} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><PinsLayer items={items} scale={1 / zoom} /></div>;
+}
+
 // The infinite canvas: dot grid, world transform, groups and artboards.
 function Canvas({ spaceHeld }) {
-  const { state, act, ui, setUi, viewport, canvasRef } = useS();
+  const { state, act, ui, setUi, viewport, canvasRef, canvasApi } = useS();
   const p = state.project, v = state.view, tokens = p.tokens;
   const bp = v.breakpoint;
   const worldRef = useRef(null);
@@ -2612,6 +2589,28 @@ function Canvas({ spaceHeld }) {
     return () => el.removeEventListener('wheel', wheel);
   }, [viewport.onWheel]); // eslint-disable-line
   const sel = v.selection, entered = v.entered;
+  const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
+  useEffect(() => { canvasApi.current.fitAll = () => { autoFit.current = false; viewport.fitTo(layout.bounds, 80, true); }; }, [layout.bounds, viewport, canvasApi]);
+  const draw = useDrawTools({ tool, origin: layout.diagram, tokens, shapes: p.draw.shapes, sel });
+  const [draft, setDraft] = useState(null); // pin being placed: {sx, sy, target, x, y} (screen px + target coords)
+  // the Pin tool on an artboard: board pin (not entered) or node pin on a block / the frame (entered)
+  const annotateDown = (e, n) => {
+    if (e.button !== 0 || e.target.closest('.ac-pin, .ac-pop')) return;
+    e.stopPropagation(); e.preventDefault();
+    const r = canvasRef.current.getBoundingClientRect();
+    const box = layout.pos[n.id];
+    const w = viewport.toWorld(e.clientX, e.clientY);
+    const sec = entered === n.id ? e.target.closest('[data-block-id]') : null;
+    let target, x, y;
+    if (entered !== n.id) { target = { type: 'board', nodeId: n.id }; x = (w.x - box.x) / box.w; y = (w.y - box.y) / box.h; }
+    else if (sec) { const art = e.target.closest('[data-art-id]'); const sr = sec.getBoundingClientRect(), ar = art.getBoundingClientRect(); target = { type: 'node', nodeId: n.id, blockId: sec.getAttribute('data-block-id') }; x = (e.clientX - sr.left) / sr.width; y = (e.clientY - sr.top) / sr.height; void ar; }
+    else { target = { type: 'node', nodeId: n.id }; x = (w.x - box.x) / box.w; y = (w.y - box.y) / (n.kind === 'screen' ? PHONE_H : box.h); }
+    setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target, x: clamp(x, 0, 1), y: clamp(y, 0, 1) });
+  };
+  const drawPinItems = p.pins.filter(x => x.target.type === 'draw' && pinVisible(x, state, ui)).map(x => ({
+    pin: x, left: x.x, top: x.y,
+    coords: (cx, cy) => { const q = draw.toDiagram(cx, cy); return { x: Math.round(q.x), y: Math.round(q.y) }; },
+  }));
   const [edgeDrag, setEdgeDrag] = useState(null);   // {fromId, x1, y1, x2, y2} world
   const [pending, setPending] = useState(null);     // {fromId, toId, sx, sy} screen
   const onPortDown = (e, n, portY) => {
@@ -2630,10 +2629,16 @@ function Canvas({ spaceHeld }) {
     };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
-  const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
   const onDown = e => {
     if (e.button !== 0) return;
     const bg = e.target === e.currentTarget || e.target.closest('[data-canvas-bg]');
+    if (tool === 'pin') {
+      if (!bg || e.target.closest('.ac-pin, .ac-pop')) return;
+      const r = canvasRef.current.getBoundingClientRect(), q = draw.toDiagram(e.clientX, e.clientY);
+      setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target: { type: 'draw' }, x: Math.round(q.x), y: Math.round(q.y) });
+      return;
+    }
+    if (bg && draw.onCanvasDown(e)) return;
     if (tool === 'hand' || (tool === 'select' && bg)) {
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY, o = viewport.ref.current;
@@ -2645,17 +2650,23 @@ function Canvas({ spaceHeld }) {
   };
   let step = 24 * view.zoom; while (step < 14) step *= 2;
   const gridOpacity = clamp((view.zoom - 0.2) / 0.15, 0, 1);
-  const cursor = tool === 'hand' ? 'grab' : 'default';
+  const cursor = tool === 'hand' ? 'grab' : tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
   return (
     <div ref={canvasRef} data-canvas="1" style={{ position: 'absolute', inset: 0, overflow: 'hidden', userSelect: 'none', background: CH.backdrop, cursor, touchAction: 'none' }} onPointerDownCapture={() => { autoFit.current = false; }} onPointerDown={onDown}>
       <div data-canvas-bg="1" style={{ position: 'absolute', inset: 0, opacity: gridOpacity, backgroundImage: 'radial-gradient(var(--ac-dot) 1px, transparent 1.2px)', backgroundSize: `${step}px ${step}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
       <div ref={worldRef} className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
-        {layout.groups.map(g => (
-          <div key={g.flow.id} data-canvas-bg="1" className="absolute" style={{ left: g.x, top: g.y, width: g.w, height: g.h, border: '1px dashed #D2CFC7', borderRadius: 16, background: 'rgba(255,255,255,.28)' }} />
-        ))}
+        <Groups layout={layout} zoom={view.zoom} flowId={ui.flowId} />
+        <div data-canvas-bg="1" style={{ position: 'absolute', left: layout.diagramBox.x - ART.GROUP_PAD, top: layout.diagramBox.y - ART.GROUP_PAD, width: layout.diagramBox.w + 2 * ART.GROUP_PAD, height: layout.diagramBox.h + 2 * ART.GROUP_PAD, border: `${1 / view.zoom}px dashed #D2CFC7`, borderRadius: 16 / view.zoom, background: 'rgba(255,255,255,.28)' }}>
+          <div style={{ position: 'absolute', left: 14 / view.zoom, top: -9 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 50%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
+        </div>
+        <DrawLayer origin={layout.diagram} zoom={view.zoom} tokens={tokens} shapes={p.draw.shapes} sel={sel} tool={tool} draw={draw} />
+        <div style={{ position: 'absolute', left: layout.diagram.x, top: layout.diagram.y, width: 0, height: 0, zIndex: 40 }}><PinsLayer items={drawPinItems} scale={1 / view.zoom} /></div>
         <Connectors layout={layout} edges={p.edges} zoom={view.zoom} sel={sel} drag={edgeDrag} />
-        <Artboards layout={layout} zoom={view.zoom} bp={bp} tokens={tokens} nodes={p.nodes} flows={p.flows} sel={sel} entered={entered} tool={tool} annotateDown={() => {}} pinsFor={null} onPortDown={onPortDown} />
+        <Artboards layout={layout} zoom={view.zoom} bp={bp} tokens={tokens} nodes={p.nodes} flows={p.flows} sel={sel} entered={entered} tool={tool} annotateDown={annotateDown}
+          pinsFor={(n, box) => <ArtboardPins node={n} box={box} zoom={view.zoom} entered={entered === n.id} />} onPortDown={onPortDown} />
       </div>
+      {/* pin being placed: screen space so it keeps its size */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 45 }}><PinsLayer items={[]} draft={draft} onDraftDone={() => setDraft(null)} /></div>
       {pending && (
         <div style={{ position: 'absolute', left: pending.sx, top: pending.sy, zIndex: 50 }} onPointerDown={e => e.stopPropagation()}>
           <EdgeLabelInput onDone={label => { const pd = pending; setPending(null); if (label != null) act('upsert_edge', { fromId: pd.fromId, toId: pd.toId, label }); }} />
@@ -2665,15 +2676,6 @@ function Canvas({ spaceHeld }) {
   );
 }
 window.__ac = Object.assign(window.__ac || {}, { layoutCanvas, laneOrder });
-
-function WebEditor() {
-  const { state } = useS();
-  const v = state.view;
-  if (v.view.web === 'board') return <StoryboardView channel="web" />;
-  const node = findNode(state.project, v.currentNodeId.web);
-  if (!node) return <StartChannel channel="web" />;
-  return <WebPage node={node} />;
-}
 
 function WebPage({ node }) {
   const { state, act, ui } = useS();
@@ -2774,15 +2776,6 @@ function WebPage({ node }) {
   );
 }
 
-function StoryEditor() {
-  const { state } = useS();
-  const v = state.view;
-  if (v.view.story === 'board') return <StoryboardView channel="mobile" />;
-  const node = findNode(state.project, v.currentNodeId.mobile);
-  if (!node) return <StartChannel channel="mobile" />;
-  return <StoryPage node={node} />;
-}
-
 function StoryPage({ node }) {
   const { state, act, ui } = useS();
   const p = state.project, v = state.view, sel = v.selection;
@@ -2877,192 +2870,6 @@ function moveShape(s, dx, dy, snapOn) {
 const geomPatch = s => (s.type === 'line' || s.type === 'arrow') ? { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 }
   : s.type === 'pen' ? { points: s.points } : s.type === 'text' ? { x: s.x, y: s.y } : { x: s.x, y: s.y, w: s.w, h: s.h };
 
-function DrawEditor({ spaceHeld }) {
-  const { state, act, ui, drawView: view, setDrawView } = useS();
-  const p = state.project, tokens = p.tokens, sel = state.view.selection;
-  const svgRef = useRef(null);
-  const [creating, setCreating] = useState(null);
-  const [override, setOverride] = useState(null); // shape being moved/resized (local until release)
-  const [textAt, setTextAt] = useState(null);
-  const [draft, setDraft] = useState(null);
-  const viewRef = useLatest(view);
-  const tool = spaceHeld ? 'pan' : ui.drawTool;
-  const selShape = sel && sel.kind === 'shape' ? p.draw.shapes.find(s => s.id === sel.shapeId) : null;
-
-  const toWorld = (cx, cy) => { const r = svgRef.current.getBoundingClientRect(), vw = viewRef.current; return { x: (cx - r.left - vw.x) / vw.zoom, y: (cy - r.top - vw.y) / vw.zoom }; };
-
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-    const wheel = e => {
-      e.preventDefault();
-      const r = el.getBoundingClientRect();
-      const mx = e.clientX - r.left, my = e.clientY - r.top;
-      setDrawView(vw => {
-        const z = clamp(vw.zoom * Math.exp(-e.deltaY * 0.0015), 0.25, 4);
-        const wx = (mx - vw.x) / vw.zoom, wy = (my - vw.y) / vw.zoom;
-        return { x: mx - wx * z, y: my - wy * z, zoom: z };
-      }, true);
-    };
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
-  }, [setDrawView]);
-
-  const track = (onMove, onUp) => {
-    const move = ev => onMove(ev);
-    const up = ev => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onUp(ev); };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
-  };
-
-  const onDown = e => {
-    if (e.button !== 0 || textAt) return;
-    const w = toWorld(e.clientX, e.clientY);
-    if (ui.annotate) {
-      const r = svgRef.current.getBoundingClientRect();
-      setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target: { type: 'draw' }, x: Math.round(w.x), y: Math.round(w.y) });
-      return;
-    }
-    if (tool === 'pan') {
-      const sx = e.clientX, sy = e.clientY, o = viewRef.current;
-      track(ev => setDrawView(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy })), () => setDrawView(vw => vw, true));
-      return;
-    }
-    if (tool === 'select') { if (sel) act('set_selection', { selection: null }); return; }
-    const snapOn = !e.altKey;
-    const sx = snap(w.x, snapOn), sy = snap(w.y, snapOn);
-    if (tool === 'text') { setTextAt({ x: sx, y: sy }); return; }
-    if (tool === 'pen') {
-      let pts = [[Math.round(w.x * 10) / 10, Math.round(w.y * 10) / 10]];
-      let lastScreen = [e.clientX, e.clientY];
-      setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
-      track(ev => {
-        if (Math.hypot(ev.clientX - lastScreen[0], ev.clientY - lastScreen[1]) < 2) return;
-        lastScreen = [ev.clientX, ev.clientY];
-        const q = toWorld(ev.clientX, ev.clientY);
-        pts = [...pts, [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10]];
-        setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
-      }, () => {
-        const simp = pts.filter((q, i) => i === 0 || i === pts.length - 1 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) >= 1.5);
-        setCreating(null);
-        if (simp.length >= 2) act('add_shape', { shape: { type: 'pen', points: simp, stroke: 'ink', sw: 2 } });
-      });
-      return;
-    }
-    const make = (ev, alt) => {
-      const q = toWorld(ev.clientX, ev.clientY);
-      const ex = snap(q.x, !alt), ey = snap(q.y, !alt);
-      if (tool === 'line' || tool === 'arrow') return { type: tool, x1: sx, y1: sy, x2: ex, y2: ey, stroke: 'ink', sw: 1.5 };
-      return { type: tool, x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy), stroke: 'ink', fill: 'none', sw: 1.5 };
-    };
-    let last = make(e, e.altKey);
-    setCreating(last);
-    track(ev => { last = make(ev, ev.altKey); setCreating(last); }, () => {
-      setCreating(null);
-      const big = last.type === 'line' || last.type === 'arrow' ? Math.hypot(last.x2 - last.x1, last.y2 - last.y1) > 2 : last.w > 2 && last.h > 2;
-      if (big) act('add_shape', { shape: last });
-    });
-  };
-
-  const onShapeDown = (e, s) => {
-    if (ui.annotate || tool !== 'select' || e.button !== 0) return;
-    e.stopPropagation();
-    if (!sel || sel.shapeId !== s.id) act('set_selection', { selection: { kind: 'shape', shapeId: s.id } });
-    const start = toWorld(e.clientX, e.clientY);
-    let cur = s, moved = false;
-    track(ev => {
-      const q = toWorld(ev.clientX, ev.clientY);
-      const dx = q.x - start.x, dy = q.y - start.y;
-      if (!moved && Math.hypot(dx, dy) * viewRef.current.zoom < 3) return;
-      moved = true;
-      cur = moveShape(s, dx, dy, !ev.altKey);
-      setOverride(cur);
-    }, () => {
-      if (moved) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null));
-      else setOverride(null);
-    });
-  };
-
-  const onHandleDown = (e, s, h) => {
-    e.stopPropagation();
-    let cur = s;
-    track(ev => {
-      const q = toWorld(ev.clientX, ev.clientY);
-      const x = snap(q.x, !ev.altKey), y = snap(q.y, !ev.altKey);
-      if (s.type === 'line' || s.type === 'arrow') cur = h === 'p1' ? { ...s, x1: x, y1: y } : { ...s, x2: x, y2: y };
-      else {
-        let x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
-        if (h.includes('w')) x1 = x; if (h.includes('e')) x2 = x; if (h.includes('n')) y1 = y; if (h.includes('s')) y2 = y;
-        cur = { ...s, x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.max(1, Math.abs(x2 - x1)), h: Math.max(1, Math.abs(y2 - y1)) };
-      }
-      setOverride(cur);
-    }, () => { if (cur !== s) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null)); else setOverride(null); });
-  };
-
-  const shapes = p.draw.shapes.map(s => (override && override.id === s.id ? override : s));
-  const shown = selShape ? (override && override.id === selShape.id ? override : selShape) : null;
-  const hs = 8 / view.zoom;
-  const handles = [];
-  if (shown && tool === 'select' && !ui.annotate) {
-    if (shown.type === 'rect' || shown.type === 'ellipse') {
-      const { x, y, w, h } = shown;
-      [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2]]
-        .forEach(([k, hx, hy]) => handles.push(<rect key={k} x={hx - hs / 2} y={hy - hs / 2} width={hs} height={hs} fill="#FBF8F2" stroke={V} strokeWidth={1.5 / view.zoom} style={{ cursor: k.length === 2 ? (k === 'nw' || k === 'se' ? 'nwse-resize' : 'nesw-resize') : k === 'n' || k === 's' ? 'ns-resize' : 'ew-resize' }} onPointerDown={e => onHandleDown(e, shown, k)} />));
-    } else if (shown.type === 'line' || shown.type === 'arrow') {
-      [['p1', shown.x1, shown.y1], ['p2', shown.x2, shown.y2]].forEach(([k, hx, hy]) => handles.push(<circle key={k} cx={hx} cy={hy} r={hs / 2 + 1 / view.zoom} fill="#FBF8F2" stroke={V} strokeWidth={1.5 / view.zoom} style={{ cursor: 'move' }} onPointerDown={e => onHandleDown(e, shown, k)} />));
-    }
-  }
-  const box = shown && shapeBox(shown, tokens);
-  const dot = 8 * view.zoom >= 6 ? 8 : 32;
-  const pinItems = p.pins.filter(x => x.target.type === 'draw' && pinVisible(x, state, ui)).map(x => ({
-    pin: x, left: view.x + x.x * view.zoom, top: view.y + x.y * view.zoom,
-    coords: (cx, cy) => { const q = toWorld(cx, cy); return { x: Math.round(q.x), y: Math.round(q.y) }; },
-  }));
-  const cursor = ui.annotate ? 'crosshair' : tool === 'pan' ? 'grab' : tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <svg ref={svgRef} data-draw-canvas="1" width="100%" height="100%" style={{ display: 'block', background: tokens.colors.paper, cursor, touchAction: 'none' }} onPointerDown={onDown}>
-        <defs>
-          <pattern id="dotgrid" width={dot * view.zoom} height={dot * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
-            <circle cx={0.8} cy={0.8} r={0.8} fill="#CFC6B5" />
-          </pattern>
-          {COLOR_KEYS.map(k => (
-            <marker key={k} id={'ah-' + k} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={tokens.colors[k]} /></marker>
-          ))}
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dotgrid)" />
-        <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
-          {shapes.map(s => (
-            <g key={s.id} data-shape-id={s.id} onPointerDown={e => onShapeDown(e, s)} style={{ cursor: tool === 'select' && !ui.annotate ? 'move' : undefined }}>
-              <DrawShape s={s} tokens={tokens} />
-              {(s.type === 'line' || s.type === 'arrow' || s.type === 'pen') && (
-                s.type === 'pen'
-                  ? <polyline points={s.points.map(q => q.join(',')).join(' ')} fill="none" stroke="transparent" strokeWidth={10 / view.zoom} />
-                  : <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth={10 / view.zoom} />
-              )}
-              {s.type === 'text' && (() => { const b = shapeBox(s, tokens); return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />; })()}
-              {(s.type === 'rect' || s.type === 'ellipse') && s.fill === 'none' && <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="transparent" stroke="none" />}
-            </g>
-          ))}
-          {creating && <g opacity=".85"><DrawShape s={creating} tokens={tokens} /></g>}
-          {box && <rect x={box.x - 4 / view.zoom} y={box.y - 4 / view.zoom} width={box.w + 8 / view.zoom} height={box.h + 8 / view.zoom} fill="none" stroke={V} strokeWidth={1 / view.zoom} strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`} pointerEvents="none" />}
-          {handles}
-          {textAt && (
-            <foreignObject x={textAt.x} y={textAt.y - tokens.type.md.lh} width={420} height={tokens.type.md.lh + 8}>
-              <TextPlacer onDone={text => { const at = textAt; setTextAt(null); if (text) act('add_shape', { shape: { type: 'text', x: at.x, y: at.y, text, role: 'md', ink: 'ink' } }); }} tokens={tokens} />
-            </foreignObject>
-          )}
-        </g>
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
-      </div>
-      <div className="absolute left-3 bottom-3 text-[11px] text-[#6B665C] bg-[#FBF8F2]/90 px-2 py-1 rounded border border-[#DDD5C4] pointer-events-none">
-        {tool[0].toUpperCase() + tool.slice(1)} · {Math.round(view.zoom * 100)}% · snap 8px (Alt frees)
-      </div>
-    </div>
-  );
-}
-
 function TextPlacer({ onDone, tokens }) {
   const [d, setD] = useState('');
   const done = useRef(false);
@@ -3133,28 +2940,12 @@ class ErrorBoundary extends React.Component {
 function App() {
   const studio = useStudio();
   const { state, conn, act, toast } = studio;
-  const [ui, setUi] = useState({ annotate: false, pinKind: 'issue', drawTool: 'select', inspectorTab: 'content', reviewFilter: { kind: 'all', status: 'open' }, skillsOpen: false });
+  const [ui, setUi] = useState({ tool: 'select', pinKind: 'issue', inspectorTab: 'content', reviewFilter: { kind: 'all', status: 'open' }, skillsOpen: false, leftTab: 'layers', leftOpen: true, flowId: null });
+  const canvasApi = useRef({});
   const [spaceHeld, setSpaceHeld] = useState(false);
   const docRef = useRef({});
   const navRef = useRef(null);
   const stRef = useLatest(state), uiRef = useLatest(ui);
-
-  // draw view: local while interacting, persisted with set_draw_view (debounced)
-  const [drawView, setDV] = useState({ x: 0, y: 0, zoom: 1 });
-  const dvRef = useRef(drawView), lastSent = useRef(null), dvTimer = useRef(0);
-  const serverView = state ? state.project.draw.view : null;
-  useEffect(() => {
-    if (!serverView) return;
-    if (!lastSent.current || JSON.stringify(serverView) !== JSON.stringify(lastSent.current)) { dvRef.current = serverView; setDV(serverView); lastSent.current = serverView; }
-  }, [serverView]);
-  const setDrawView = useCallback((fn, commit) => {
-    const next = fn(dvRef.current);
-    dvRef.current = next; setDV(next);
-    if (commit) {
-      clearTimeout(dvTimer.current);
-      dvTimer.current = setTimeout(() => { lastSent.current = next; act('set_draw_view', next); }, 250);
-    }
-  }, [act]);
 
   // canvas viewport: local while interacting, persisted with set_canvas_view (debounced)
   const canvasRef = useRef(null);
@@ -3163,7 +2954,7 @@ function App() {
 
   // leaving the draw tab or a mode resets transient local UI
   const tab = state ? state.view.tab : 'web';
-  useEffect(() => { setUi(u => (u.annotate ? { ...u, annotate: false } : u)); }, [tab]);
+  useEffect(() => { setUi(u => (u.tool !== 'select' ? { ...u, tool: 'select' } : u)); }, [tab]);
 
   // one keydown listener on window (§11.1)
   useEffect(() => {
@@ -3188,7 +2979,8 @@ function App() {
         if (v.preview) { act('set_preview', { on: false }); return; }
         if (typing) { active.blur(); return; }
         if (u.skillsOpen) { setUi(x => ({ ...x, skillsOpen: false })); return; }
-        if (u.annotate) setUi(x => ({ ...x, annotate: false }));
+        if (u.tool !== 'select') { setUi(x => ({ ...x, tool: 'select' })); return; }
+        if (u.flowId) { setUi(x => ({ ...x, flowId: null })); return; }
         if (sel) act('set_selection', { selection: null });
         return;
       }
@@ -3198,11 +2990,11 @@ function App() {
         if (e.key === 'ArrowRight' && navRef.current) { e.preventDefault(); navRef.current.forward(); }
         return;
       }
-      if (v.tab === 'draw') {
+      if (v.tab !== 'doc') {
         if (e.key === ' ') { e.preventDefault(); if (!e.repeat) setSpaceHeld(true); return; }
-        if (mod && e.key === '0') { e.preventDefault(); setDrawView(() => ({ x: 0, y: 0, zoom: 1 }), true); return; }
-        const keyTool = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'pen', h: 'pan' }[e.key];
-        if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, drawTool: keyTool })); return; }
+        if (mod && e.key === '0') { e.preventDefault(); if (canvasApi.current.fitAll) canvasApi.current.fitAll(); return; }
+        const keyTool = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'pen', c: 'pin' }[e.key];
+        if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, tool: keyTool })); return; }
       }
       if (mod && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
@@ -3240,12 +3032,12 @@ function App() {
     window.addEventListener('keyup', onUp);
     window.addEventListener('blur', onBlur);
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); };
-  }, [act, setDrawView, stRef, uiRef, studio.showToast]);
+  }, [act, stRef, uiRef, studio.showToast]);
 
   if (!state) {
     return <div className="h-full flex items-center justify-center font-ui text-[#6B665C]">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
   }
-  const ctx = { ...studio, ui, setUi, docRef, drawView, setDrawView, viewport, canvasRef };
+  const ctx = { ...studio, ui, setUi, docRef, viewport, canvasRef, canvasApi };
   const v = state.view;
   const editor = v.tab === 'doc' ? <DesignDoc /> : <Canvas spaceHeld={spaceHeld} />;
   return (
