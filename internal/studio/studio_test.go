@@ -662,3 +662,38 @@ func TestSymlinkedDataDirRefused(t *testing.T) {
 		t.Fatalf("wrote through the symlink: %v", m)
 	}
 }
+
+func TestMoveNodeAndTidy(t *testing.T) {
+	s, _ := newMem(t)
+	act(t, s, "move_node", map[string]any{"nodeId": "pg_shop", "x": 1500.4, "y": -20})
+	n := s.project.Node("pg_shop")
+	if n.Pos == nil || n.Pos.X != 1500 || n.Pos.Y != -20 {
+		t.Fatalf("pos = %+v", n.Pos)
+	}
+	b, _ := json.Marshal(n)
+	if !strings.Contains(string(b), `"pos":{"x":1500,"y":-20}`) {
+		t.Fatalf("json %s", b)
+	}
+	act(t, s, "tidy_flow", map[string]any{"flowId": "fl_marketing"})
+	if s.project.Node("pg_shop").Pos != nil {
+		t.Fatal("tidy did not clear pos")
+	}
+	b, _ = json.Marshal(s.project.Node("pg_shop"))
+	if strings.Contains(string(b), `"pos"`) {
+		t.Fatalf("pos still emitted: %s", b)
+	}
+	refused(t, s, "invalid-payload", "tidy_flow", map[string]any{"flowId": "fl_marketing"})
+	refused(t, s, "unknown-id", "move_node", map[string]any{"nodeId": "nope", "x": 0, "y": 0})
+}
+
+func TestMoveNodeHistoryIsChannel(t *testing.T) {
+	s, _ := newMem(t)
+	act(t, s, "move_node", map[string]any{"nodeId": "sc_welcome", "x": 10, "y": 10})
+	if !s.historyFlags()["story"].CanUndo || s.historyFlags()["web"].CanUndo {
+		t.Fatal("move must go to the story history only")
+	}
+	act(t, s, "undo", map[string]any{"tab": "story"})
+	if s.project.Node("sc_welcome").Pos != nil {
+		t.Fatal("undo did not restore pos")
+	}
+}

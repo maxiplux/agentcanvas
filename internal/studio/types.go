@@ -70,6 +70,12 @@ type TypeSpec struct {
 	Weight int `json:"weight"`
 }
 
+// Point is a manual artboard position on the canvas, in world units (§8.2).
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
 type Flow struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -84,6 +90,7 @@ type Node struct {
 	ID     string `json:"id"`
 	FlowID string `json:"flowId"`
 	Name   string `json:"name"`
+	Pos    *Point `json:"pos,omitempty"` // nil = auto-placed on the canvas
 	// page
 	Blocks []*Block `json:"blocks"`
 	// screen
@@ -115,6 +122,7 @@ type pageJSON struct {
 	ID     string   `json:"id"`
 	FlowID string   `json:"flowId"`
 	Name   string   `json:"name"`
+	Pos    *Point   `json:"pos,omitempty"`
 	Blocks []*Block `json:"blocks"`
 }
 
@@ -123,6 +131,7 @@ type screenJSON struct {
 	ID        string     `json:"id"`
 	FlowID    string     `json:"flowId"`
 	Name      string     `json:"name"`
+	Pos       *Point     `json:"pos,omitempty"`
 	Archetype string     `json:"archetype"`
 	Layout    string     `json:"layout"`
 	Fill      string     `json:"fill"`
@@ -144,14 +153,14 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 		if hs == nil {
 			hs = []*Hotspot{}
 		}
-		return json.Marshal(screenJSON{n.Kind, n.ID, n.FlowID, n.Name, n.Archetype, n.Layout, n.Fill, n.Ink,
+		return json.Marshal(screenJSON{n.Kind, n.ID, n.FlowID, n.Name, n.Pos, n.Archetype, n.Layout, n.Fill, n.Ink,
 			n.Title, n.Body, n.TypeRole, n.Weight, n.Align, n.Pad, n.Gap, n.CTA, hs})
 	}
 	bl := n.Blocks
 	if bl == nil {
 		bl = []*Block{}
 	}
-	return json.Marshal(pageJSON{n.Kind, n.ID, n.FlowID, n.Name, bl})
+	return json.Marshal(pageJSON{n.Kind, n.ID, n.FlowID, n.Name, n.Pos, bl})
 }
 
 type ScreenCTA struct {

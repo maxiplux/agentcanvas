@@ -111,6 +111,8 @@ func init() {
 		"delete_flow":      (*reducer).deleteFlowA,
 		"upsert_node":      (*reducer).upsertNode,
 		"reorder_nodes":    (*reducer).reorderNodes,
+		"move_node":        (*reducer).moveNode,
+		"tidy_flow":        (*reducer).tidyFlow,
 		"delete_node":      (*reducer).deleteNodeA,
 		"insert_block":     (*reducer).insertBlock,
 		"update_block":     (*reducer).updateBlock,
@@ -1076,6 +1078,56 @@ func (r *reducer) reorderNodes() error {
 	}
 	r.out.History = histFor(f.Channel)
 	r.out.Summary = "Reordered " + f.Name
+	return nil
+}
+
+// moveNode places an artboard on the canvas (§8.2); the position is rounded to whole world px.
+func (r *reducer) moveNode() error {
+	var pl struct {
+		NodeID string  `json:"nodeId"`
+		X      float64 `json:"x"`
+		Y      float64 `json:"y"`
+	}
+	if err := r.decode(&pl); err != nil {
+		return err
+	}
+	n, err := r.node(pl.NodeID)
+	if err != nil {
+		return err
+	}
+	if math.IsNaN(pl.X) || math.IsInf(pl.X, 0) || math.IsNaN(pl.Y) || math.IsInf(pl.Y, 0) {
+		return errInvalid("x and y must be finite numbers", "send world coordinates in px")
+	}
+	n.Pos = &Point{X: math.Round(pl.X), Y: math.Round(pl.Y)}
+	r.out.History = histFor(n.Channel())
+	r.out.Summary = fmt.Sprintf("Moved %s to (%d, %d)", quote(n.Name), int(n.Pos.X), int(n.Pos.Y))
+	return nil
+}
+
+// tidyFlow clears every manual position in a flow so its nodes return to the lane layout.
+func (r *reducer) tidyFlow() error {
+	var pl struct {
+		FlowID string `json:"flowId"`
+	}
+	if err := r.decode(&pl); err != nil {
+		return err
+	}
+	f := r.p.Flow(pl.FlowID)
+	if f == nil {
+		return errUnknown("flow", pl.FlowID)
+	}
+	cleared := 0
+	for _, n := range r.p.Nodes {
+		if n.FlowID == f.ID && n.Pos != nil {
+			n.Pos = nil
+			cleared++
+		}
+	}
+	if cleared == 0 {
+		return errInvalid("nothing to tidy in "+f.Name, "move a node first, or pick a flow with placed nodes")
+	}
+	r.out.History = histFor(f.Channel)
+	r.out.Summary = "Tidied " + f.Name
 	return nil
 }
 
