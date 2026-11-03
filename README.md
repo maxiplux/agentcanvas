@@ -8,6 +8,8 @@ Any coding agent that speaks [MCP](https://modelcontextprotocol.io) can drive th
 - **One project per directory.** State lives in `./.agentcanvas/` next to your code.
 - **Agent-neutral MCP.** Streamable HTTP at `/mcp`, plus stdio through `agent-canvas attach` or `agent-canvas serve --stdio`.
 
+For an illustrated guide to installing and using the CLI, open [docs/index.html](docs/index.html) in a browser. It is a single self-contained page that makes no network requests.
+
 ## Install
 
 ### Download a release binary

@@ -98,7 +98,9 @@ func Run(env Env, args []string) int {
 func newFlags(env Env, name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(env.Stderr)
-	fs.Usage = func() { fmt.Fprint(env.Stderr, usage) }
+	fs.Usage = func() {
+		// Intentionally empty: parse prints usage once (stdout for --help, stderr for mistakes).
+	}
 	return fs
 }
 
@@ -108,6 +110,7 @@ func parse(env Env, fs *flag.FlagSet, args []string) (ok bool, code int) {
 			fmt.Fprint(env.Stdout, usage)
 			return false, ExitOK
 		}
+		fmt.Fprint(env.Stderr, "\n"+usage)
 		return false, ExitErr
 	}
 	return true, ExitOK
