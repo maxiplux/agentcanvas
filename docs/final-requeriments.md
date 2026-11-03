@@ -622,7 +622,7 @@ Full viewport, no page scroll. One infinite canvas fills the window under a 44px
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Top bar (44px, charcoal).** Wordmark · project name (the project directory) with a menu holding `Load the Hearth sample…` and `Start over (blank)…` · a two-way switch `Canvas | DESIGN.md` (the server `tab` is `doc` for DESIGN.md, else the last canvas tab) · agent presence pill (§8.8) · open-issue badge · undo ⟲ / redo ⟳ · `▶ Preview` (Preview for a page, Play for a screen) · `Export ▾` · `Skills · N`. No per-tab tool strips.
+**Top bar (44px, navy ink).** Wordmark · project name (the project directory) with a menu holding `Load the Hearth sample…` and `Start over (blank)…` · a two-way switch `Canvas | DESIGN.md` (the server `tab` is `doc` for DESIGN.md, else the last canvas tab) · agent presence pill (§8.8) · open-issue badge · undo ⟲ / redo ⟳ · `▶ Preview` (Preview for a page, Play for a screen) · `Export ▾` · `Skills · N`. No per-tab tool strips.
 
 **Left project panel (floating, 272px, `Cmd/Ctrl+\` collapses it to a 40px rail).** Three tabs:
 
@@ -646,21 +646,21 @@ Footer: **Ask your agent** composer (`Cmd/Ctrl+K`): typing a request and pressin
 
 **Open-issue badge**: count of pins where `kind === 'issue' && !resolved` across the whole project. Clicking it opens the Review tab of the left panel filtered to Issues/Open.
 
-**Visual system (normative for the chrome).** Neutral light tools, warm content: the tokens below style every piece of chrome; designed content keeps using `project.tokens`.
+**Visual system (normative for the chrome).** Cool blue-toned tools, warm content: the tokens below style every piece of chrome; designed content keeps using `project.tokens`.
 
 | token | value | use |
 |---|---|---|
-| `canvas` | `#F3F2EF` | the infinite surface (24 px dot grid in `dot`, fading below 35 % zoom) |
-| `dot` | `#D9D6CF` | grid dots |
+| `canvas` | `#F2F4F8` | the infinite surface (24 px dot grid in `dot`, fading below 35 % zoom) |
+| `dot` | `#D3D9E5` | grid dots |
 | `panel` | `#FFFFFF` | floating panels, artboards |
-| `hair` | `#E3E0D9` | borders |
-| `ink` | `#1C1B19` | text, active controls, top bar |
-| `muted` | `#7A766D` | secondary text and icons |
-| `faint` | `#A8A49B` | tertiary text, placeholders |
-| `accent` | `#D8432A` | selection ring, pins, cross-flow edges, one primary action |
-| `accentSoft` | `#FBE8E3` | selected rows |
-| `edge` | `#8E8A80` | connectors |
-| `ok` / `warn` | `#2E7D4F` / `#B23A1E` | check pills |
+| `hair` | `#E0E5EE` | borders |
+| `ink` | `#141B2D` | text, active controls, top bar |
+| `muted` | `#67718A` | secondary text and icons |
+| `faint` | `#98A1B5` | tertiary text, placeholders |
+| `accent` | `#2F6BFF` | selection ring, pins, cross-flow edges, one primary action |
+| `accentSoft` | `#E4ECFF` | selected rows |
+| `edge` | `#8A94AB` | connectors |
+| `ok` / `warn` | `#2E7D4F` / `#C0392B` | check pills |
 
 Radii: 12 px panels, 8 px controls and rows, 6 px chips, 999 pills; artboards 0 px (web) and 18 px (phone). Elevation `0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08)` on floating panels. Inter 13 px for tools (11 px uppercase `.08em` section labels), Fraunces only for the wordmark and designed content. Controls 30 px inputs, 32 px icon buttons, 28 px segmented buttons, focus ring 2 px `accent` at 2 px offset. Motion: 120 ms hover, 180 ms panel open/close, 220 ms ease-out zoom-to-artboard, all off under `prefers-reduced-motion`. No gradients, no purple, no glassmorphism.
 
@@ -674,7 +674,7 @@ Radii: 12 px panels, 8 px controls and rows, 6 px chips, 999 pills; artboards 0 
 
 **Placement.** Inside a group, nodes without a position are auto-placed left to right in BFS order from `startId` following edges with `kind !== 'back'` (unreached nodes follow in `nodes` order; §9.5), 120 px apart, after the right-most placed node. Dragging an artboard sets `node.pos {x, y}` (world units, 8 px snap unless `Alt`) through `move_node`; `tidy_flow` clears every position in a flow so it returns to the lane. Auto-placed and placed nodes coexist.
 
-**Ports and edges.** Each artboard has an input port (left) and an output port (right) at `y + min(height, 400) / 2`. Drag from an output port to any artboard of the same channel to create an edge; on drop an inline label input prefilled `"Link"` appears (`Enter` commits, `Esc` cancels); kind is auto-set (`cross` when the flows differ, else `primary`). Edges are SVG cubic Béziers in one world-space overlay with non-scaling strokes, leaving the output port to the right and entering the input port from the left; back and leftward edges bow below the lower artboard. Style: `primary` solid 1.5 px `edge`; `alt` dashed `6 4`; `back` dotted `2 4`; `cross` solid 2 px `accent`. Arrowhead at the target. The label is a white pill at the curve midpoint (counter-scaled); edges sharing a from/to pair are offset 28 world px each so labels never overlap. Hovering an edge raises it. Click an edge (hit test within 6 screen px, or the label) to select it; the Inspector shows the **Edge** panel: label, kind radio (disabled with explanation when cross), from/to names, `Delete edge`. `Delete` on a selected node deletes it (with confirm if it has blocks/pins).
+**Ports and edges.** Each artboard has an input port (left) and an output port (right) at `y + min(height, 400) / 2`. Drag from an output port to any artboard of the same channel to create an edge; on drop an inline label input prefilled `"Link"` appears (`Enter` commits, `Esc` cancels); kind is auto-set (`cross` when the flows differ, else `primary`). Edges are SVG cubic Béziers in one world-space overlay with non-scaling strokes, leaving the output port to the right and entering the input port from the left; back and leftward edges bow below the lower artboard. Style: `primary` solid 1.5 px `edge`; `alt` dashed `6 4`; `back` dotted `2 4`; `cross` solid 2 px `accent` (blue). Arrowhead at the target. The label is a white pill at the curve midpoint (counter-scaled); edges sharing a from/to pair are offset 28 world px each so labels never overlap. Hovering an edge raises it. Click an edge (hit test within 6 screen px, or the label) to select it; the Inspector shows the **Edge** panel: label, kind radio (disabled with explanation when cross), from/to names, `Delete edge`. `Delete` on a selected node deletes it (with confirm if it has blocks/pins).
 
 **Pins** on the canvas target `board` (fractions of the artboard) when the artboard is not entered, `node` when it is, and `draw` in the diagram group (§10).
 
@@ -699,19 +699,19 @@ Radii: 12 px panels, 8 px controls and rows, 6 px chips, 999 pills; artboards 0 
 
 **Selection**
 
-- Click a block → select block (vermillion 2 px outline, label chip with the block type top-left).
-- Click a child (nav link, feature card, footer link) → select child (dashed vermillion outline on the child, solid on the parent). Click again on the same child toggles back to the block.
+- Click a block → select block (2 px `accent` outline, label chip with the block type top-left).
+- Click a child (nav link, feature card, footer link) → select child (dashed `accent` outline on the child, solid on the parent). Click again on the same child toggles back to the block.
 - Outline mirrors selection both ways.
-- Drag the block's label chip to reorder blocks (vertical only; a 2 px vermillion insertion line shows the drop position). Reorder is one history step.
+- Drag the block's label chip to reorder blocks (vertical only; a 2 px `accent` insertion line shows the drop position). Reorder is one history step.
 - Inspector header actions on a selected block: `Duplicate` (inserts a deep copy with new ids directly after), `Delete`, `↑ ↓` move.
 
 **Inspector › Content** (per block): text inputs for every string field; for lists (`links`, `items`) a row per child with text, a **Target** dropdown (grouped by flow: "Marketing › Home", "Checkout › Cart", plus "No link"), `+ add`, and `×`. CTA buttons also show the Target dropdown. Changing a Target writes the edge per §6.1.
 
 **Inspector › Design** (per block or child): segmented `typeRole`, segmented `weight`, segmented `align`, `pad` and `gap` from the space scale, `fill` and `ink` as token swatches (six swatches each, current one ringed), plus `buttonFill/buttonInk` on cta. Below: **Contrast** readout for the block's body text (`fill` vs `ink`, or `buttonFill` vs `buttonInk`) with the ratio to one decimal and a pass/fail chip (§9.2). Bottom of the panel: **Project tokens** section with six color inputs and the type table (size/line-height numeric inputs) — editing here is global.
 
-**Specs overlay** (`showSpecs`): on the selected block or child, draw measurement labels: font size/line-height of the main text element (`17/26`), padding on top and left (`24`), gap between children (`16`). Labels are 10 px Inter in vermillion with hairline guides. Works at every breakpoint and reflects stepped-down values, not the token value.
+**Specs overlay** (`showSpecs`): on the selected block or child, draw measurement labels: font size/line-height of the main text element (`17/26`), padding on top and left (`24`), gap between children (`16`). Labels are 10 px Inter in the studio `accent` with hairline guides. Works at every breakpoint and reflects stepped-down values, not the token value.
 
-**12-column overlay** (`showGrid`): 12 translucent vermillion columns over the page frame; gutter 24 px, side margin 24 px at `desktop`, 16 px at `tablet` and `phone`. Non-interactive (`pointer-events: none`).
+**12-column overlay** (`showGrid`): 12 translucent `accent` columns over the page frame; gutter 24 px, side margin 24 px at `desktop`, 16 px at `tablet` and `phone`. Non-interactive (`pointer-events: none`).
 
 ### 8.4 Mobile story designer
 
@@ -730,7 +730,7 @@ Screens of a flow are siblings in their group on the canvas; node order is chang
 | split | split | top half `wash` panel with title, bottom half `fill` with body + CTA |
 
 - CTA button height: `sm` 36, `md` 44, `lg` 52. Width `390 − 2×space[pad]`.
-- Hotspots render as dashed vermillion rectangles with a label chip in edit mode and are invisible (but tappable) in Play. Create with `+ Hotspot` in Content; drag to move; drag the bottom-right handle to resize; numeric x/y/w/h fields in the inspector.
+- Hotspots render as dashed `accent` rectangles with a label chip in edit mode and are invisible (but tappable) in Play. Create with `+ Hotspot` in Content; drag to move; drag the bottom-right handle to resize; numeric x/y/w/h fields in the inspector.
 - **Inspector › Content**: name, title, body, CTA label + Target + size, hotspots list (label, Target, x/y/w/h). **Inspector › Design**: archetype, layout, typeRole, weight, align, pad, gap, fill/ink, CTA fill/ink, Contrast readout, **Tap targets** readout listing every CTA/hotspot with its px height and a pass/fail chip (§9.4).
 
 ### 8.5 SVG draw
@@ -843,7 +843,7 @@ function laneOrder(flow, nodes, edges) {
 
 - **Placement**: with the `Pin` tool active, the cursor is a crosshair; a kind picker (Issue / Suggestion / Question, default Issue, remembered for the session) appears beside the rail. Click inside an entered page or screen, on any artboard, or in the diagram group to place a pin. A popover opens immediately with a textarea; `Enter` saves, `Shift+Enter` newline, `Esc` cancels (and removes the empty pin). Empty bodies are not saved.
 - **Target resolution**: in Page view clicking inside a block records `{type:'node', nodeId, blockId}` with `x,y` as fractions of that **block's** box (so pins follow reflow). Clicking the frame outside blocks records `{type:'node', nodeId}` with fractions of the frame. On an artboard that is not entered, `{type:'board', nodeId}` with fractions of the artboard. In the diagram group, `{type:'draw'}` with diagram coordinates.
-- **Rendering**: 22 px circle, vermillion fill, paper number, 1.5 px paper ring, small drop shadow. Resolved pins render in `muted` with a check glyph instead of the number when the filter shows them. Kind is shown by a glyph on hover and in the popover: `!` issue, `✦` suggestion, `?` question.
+- **Rendering**: 22 px circle, studio `accent` fill, white number, 1.5 px paper ring, small drop shadow. Resolved pins render in `muted` with a check glyph instead of the number when the filter shows them. Kind is shown by a glyph on hover and in the popover: `!` issue, `✦` suggestion, `?` question.
 - **Interaction**: click selects (popover shows kind, body, Resolve/Reopen, Delete, and the target name). Drag moves (updates fractions/world coords). `Delete` key deletes a selected pin.
 - **Show pins**: when on, pins are visible while designing and do not block clicks on content unless the click is on the pin itself. When off, pins are hidden everywhere except the Review list.
 - **Review tab** (left panel): filters `kind` (All / Issue / Suggestion / Question) and `status` (Open / Resolved / All, default Open); list rows show number, kind glyph, first line of body, target label ("Home › Hero", "Storyboard › Cart", "Draw"). Clicking a row zooms the canvas so the pin is visible (entering the node for node pins) and selects it. Below the list: **Checks** (computed contrast and tap-target failures with jump links).
@@ -1201,12 +1201,12 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 | 3 | When the Draw tab is opened, then the five seed shapes render; choosing Rect and dragging creates a rect whose corners are multiples of 8. |
 | 4 | When the Doc tab is opened, then the textarea contains the seed markdown and the preview shows four `##` headings; the left rail lists five headings. |
 | 5 | Then the web Outline shows flows Marketing and Checkout; the story Outline shows Onboarding and Account; each flow row lists its nodes. |
-| 6 | When the canvas fits all, then the Marketing and Checkout groups show 2 artboards each and 12 distinct curves (`ed_w1`…`ed_w12`), 9 of them vermillion; entering Home and pressing Esc returns to the same viewport. |
-| 7 | When dragging from the `pg_shop` output port onto `pg_cart` and typing "Buy now" + Enter, then a new edge appears in vermillion with kind `cross` shown read-only in the inspector, and Preview from Shop can follow it. |
+| 6 | When the canvas fits all, then the Marketing and Checkout groups show 2 artboards each and 12 distinct curves (`ed_w1`…`ed_w12`), 9 of them in the studio accent (blue); entering Home and pressing Esc returns to the same viewport. |
+| 7 | When dragging from the `pg_shop` output port onto `pg_cart` and typing "Buy now" + Enter, then a new edge appears in the studio accent (blue) with kind `cross` shown read-only in the inspector, and Preview from Shop can follow it. |
 | 8 | Then `sc_welcome` shows two outbound edges (Get started, Skip) with offset labels; the Edge inspector for each shows a different label. |
 | 9 | When Play starts in Onboarding and "Allow and finish" is tapped on Notifications, then the Home screen of Account appears and the progress bars show two segments. |
 | 10 | When `+ Flow` is clicked, renamed "Support", a page added and then the flow deleted, then no orphan nodes, edges, or pins remain (check `.agentcanvas/project.json`). Deleting the last flow in a channel is disabled. |
-| 11 | When the `accent` token is changed to `#0055FF` in Design › Project tokens, then every CTA button on web and mobile and the hero CTA update; storyboard cross edges and pins stay vermillion. |
+| 11 | When the `accent` token is changed to `#0055FF` in Design › Project tokens, then every CTA button on web and mobile and the hero CTA update; cross edges and pins stay the studio accent (blue). |
 | 12 | When `bk_home_hero` is selected, then Design shows segmented typeRole (display active), weight, align, pad (8 active), gap (4 active), fill/ink swatches; changing pad to 32 updates padding visibly. |
 | 13 | When the hero headline is edited, then blurred, then `Cmd/Ctrl+Z`, then the previous headline returns; `Cmd/Ctrl+Shift+Z` re-applies it; 51 distinct edits keep only the last 50 undoable. Undo in Story does not touch Web. |
 | 14 | When `Preview` is clicked, then every panel, the rail, the pill and the top bar are gone; clicking nav "Cart" shows the Cart page; `Esc` returns to the canvas with Home still entered. |
@@ -1227,7 +1227,7 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 | 29 | Reload keeps all pins. The exported `hearth-home.html` and `hearth-draw.svg` contain no pin markup; the exported `DESIGN.md` lists pins 1 and 2 under Open issues. |
 | 30 | Seed has hero `bodyRole: xs`, `pad: 2`; `bk_shop_cta` fails AA; `sc_profile` CTA is `sm`. |
 | 31 | The seed canvas shows `ed_w1…ed_w12` and pins 1 and 2 on their blocks. |
-| 32 | The seed canvas shows Onboarding (3) and Account (2) with `ed_m4` drawn in vermillion into the Account group. |
+| 32 | The seed canvas shows Onboarding (3) and Account (2) with `ed_m4` drawn in the studio accent (blue) into the Account group. |
 | 33 | Seed DESIGN.md contains headings Intent, Users, Principles, Decisions with the §7.5 text. |
 | 34 | With the machine offline (or all non-loopback traffic blocked), `agent-canvas serve` then opening the UI URL loads the full studio with Inter and Fraunces rendered; the browser network panel shows requests only to `127.0.0.1:<port>`. |
 | 35 | With `47321` occupied, the server binds `47322` and prints the UI URL, the MCP URL, and the agent note; with `47321`–`47341` all occupied it exits with code `2`. |

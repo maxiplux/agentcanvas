@@ -19,8 +19,8 @@ tailwind.config = {
         // project token names (designed content)
         paper: '#F4EFE6', wash: '#E9E2D4', line: '#CFC6B5',
         // studio chrome tokens (spec §8.1)
-        canvas: '#F3F2EF', dot: '#D9D6CF', panel: '#FFFFFF', hair: '#E3E0D9', ink: '#1C1B19', muted: '#7A766D', faint: '#A8A49B',
-        bar: '#1C1B19', accent: '#D8432A', accentSoft: '#FBE8E3', edge: '#8E8A80', ok: '#2E7D4F', warn: '#B23A1E',
+        canvas: '#F2F4F8', dot: '#D3D9E5', panel: '#FFFFFF', hair: '#E0E5EE', ink: '#141B2D', muted: '#67718A', faint: '#98A1B5',
+        bar: '#141B2D', accent: '#2F6BFF', accentSoft: '#E4ECFF', edge: '#8A94AB', ok: '#2E7D4F', warn: '#C0392B',
       },
       borderRadius: { panel: '12px' },
       boxShadow: { float: '0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08)', art: '0 1px 2px rgba(20,18,14,.04), 0 6px 18px rgba(20,18,14,.06)' },
@@ -30,8 +30,8 @@ tailwind.config = {
 </script>
 <style>
   :root {
-    --ac-canvas: #F3F2EF; --ac-dot: #D9D6CF; --ac-panel: #FFFFFF; --ac-hair: #E3E0D9; --ac-ink: #1C1B19; --ac-muted: #7A766D; --ac-faint: #A8A49B;
-    --ac-bar: #1C1B19; --ac-accent: #D8432A; --ac-accent-soft: #FBE8E3; --ac-edge: #8E8A80; --ac-ok: #2E7D4F; --ac-warn: #B23A1E;
+    --ac-canvas: #F2F4F8; --ac-dot: #D3D9E5; --ac-panel: #FFFFFF; --ac-hair: #E0E5EE; --ac-ink: #141B2D; --ac-muted: #67718A; --ac-faint: #98A1B5;
+    --ac-bar: #141B2D; --ac-accent: #2F6BFF; --ac-accent-soft: #E4ECFF; --ac-edge: #8A94AB; --ac-ok: #2E7D4F; --ac-warn: #C0392B;
     --ac-shadow: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08);
     --ac-shadow-art: 0 1px 2px rgba(20,18,14,.04), 0 6px 18px rgba(20,18,14,.06);
   }
@@ -45,13 +45,13 @@ tailwind.config = {
   /* floating chrome (spec §8.1) */
   .ac-float { background: var(--ac-panel); border: 1px solid var(--ac-hair); border-radius: 12px; box-shadow: var(--ac-shadow); }
   .ac-ibtn { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--ac-muted); position: relative; background: none; border: 0; }
-  .ac-ibtn:hover { background: #F3F2EF; color: var(--ac-ink); }
+  .ac-ibtn:hover { background: #F2F4F8; color: var(--ac-ink); }
   .ac-ibtn.on { background: var(--ac-ink); color: #fff; }
   .ac-ibtn svg, .ac-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .ac-tip { position: absolute; background: var(--ac-ink); color: #fff; font: 11px/1 'Inter', sans-serif; padding: 5px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 120ms; z-index: 95; }
   .ac-tip kbd { font: inherit; opacity: .55; margin-left: 6px; }
   .ac-tip-host:hover > .ac-tip { opacity: 1; transition-delay: 300ms; }
-  .ac-art { position: absolute; background: var(--ac-panel); border: 1px solid #E6E3DC; box-shadow: var(--ac-shadow-art); }
+  .ac-art { position: absolute; background: var(--ac-panel); border: 1px solid #DEE3EC; box-shadow: var(--ac-shadow-art); }
   .ac-art.sel { outline: 2px solid var(--ac-accent); outline-offset: 0; }
   .ac-dim { opacity: .6; transition: opacity 180ms; }
   .ac-slide-in { animation: acslide 180ms ease-out; }
@@ -67,12 +67,12 @@ tailwind.config = {
   .ac-scroll::-webkit-scrollbar-track { background: transparent; }
   /* linked elements in edit mode show a pointer and a tiny ↗ badge */
   .ac-edit .ac-link { position: relative; cursor: pointer; }
-  .ac-edit .ac-link:hover::after { content: '↗'; position: absolute; top: -9px; right: -11px; width: 15px; height: 15px; border-radius: 3px; background: #D8432A; color: #F4F2EC; font: 600 10px/15px Inter, sans-serif; text-align: center; pointer-events: none; z-index: 5; }
+  .ac-edit .ac-link:hover::after { content: '↗'; position: absolute; top: -9px; right: -11px; width: 15px; height: 15px; border-radius: 3px; background: #2F6BFF; color: #F3F5F9; font: 600 10px/15px Inter, sans-serif; text-align: center; pointer-events: none; z-index: 5; }
   .ac-preview .ac-link { cursor: pointer; }
   .ac-annotate, .ac-annotate * { cursor: crosshair !important; }
-  .ac-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #D8432A; color: #F4F2EC; box-shadow: 0 0 0 1.5px #F4F2EC, 0 2px 6px rgba(0,0,0,.35); font: 600 11px/22px Inter, sans-serif; text-align: center; z-index: 40; cursor: grab; user-select: none; touch-action: none; }
-  .ac-pin.resolved { background: #7A766D; }
-  .ac-pin.selected { box-shadow: 0 0 0 1.5px #F4F2EC, 0 0 0 3.5px #D8432A, 0 2px 6px rgba(0,0,0,.35); }
+  .ac-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #2F6BFF; color: #F3F5F9; box-shadow: 0 0 0 1.5px #F3F5F9, 0 2px 6px rgba(0,0,0,.35); font: 600 11px/22px Inter, sans-serif; text-align: center; z-index: 40; cursor: grab; user-select: none; touch-action: none; }
+  .ac-pin.resolved { background: #67718A; }
+  .ac-pin.selected { box-shadow: 0 0 0 1.5px #F3F5F9, 0 0 0 3.5px #2F6BFF, 0 2px 6px rgba(0,0,0,.35); }
   .ac-pin .ac-pin-kind { display: none; }
   .ac-pin:hover .ac-pin-n { display: none; }
   .ac-pin:hover .ac-pin-kind { display: inline; }
@@ -115,8 +115,8 @@ const STROKE_WIDTHS = [1, 1.5, 2, 3];
 const PIN_KINDS = ['issue', 'suggestion', 'question'];
 const PIN_GLYPH = { issue: '!', suggestion: '✦', question: '?' };
 const PIN_NAME = { issue: 'Issue', suggestion: 'Suggestion', question: 'Question' };
-const V = '#D8432A'; // vermillion: selection, pins, cross edges — never the project accent
-const CH = { bar: '#1C1B19', barText: '#F4F2EC', panel: '#FFFFFF', hair: '#E3E0D9', backdrop: '#F3F2EF', ink: '#1C1B19', muted: '#7A766D', faint: '#A8A49B', edge: '#8E8A80', stage: '#141311' };
+const V = '#2F6BFF'; // studio accent (blue): selection, pins, cross edges — never the project accent
+const CH = { bar: '#141B2D', barText: '#F3F5F9', panel: '#FFFFFF', hair: '#E0E5EE', backdrop: '#F2F4F8', ink: '#141B2D', muted: '#67718A', faint: '#98A1B5', edge: '#8A94AB', stage: '#0F1424' };
 const SERIF = "'Fraunces', Georgia, serif";
 const PHONE_W = 390, PHONE_H = 844;
 const THUMB = { web: { w: 220, h: 140 }, mobile: { w: 110, h: 220 } };
@@ -408,7 +408,7 @@ function Seg({ options, value, onChange, disabled, small }) {
         return (
           <button key={String(v)} type="button" disabled={disabled} title={typeof o === 'object' ? o.title : undefined}
             onClick={() => onChange(v)}
-            className={(small ? 'px-2 h-[26px] text-[11px] ' : 'px-2.5 h-7 text-[12px] ') + 'border-r last:border-r-0 border-hair ' + (on ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')}>
+            className={(small ? 'px-2 h-[26px] text-[11px] ' : 'px-2.5 h-7 text-[12px] ') + 'border-r last:border-r-0 border-hair ' + (on ? 'bg-ink text-white' : 'text-ink hover:bg-[#F2F4F8]')}>
             {label}
           </button>
         );
@@ -426,7 +426,7 @@ function TokenSwatches({ value, onChange, allowNone, disabled }) {
       {keys.map(k => (
         <button key={k} type="button" disabled={disabled} title={k} onClick={() => onChange(k)}
           className="w-5 h-5 rounded-[3px] border border-hair relative"
-          style={{ background: k === 'none' ? 'linear-gradient(135deg, #fff 45%, #D8432A 47%, #D8432A 53%, #fff 55%)' : tokens.colors[k], boxShadow: value === k ? `0 0 0 2px #FFFFFF, 0 0 0 3.5px ${V}` : 'none' }} />
+          style={{ background: k === 'none' ? 'linear-gradient(135deg, #fff 45%, #2F6BFF 47%, #2F6BFF 53%, #fff 55%)' : tokens.colors[k], boxShadow: value === k ? `0 0 0 2px #FFFFFF, 0 0 0 3.5px ${V}` : 'none' }} />
       ))}
     </div>
   );
@@ -480,14 +480,14 @@ function IconButton({ title, onClick, children, active, disabled, dark, classNam
   return (
     <button type="button" title={title} disabled={disabled} onClick={onClick}
       className={'h-7 px-2 rounded-md text-[12px] inline-flex items-center gap-1 whitespace-nowrap ' +
-        (dark ? (active ? 'bg-[#F4F2EC] text-ink' : 'text-white hover:bg-white/10') : (active ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')) + ' ' + (className || '')}>
+        (dark ? (active ? 'bg-[#F3F5F9] text-ink' : 'text-white hover:bg-white/10') : (active ? 'bg-ink text-white' : 'text-ink hover:bg-[#F2F4F8]')) + ' ' + (className || '')}>
       {children}
     </button>
   );
 }
 
 function Pill({ children, tone }) {
-  const tones = { pass: 'bg-[#E3EEDF] text-[#2F5A2A]', fail: 'bg-[#FBE8E3] text-warn', dark: 'bg-ink text-white', neutral: 'bg-[#F3F2EF] text-ink' };
+  const tones = { pass: 'bg-[#E3EEDF] text-[#2F5A2A]', fail: 'bg-[#E4ECFF] text-warn', dark: 'bg-ink text-white', neutral: 'bg-[#F2F4F8] text-ink' };
   return <span className={'inline-flex items-center rounded-md px-1.5 h-[18px] text-[10px] font-semibold ' + (tones[tone] || tones.neutral)}>{children}</span>;
 }
 
@@ -787,7 +787,7 @@ function useOutsideClose(open, setOpen) {
 function BarButton({ title, onClick, children, active, disabled, className }) {
   return (
     <button type="button" title={title} disabled={disabled} onClick={onClick}
-      className={'h-[30px] px-2.5 rounded-lg text-[12px] inline-flex items-center gap-1.5 whitespace-nowrap ' + (active ? 'bg-[#F4F2EC] text-ink' : 'text-[#F4F2EC] hover:bg-white/10') + ' ' + (className || '')}>
+      className={'h-[30px] px-2.5 rounded-lg text-[12px] inline-flex items-center gap-1.5 whitespace-nowrap ' + (active ? 'bg-[#F3F5F9] text-ink' : 'text-[#F3F5F9] hover:bg-white/10') + ' ' + (className || '')}>
       {children}
     </button>
   );
@@ -799,16 +799,16 @@ function ProjectMenu() {
   const ref = useOutsideClose(open, setOpen);
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(o => !o)} title="Project" className="h-[30px] px-2.5 rounded-lg inline-flex items-center gap-2 text-[13px] text-[#D8D4CA] hover:bg-white/10">
-        <span className="opacity-50">/</span><span className="text-[#F4F2EC] font-medium">{state.name || 'project'}</span><span className="opacity-50 text-[10px]">▾</span>
+      <button type="button" onClick={() => setOpen(o => !o)} title="Project" className="h-[30px] px-2.5 rounded-lg inline-flex items-center gap-2 text-[13px] text-[#C7CDDB] hover:bg-white/10">
+        <span className="opacity-50">/</span><span className="text-[#F3F5F9] font-medium">{state.name || 'project'}</span><span className="opacity-50 text-[10px]">▾</span>
       </button>
       {open && (
         <div className="absolute left-0 top-9 w-64 ac-float py-1 z-[60] text-ink">
-          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F3F2EF] text-[12px]"
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F2F4F8] text-[12px]"
             onClick={() => { setOpen(false); if (window.confirm('Replace the whole project with the Hearth sample? Your current project and every undo history are cleared.')) act('reset_project', { template: 'sample' }); }}>
             Load the Hearth sample…
           </button>
-          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#FBE8E3] text-[12px] text-warn"
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#E4ECFF] text-[12px] text-warn"
             onClick={() => { setOpen(false); if (window.confirm('Start over with a blank project? Your current project and every undo history are cleared.')) act('reset_project', {}); }}>
             Start over (blank)…
           </button>
@@ -827,14 +827,14 @@ function TopBar() {
   const cur = findNode(p, v.entered) || (v.selection && v.selection.nodeId ? findNode(p, v.selection.nodeId) : null) || findNode(p, tab === 'story' ? v.currentNodeId.mobile : v.currentNodeId.web);
   const play = !!(cur && cur.kind === 'screen');
   return (
-    <header className="h-11 flex-none flex items-center gap-2 px-3 bg-bar text-[#F4F2EC] select-none relative z-[50]">
+    <header className="h-11 flex-none flex items-center gap-2 px-3 bg-bar text-[#F3F5F9] select-none relative z-[50]">
       <span className="font-serif text-[15px] font-semibold tracking-tight pl-1">AgentCanvas</span>
       <ProjectMenu />
       <DarkSeg value={tab === 'doc' ? 'doc' : 'canvas'} onChange={x => act('set_tab', { tab: x === 'doc' ? 'doc' : lastCanvasTab.current })}
         options={[{ value: 'canvas', label: 'Canvas' }, { value: 'doc', label: 'DESIGN.md' }]} />
       <div className="flex-1" />
       {agent && (
-        <span className="inline-flex items-center gap-2 h-7 px-2.5 rounded-full bg-white/[.08] text-[#D8D4CA] text-[12px] max-w-[360px]" title={agent}>
+        <span className="inline-flex items-center gap-2 h-7 px-2.5 rounded-full bg-white/[.08] text-[#C7CDDB] text-[12px] max-w-[360px]" title={agent}>
           <span className="w-[7px] h-[7px] rounded-full flex-none" style={{ background: '#5FB37A', boxShadow: '0 0 0 3px rgba(95,179,122,.25)' }} />
           <span className="truncate">{agent}</span>
         </span>
@@ -855,7 +855,7 @@ function DarkSeg({ options, value, onChange }) {
     <div className="inline-flex rounded-lg bg-white/[.06] p-0.5">
       {options.map(o => (
         <button key={o.value} type="button" title={o.title} onClick={() => onChange(o.value)}
-          className={'px-2.5 h-[26px] text-[12px] rounded-md font-medium ' + (value === o.value ? 'bg-[#F4F2EC] text-ink' : 'text-[#B9B5AB] hover:text-[#F4F2EC]')}>{o.label}</button>
+          className={'px-2.5 h-[26px] text-[12px] rounded-md font-medium ' + (value === o.value ? 'bg-[#F3F5F9] text-ink' : 'text-[#AEB5C6] hover:text-[#F3F5F9]')}>{o.label}</button>
       ))}
     </div>
   );
@@ -868,8 +868,8 @@ function IssueBadge() {
   return (
     <button type="button" title="Open issues — show in Review"
       onClick={() => setUi(u => ({ ...u, leftOpen: true, leftTab: 'review', reviewFilter: { kind: 'issue', status: 'open' }, skillsOpen: false }))}
-      className="h-[30px] px-2 rounded-lg inline-flex items-center gap-1.5 text-[12px] text-[#F4F2EC] hover:bg-white/10">
-      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F4F2EC' }}>{n}</span>
+      className="h-[30px] px-2 rounded-lg inline-flex items-center gap-1.5 text-[12px] text-[#F3F5F9] hover:bg-white/10">
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F3F5F9' }}>{n}</span>
       <span>open {n === 1 ? 'issue' : 'issues'}</span>
     </button>
   );
@@ -901,7 +901,7 @@ function ExportMenu() {
       {open && (
         <div className="absolute right-0 top-9 w-64 ac-float text-ink py-1 z-[60]">
           {items.map(([label, fn]) => (
-            <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#F3F2EF] text-[12px]">{label}</button>
+            <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#F2F4F8] text-[12px]">{label}</button>
           ))}
         </div>
       )}
@@ -927,7 +927,7 @@ function SkillsSheet() {
       </div>
       <div className="flex-1 overflow-auto ac-scroll">
         {!open && state.skills.map(s => (
-          <button key={s.name} type="button" onClick={() => setOpen(s.name)} className="w-full text-left px-3 py-2.5 border-b border-hair hover:bg-[#F3F2EF]">
+          <button key={s.name} type="button" onClick={() => setOpen(s.name)} className="w-full text-left px-3 py-2.5 border-b border-hair hover:bg-[#F2F4F8]">
             <div className="flex items-center gap-1.5"><span className="font-semibold text-[12px]">{s.name}</span><span className="text-[11px] text-muted">v{s.version}</span>{s.builtin && <Pill tone="dark">built-in</Pill>}</div>
             <div className="text-[11px] text-muted mt-0.5">{s.description}</div>
           </button>
@@ -1014,7 +1014,7 @@ function ToolRail() {
         <div className="ac-float font-ui" style={{ position: 'absolute', right: 66, top: '50%', transform: 'translateY(-50%)', padding: 4, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 33 }}>
           {PIN_KINDS.map(k => (
             <button key={k} type="button" onClick={() => setUi(u => ({ ...u, pinKind: k }))}
-              className={'h-7 px-2.5 rounded-md text-[12px] text-left inline-flex items-center gap-2 ' + (ui.pinKind === k ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')}>
+              className={'h-7 px-2.5 rounded-md text-[12px] text-left inline-flex items-center gap-2 ' + (ui.pinKind === k ? 'bg-ink text-white' : 'text-ink hover:bg-[#F2F4F8]')}>
               <span className="w-4 text-center font-semibold">{PIN_GLYPH[k]}</span>{PIN_NAME[k]}
             </button>
           ))}
@@ -1040,7 +1040,7 @@ function ZoomPill() {
       <button type="button" className="ac-ibtn ac-tip-host" style={{ width: 28, height: 28 }} onClick={() => canvasApi.current.fitAll && canvasApi.current.fitAll()}><Icon name="fit" /><span className="ac-tip" style={{ right: 0, bottom: 34 }}>Fit everything<kbd>{MOD}0</kbd></span></button>
       <span className="w-px h-[18px] bg-hair mx-1" />
       <button type="button" className="ac-ibtn" style={{ width: 28, height: 28 }} title="Zoom out" onClick={() => viewport.zoomBy(1 / 1.25)}>−</button>
-      <button type="button" className="text-[12px] font-medium tabular-nums text-ink min-w-[48px] text-center h-7 rounded-md hover:bg-[#F3F2EF]" title="Reset to 100%" onClick={() => viewport.setZoom(1)}>{z}%</button>
+      <button type="button" className="text-[12px] font-medium tabular-nums text-ink min-w-[48px] text-center h-7 rounded-md hover:bg-[#F2F4F8]" title="Reset to 100%" onClick={() => viewport.setZoom(1)}>{z}%</button>
       <button type="button" className="ac-ibtn" style={{ width: 28, height: 28 }} title="Zoom in" onClick={() => viewport.zoomBy(1.25)}>+</button>
       <span className="w-px h-[18px] bg-hair mx-1" />
       <button type="button" className={'ac-ibtn' + (help ? ' on' : '')} style={{ width: 28, height: 28 }} title="Keyboard shortcuts" onClick={() => setHelp(h => !h)}>?</button>
@@ -1145,7 +1145,7 @@ function LeftPanel() {
 function LayerRow({ depth, on, dim, onClick, onDoubleClick, children, draggable, onDragStart, onDragOver, onDrop, onDragEnd, dataAttr }) {
   return (
     <div {...(dataAttr || {})} draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd}
-      className={'group flex items-center gap-1.5 h-[30px] pr-2 rounded-lg cursor-pointer text-[12px] ' + (on ? 'bg-accentSoft text-[#8E2A18]' : dim ? 'text-muted hover:bg-[#F6F5F2]' : 'text-ink hover:bg-[#F6F5F2]')}
+      className={'group flex items-center gap-1.5 h-[30px] pr-2 rounded-lg cursor-pointer text-[12px] ' + (on ? 'bg-accentSoft text-[#1E4FD8]' : dim ? 'text-muted hover:bg-[#F3F5F9]' : 'text-ink hover:bg-[#F3F5F9]')}
       style={{ paddingLeft: 8 + depth * 14 }} onClick={onClick} onDoubleClick={onDoubleClick}>
       {children}
     </div>
@@ -1293,7 +1293,7 @@ function Activity() {
   return (
     <div className="p-1">
       {activity.map((e, i) => (
-        <button key={e.rev + ':' + i} type="button" onClick={() => jump(e)} className="w-full text-left grid gap-2 p-2 rounded-[10px] hover:bg-[#F6F5F2]" style={{ gridTemplateColumns: '22px 1fr' }}>
+        <button key={e.rev + ':' + i} type="button" onClick={() => jump(e)} className="w-full text-left grid gap-2 p-2 rounded-[10px] hover:bg-[#F3F5F9]" style={{ gridTemplateColumns: '22px 1fr' }}>
           <span className={'w-[22px] h-[22px] rounded-full grid place-items-center text-[9px] font-semibold ' + (e.source === 'mcp' ? 'bg-ink text-white' : 'bg-hair text-ink')}>{e.source === 'mcp' ? 'AG' : 'You'}</span>
           <span className="min-w-0">
             <span className="block text-[12px] leading-4 text-ink"><b className="font-medium">{e.source === 'mcp' ? 'Agent' : 'You'}</b> · {e.summary}</span>
@@ -1328,7 +1328,7 @@ function PromptComposer() {
   };
   return (
     <div className="flex-none border-t border-hair p-2.5">
-      <div className="rounded-[10px] border border-hair bg-[#FBFAF8] px-2.5 py-2 focus-within:border-ink">
+      <div className="rounded-[10px] border border-hair bg-[#F8F9FC] px-2.5 py-2 focus-within:border-ink">
         <textarea data-prompt="1" value={text} rows={2} placeholder="Ask your agent to change the canvas…" onChange={e => setText(e.target.value)}
           onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copy(); } if (e.key === 'Escape') e.currentTarget.blur(); }}
           className="w-full resize-none bg-transparent text-[12px] leading-4 outline-none placeholder:text-faint" />
@@ -1388,7 +1388,7 @@ function DocRail() {
       <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-muted font-semibold">Headings</div>
       <div className="flex-1 overflow-auto ac-scroll pb-4">
         {heads.map(h => (
-          <button key={h.line} type="button" onClick={() => jump(h)} className="w-full text-left h-7 hover:bg-[#F3F2EF] text-[12px] truncate"
+          <button key={h.line} type="button" onClick={() => jump(h)} className="w-full text-left h-7 hover:bg-[#F2F4F8] text-[12px] truncate"
             style={{ paddingLeft: 12 + (h.level - 1) * 12, fontWeight: h.level === 1 ? 600 : 400 }}>{h.text}</button>
         ))}
       </div>
@@ -1562,7 +1562,7 @@ function EdgeList({ title, edges, dir }) {
         return (
           <button key={e.id} type="button" onClick={() => act('set_selection', { selection: { kind: 'edge', edgeId: e.id } })}
             className="w-full flex items-center gap-1.5 text-left text-[12px] py-1 hover:text-accent">
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: e.kind === 'cross' ? V : '#1C1B19' }} />
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: e.kind === 'cross' ? V : '#141B2D' }} />
             <span className="truncate flex-1">“{e.label}” {dir === 'to' ? '→' : '←'} {other ? other.name : '?'}</span>
             <span className="text-[10px] text-muted">{e.kind}</span>
           </button>
@@ -2004,8 +2004,8 @@ function ReviewPanel() {
           return (
             <button key={x.id} type="button" data-review-pin={x.id}
               onClick={() => act('set_selection', { selection: { kind: 'pin', pinId: x.id } }).then(() => { if (x.target.nodeId && canvasApi.current.fitNode) canvasApi.current.fitNode(x.target.nodeId); else if (canvasApi.current.fitDiagram) canvasApi.current.fitDiagram(); })}
-              className={'w-full text-left flex gap-2 py-1.5 px-1 rounded-lg ' + (on ? 'bg-accentSoft' : 'hover:bg-[#F6F5F2]')}>
-              <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F4F2EC' }}>{x.resolved ? '✓' : x.n}</span>
+              className={'w-full text-left flex gap-2 py-1.5 px-1 rounded-lg ' + (on ? 'bg-accentSoft' : 'hover:bg-[#F3F5F9]')}>
+              <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F3F5F9' }}>{x.resolved ? '✓' : x.n}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[12px] truncate"><b className="mr-1">{PIN_GLYPH[x.kind]}</b>{firstLine(x.body)}</span>
                 <span className="block text-[11px] text-muted">#{x.n} · {pinWhere(p, x)}</span>
@@ -2122,7 +2122,7 @@ function PinPopover({ pin, anchorRef }) {
     <div className="ac-pop fixed z-[90] w-[260px] bg-panel border border-hair rounded-md shadow-float p-2.5 text-[12px] text-ink font-ui"
       style={pos} onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="flex items-center gap-1.5 font-semibold"><span className="w-5 h-5 rounded-full text-center leading-5 text-[11px]" style={{ background: V, color: '#F4F2EC' }}>{PIN_GLYPH[pin.kind]}</span>{PIN_NAME[pin.kind]} #{pin.n}</span>
+        <span className="flex items-center gap-1.5 font-semibold"><span className="w-5 h-5 rounded-full text-center leading-5 text-[11px]" style={{ background: V, color: '#F3F5F9' }}>{PIN_GLYPH[pin.kind]}</span>{PIN_NAME[pin.kind]} #{pin.n}</span>
         <select value={pin.kind} onChange={e => act('update_pin', { pinId: pin.id, kind: e.target.value })} className="text-[11px] bg-transparent">
           {PIN_KINDS.map(k => <option key={k} value={k}>{PIN_GLYPH[k]} {PIN_NAME[k]}</option>)}
         </select>
@@ -2358,9 +2358,9 @@ function PreviewStage({ navRef }) {
     <div className="fixed inset-0 z-[100]" style={{ background: CH.stage }}>
       {stage}
       <div className="ac-float fixed left-1/2 -translate-x-1/2 bottom-5 z-[101] flex items-center gap-2 h-9 pl-2 pr-1.5 !rounded-full text-ink text-[12px]">
-        <button type="button" title="Back" disabled={stack.length < 2} onClick={back} className="w-7 h-7 rounded-full hover:bg-[#F3F2EF]">←</button>
+        <button type="button" title="Back" disabled={stack.length < 2} onClick={back} className="w-7 h-7 rounded-full hover:bg-[#F2F4F8]">←</button>
         <span><b>{mobile ? 'Play' : 'Preview'}</b> · {node.name} · Esc to exit</span>
-        <button type="button" title="Exit (Esc)" onClick={exit} className="w-7 h-7 rounded-full hover:bg-[#F3F2EF] text-[15px]">×</button>
+        <button type="button" title="Exit (Esc)" onClick={exit} className="w-7 h-7 rounded-full hover:bg-[#F2F4F8] text-[15px]">×</button>
       </div>
     </div>
   );
@@ -2627,7 +2627,7 @@ function Connectors({ layout, edges, zoom, sel, drag }) {
               onPointerEnter={() => setHover(e.id)} onPointerLeave={() => setHover(h => (h === e.id ? null : h))} onPointerDown={ev => select(ev, e)} />
             {(zoom >= 0.3 || on || hot) && <g transform={`translate(${geo.mx},${geo.my}) scale(${k})`} style={{ pointerEvents: 'all', cursor: 'pointer' }}
               onPointerEnter={() => setHover(e.id)} onPointerLeave={() => setHover(h => (h === e.id ? null : h))} onPointerDown={ev => select(ev, e)}>
-              <rect x={-(e.label.length * 3.2 + 8)} y="-9" width={e.label.length * 6.4 + 16} height="18" rx="9" fill={on ? V : '#fff'} stroke={on ? V : cross ? V : '#E6E3DC'} />
+              <rect x={-(e.label.length * 3.2 + 8)} y="-9" width={e.label.length * 6.4 + 16} height="18" rx="9" fill={on ? V : '#fff'} stroke={on ? V : cross ? V : '#DEE3EC'} />
               <text textAnchor="middle" y="3.5" style={{ font: '500 11px Inter, sans-serif' }} fill={on ? '#fff' : cross ? V : CH.ink}>{e.label}</text>
             </g>}
           </g>
@@ -2649,7 +2649,7 @@ function Groups({ layout, zoom, flowId }) {
     const on = flowId === g.flow.id;
     const placed = g.nodes.some(x => x.pos);
     return (
-      <div key={g.flow.id} data-canvas-bg="1" data-group-id={g.flow.id} className="ac-group" style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `${1 * k}px dashed ${on ? V : '#D2CFC7'}`, borderRadius: 16 * k, background: 'rgba(255,255,255,.28)' }}>
+      <div key={g.flow.id} data-canvas-bg="1" data-group-id={g.flow.id} className="ac-group" style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `${1 * k}px dashed ${on ? V : '#CBD2E0'}`, borderRadius: 16 * k, background: 'rgba(255,255,255,.28)' }}>
         {/* label on its own line 22 screen px above the border, clear of the artboard names just below it */}
         <div style={{ position: 'absolute', left: 14 * k, top: -22 * k, height: 0 }}>
           <div className="ac-group-head" style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${k})`, transformOrigin: '0 100%', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: on ? V : CH.muted }}
@@ -2916,10 +2916,10 @@ function ContextToolbar({ node, box, view, canvasW }) {
   const top = Math.max(8, view.y + box.y * view.zoom - 46);
   const W = 520;
   const left = clamp(cx - W / 2, 8, Math.max(8, canvasW - W - 8));
-  const Btn = ({ title, onClick, on, children }) => <button type="button" title={title} onClick={onClick} className={'h-[26px] px-2 rounded-md text-[12px] font-medium inline-flex items-center gap-1 whitespace-nowrap ' + (on ? 'bg-ink text-white' : 'text-muted hover:bg-[#F3F2EF] hover:text-ink')}>{children}</button>;
+  const Btn = ({ title, onClick, on, children }) => <button type="button" title={title} onClick={onClick} className={'h-[26px] px-2 rounded-md text-[12px] font-medium inline-flex items-center gap-1 whitespace-nowrap ' + (on ? 'bg-ink text-white' : 'text-muted hover:bg-[#F2F4F8] hover:text-ink')}>{children}</button>;
   const Sep = () => <span className="w-px h-[18px] bg-hair mx-0.5" />;
   const MenuBox = ({ children }) => <div className="ac-float py-1 text-ink" style={{ position: 'absolute', left: 0, top: 36, minWidth: 180, zIndex: 5 }}>{children}</div>;
-  const Item = ({ onClick, children, danger }) => <button type="button" onClick={() => { setMenu(null); onClick(); }} className={'w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F3F2EF] ' + (danger ? 'text-warn' : '')}>{children}</button>;
+  const Item = ({ onClick, children, danger }) => <button type="button" onClick={() => { setMenu(null); onClick(); }} className={'w-full text-left px-3 py-1.5 text-[12px] hover:bg-[#F2F4F8] ' + (danger ? 'text-warn' : '')}>{children}</button>;
   const delNode = () => {
     const pins = p.pins.filter(x => x.target.nodeId === node.id).length;
     const has = (page ? node.blocks.length : 1) + pins;
@@ -3080,7 +3080,7 @@ function Canvas({ spaceHeld }) {
       <div data-canvas-bg="1" style={{ position: 'absolute', inset: 0, opacity: gridOpacity, backgroundImage: 'radial-gradient(var(--ac-dot) 1px, transparent 1.2px)', backgroundSize: `${step}px ${step}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
       <div ref={worldRef} className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
         <Groups layout={layout} zoom={view.zoom} flowId={ui.flowId} />
-        <div data-canvas-bg="1" style={{ position: 'absolute', left: layout.diagramBox.x - ART.GROUP_PAD, top: layout.diagramBox.y - ART.GROUP_PAD, width: layout.diagramBox.w + 2 * ART.GROUP_PAD, height: layout.diagramBox.h + 2 * ART.GROUP_PAD, border: `${1 / view.zoom}px dashed #D2CFC7`, borderRadius: 16 / view.zoom, background: 'rgba(255,255,255,.28)' }}>
+        <div data-canvas-bg="1" style={{ position: 'absolute', left: layout.diagramBox.x - ART.GROUP_PAD, top: layout.diagramBox.y - ART.GROUP_PAD, width: layout.diagramBox.w + 2 * ART.GROUP_PAD, height: layout.diagramBox.h + 2 * ART.GROUP_PAD, border: `${1 / view.zoom}px dashed #CBD2E0`, borderRadius: 16 / view.zoom, background: 'rgba(255,255,255,.28)' }}>
           <div style={{ position: 'absolute', left: 14 / view.zoom, top: -22 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
         </div>
         <DrawLayer origin={layout.diagram} zoom={view.zoom} tokens={tokens} shapes={p.draw.shapes} sel={sel} tool={tool} draw={draw} />
@@ -3165,8 +3165,8 @@ function DesignDoc() {
     <div className="absolute inset-0 flex">
       <textarea ref={ta} value={d.draft} spellCheck={false} onChange={e => d.onChange(e.target.value)} onFocus={d.onFocus} onBlur={d.onBlur} onKeyDown={onKeyDown}
         className="w-1/2 h-full resize-none border-0 border-r border-hair bg-panel p-6 outline-none ac-scroll"
-        style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, lineHeight: '20px', color: '#1C1B19' }} />
-      <div ref={pv} className="w-1/2 h-full overflow-auto ac-scroll bg-[#F4F2EC]">
+        style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, lineHeight: '20px', color: '#141B2D' }} />
+      <div ref={pv} className="w-1/2 h-full overflow-auto ac-scroll bg-[#F3F5F9]">
         <div className="md font-serif px-10 py-8 text-[17px] leading-[27px] text-ink" style={{ maxWidth: 720 }}>{renderMd(d.draft)}</div>
       </div>
     </div>
@@ -3193,7 +3193,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="h-full flex items-center justify-center bg-[#F3F2EF] font-ui">
+      <div className="h-full flex items-center justify-center bg-[#F2F4F8] font-ui">
         <div className="max-w-[480px] bg-panel border border-hair rounded-md p-6 shadow-float">
           <div className="font-serif text-[22px] mb-2">The studio hit an error</div>
           <pre className="text-[12px] whitespace-pre-wrap text-warn mb-4">{String(this.state.error && this.state.error.message || this.state.error)}</pre>

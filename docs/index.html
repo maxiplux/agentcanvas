@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>agent-canvas — install and use the CLI</title>
 <meta name="description" content="Install the agent-canvas binary, start the AgentCanvas design studio, and connect any MCP agent to the same canvas.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23232220'/%3E%3Ccircle cx='22' cy='10' r='5' fill='%23D8432A'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23232220'/%3E%3Ccircle cx='22' cy='10' r='5' fill='%232F6BFF'/%3E%3C/svg%3E">
 <style>
 @font-face {
   font-family: 'Fraunces';
@@ -23,7 +23,7 @@
   --ink: #1C1B19;
   --char: #232220;
   --muted: #5F5A51;
-  --v: #D8432A;
+  --v: #2F6BFF;
   --serif: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --measure: 68ch;
@@ -294,7 +294,7 @@ footer a { color: var(--paper); }
     <svg viewBox="0 0 520 380" role="img">
       <defs>
         <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1C1B19"/></marker>
-        <marker id="ah-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#D8432A"/></marker>
+        <marker id="ah-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F6BFF"/></marker>
         <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="10" fill="#E9E2D4"/><rect x="5" width="5" height="10" fill="#CFC6B5"/></pattern>
       </defs>
       <!-- lane rules -->
@@ -307,15 +307,15 @@ footer a { color: var(--paper); }
       <g class="card-a">
         <rect x="8" y="44" width="186" height="132" rx="4" fill="#FBF8F2" stroke="#1C1B19" stroke-width="1.5"/>
         <rect x="8" y="44" width="186" height="16" rx="4" fill="#232220"/>
-        <circle cx="18" cy="52" r="2.4" fill="#D8432A"/><circle cx="26" cy="52" r="2.4" fill="#6B665C"/><circle cx="34" cy="52" r="2.4" fill="#6B665C"/>
+        <circle cx="18" cy="52" r="2.4" fill="#2F6BFF"/><circle cx="26" cy="52" r="2.4" fill="#6B665C"/><circle cx="34" cy="52" r="2.4" fill="#6B665C"/>
         <text x="22" y="86" font-family="Fraunces, Georgia, serif" font-size="17" font-weight="600" fill="#1C1B19">Everyday</text>
         <text x="22" y="105" font-family="Fraunces, Georgia, serif" font-size="17" font-weight="600" fill="#1C1B19">ceramics.</text>
         <rect x="22" y="116" width="120" height="4" rx="2" fill="#CFC6B5"/>
         <rect x="22" y="125" width="96" height="4" rx="2" fill="#CFC6B5"/>
-        <rect x="22" y="140" width="62" height="20" rx="3" fill="#D8432A"/>
+        <rect x="22" y="140" width="62" height="20" rx="3" fill="#2F6BFF"/>
         <text x="101" y="188" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#5F5A51">browser · the studio</text>
       </g>
-      <g class="pin"><circle cx="176" cy="66" r="11" fill="#D8432A" stroke="#F4EFE6" stroke-width="2"/><text x="176" y="70" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-size="12" font-weight="700" fill="#F4EFE6">1</text></g>
+      <g class="pin"><circle cx="176" cy="66" r="11" fill="#2F6BFF" stroke="#F4EFE6" stroke-width="2"/><text x="176" y="70" text-anchor="middle" font-family="Fraunces, Georgia, serif" font-size="12" font-weight="700" fill="#F4EFE6">1</text></g>
 
       <!-- agents card -->
       <g class="card-b">
@@ -345,12 +345,12 @@ footer a { color: var(--paper); }
       <!-- edges -->
       <path class="edge" d="M104,196 C104,224 136,236 168,236" fill="none" stroke="#1C1B19" stroke-width="1.6"/>
       <polygon class="head h1" points="167,230.5 177,236 167,241.5" fill="#1C1B19"/>
-      <path class="edge e2" d="M421,196 C421,224 384,236 352,236" fill="none" stroke="#D8432A" stroke-width="2.2"/>
-      <polygon class="head h2" points="353,230 342,236 353,242" fill="#D8432A"/>
+      <path class="edge e2" d="M421,196 C421,224 384,236 352,236" fill="none" stroke="#2F6BFF" stroke-width="2.2"/>
+      <polygon class="head h2" points="353,230 342,236 353,242" fill="#2F6BFF"/>
       <path class="dots" d="M260,266 L260,290" fill="none" stroke="#1C1B19" stroke-width="1.6" stroke-dasharray="2 4"/>
       <polygon class="dots" points="254.5,289 260,299 265.5,289" fill="#1C1B19"/>
       <g class="pill"><rect x="88" y="206" width="54" height="17" rx="8.5" fill="#FBF8F2" stroke="#CFC6B5"/><text x="115" y="218" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#1C1B19">HTTP·SSE</text></g>
-      <g class="pill"><rect x="380" y="206" width="40" height="17" rx="8.5" fill="#FBF8F2" stroke="#D8432A"/><text x="400" y="218" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#B33A24">MCP</text></g>
+      <g class="pill"><rect x="380" y="206" width="40" height="17" rx="8.5" fill="#FBF8F2" stroke="#2F6BFF"/><text x="400" y="218" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#B33A24">MCP</text></g>
     </svg>
     <figcaption class="cap"><span>fig. 1 — one process, one canvas</span><span>loopback only</span></figcaption>
   </figure>
@@ -456,7 +456,7 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
         <div class="card"><span class="tag">DESIGN.md</span><h4>The document</h4><p>Write intent and decisions beside a live preview. The export appends your flows and open issues.</p></div>
       </div>
       <h3>Flows and connectors</h3>
-      <p>Each flow is a group on the canvas. Drag from an artboard's right-hand port onto another to connect them; links between different flows are drawn in vermillion. Drag artboards to place them, or <strong>Tidy</strong> a flow to return to the automatic lanes.</p>
+      <p>Each flow is a group on the canvas. Drag from an artboard's right-hand port onto another to connect them; links between different flows are drawn in the studio's blue accent. Drag artboards to place them, or <strong>Tidy</strong> a flow to return to the automatic lanes.</p>
       <h3>Preview and Play</h3>
       <p><strong>Preview</strong> (web) and <strong>Play</strong> (mobile) hide the studio and let you click through the design the way a user would, following its links across flows. Press <kbd>Esc</kbd> to come back.</p>
       <h3>Review pins and checks</h3>

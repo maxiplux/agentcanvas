@@ -99,7 +99,7 @@ Defined once in `tailwind.config` and as CSS variables so both Tailwind classes 
 
 | Token | Value | Use |
 |---|---|---|
-| `canvas` | `#F3F2EF` | the infinite surface |
+| `canvas` | `#F2F4F8` | the infinite surface |
 | `dot` | `#D9D6CF` | grid dots |
 | `panel` | `#FFFFFF` | floating panels, artboards |
 | `hair` | `#E3E0D9` | borders |
@@ -107,7 +107,7 @@ Defined once in `tailwind.config` and as CSS variables so both Tailwind classes 
 | `muted` | `#7A766D` | secondary text, icons |
 | `faint` | `#A8A49B` | tertiary text, placeholders |
 | `bar` | `#1C1B19` | top bar |
-| `accent` | `#D8432A` | selection ring, pins, cross-flow edges, one primary button |
+| `accent` | `#2F6BFF` | selection ring, pins, cross-flow edges, one primary button |
 | `accentSoft` | `#FBE8E3` | selected row background |
 | `edge` | `#8E8A80` | connectors |
 | `ok` / `warn` | `#2E7D4F` / `#B23A1E` | check pills |
@@ -186,4 +186,4 @@ Rough total: 9 to 12 working days for one builder, or about half that with the c
 2. **One canvas for web, mobile and diagram** rather than one canvas per channel. Alternative: a Web | Mobile | Diagram switch in the top bar, simpler undo story, less "whole product at once".
 3. **Manual placement allowed, auto by default, Tidy to reset.** This amends §8.2/§19. Alternative: pan/zoom over the fixed lane layout only.
 4. **No model call in the binary.** The prompt composer copies to the clipboard. Alternative: nothing in the left panel about prompting at all.
-5. **The vermillion accent stays** as the single brand color, used less. Alternative: a cool blue accent like Stitch, which would also mean recoloring pins and cross-flow edges and the website.
+5. **Overturned on 2026-11-03: the studio chrome is blue-toned** (accent `#2F6BFF`, navy ink `#141B2D`, cool surfaces). The warm vermillion survives only inside the designed content (the Hearth sample's own `accent` token). Original call: keep vermillion as the single brand color.
