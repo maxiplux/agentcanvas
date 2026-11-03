@@ -76,3 +76,44 @@ jobs:
             dist/agent-canvas-*
             dist/SHA256SUMS
           if-no-files-found: error
+
+  verify-installers:
+    name: Installer (${{ matrix.os }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: One-line installer (macOS / Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGENT_CANVAS_INSTALL_DIR="$RUNNER_TEMP/bin" AGENT_CANVAS_VERSION="$VERSION"
+          sh docs/install.sh
+          "$AGENT_CANVAS_INSTALL_DIR/agent-canvas" version | grep -F "$VERSION"
+          "$AGENT_CANVAS_INSTALL_DIR/agent-canvas" update --check | tee check.txt
+          grep -F "$VERSION is up to date" check.txt
+          sh docs/install.sh   # re-running updates in place
+          "$AGENT_CANVAS_INSTALL_DIR/agent-canvas" version | grep -F "$VERSION"
+
+      - name: One-line installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:AGENT_CANVAS_INSTALL_DIR = Join-Path $env:RUNNER_TEMP 'bin'
+          $env:AGENT_CANVAS_VERSION = $env:VERSION
+          Get-Content -Raw docs/install.ps1 | Invoke-Expression
+          $exe = Join-Path $env:AGENT_CANVAS_INSTALL_DIR 'agent-canvas.exe'
+          $v = & $exe version
+          if ($v -notmatch [regex]::Escape($env:VERSION)) { throw "unexpected version: $v" }
+          $c = & $exe update --check
+          if ($c -notmatch 'is up to date') { throw "unexpected update check: $c" }
+          Get-Content -Raw docs/install.ps1 | Invoke-Expression   # re-running updates in place
+          & $exe version

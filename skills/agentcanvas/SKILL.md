@@ -14,6 +14,8 @@ AgentCanvas is a local design studio: web pages, mobile story screens, connected
 
 ## Start or connect
 
+- Not installed yet? Install or update in one line: `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`). `agent-canvas update` updates an existing install.
+
 - Start the studio in the project directory: `agent-canvas serve`. It prints the UI URL and the MCP URL (`http://127.0.0.1:<port>/mcp`).
 - Any streamable-HTTP MCP client connects to the MCP URL. `GET /mcp.json` on the server returns a generic client config.
 - A client that can only spawn a command uses `agent-canvas attach` (stdio proxy to the server already running for the current directory; `--project DIR` or `--url URL` to choose another).

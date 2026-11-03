@@ -265,7 +265,7 @@ footer a { color: var(--paper); }
 
 <header class="mast">
   <a class="mark" href="#top" aria-label="AgentCanvas, back to top"><i></i>AgentCanvas</a>
-  <span class="chip">v0.1.0</span>
+  <span class="chip">v0.1.1</span>
   <nav aria-label="Sections">
     <a class="keep" href="#install">Install</a>
     <a href="#start">Quick start</a>
@@ -287,7 +287,7 @@ footer a { color: var(--paper); }
       <a class="btn" href="#install">Install</a>
       <a class="btn ghost" href="#agents">Connect an agent</a>
     </div>
-    <div class="oneliner" aria-label="Start command"><span>$</span> cd my-project &amp;&amp; agent-canvas</div>
+    <div class="oneliner" aria-label="Install command"><span>$</span> curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh</div>
   </div>
 
   <figure class="plate" aria-label="Diagram: the browser and agents both talk to one agent-canvas process, which saves to .agentcanvas in your project.">
@@ -375,66 +375,51 @@ footer a { color: var(--paper); }
     <!-- 01 -->
     <section id="install" aria-labelledby="h-install">
       <div class="num"><big>01</big>install</div>
-      <h2 id="h-install">Install the binary</h2>
-      <p>agent-canvas is one self-contained file. It needs no runtime, no Node and no internet connection once installed. Every <a href="https://github.com/maxiplux/agentcanvas/releases">release</a> ships six builds and a <code>SHA256SUMS</code> file.</p>
+      <h2 id="h-install">Install in one line</h2>
+      <p>The installer downloads the latest release for your machine, checks it against <code>SHA256SUMS</code>, and puts <code>agent-canvas</code> on your path. It never prompts and never needs <code>sudo</code> or administrator rights. <strong>Run the same line again to update.</strong></p>
 
       <div class="tabs" role="tablist" aria-label="Operating system">
-        <button role="tab" id="t-mac" aria-controls="p-mac" aria-selected="true">macOS</button>
-        <button role="tab" id="t-linux" aria-controls="p-linux" aria-selected="false" tabindex="-1">Linux</button>
+        <button role="tab" id="t-mac" aria-controls="p-mac" aria-selected="true">macOS / Linux</button>
         <button role="tab" id="t-win" aria-controls="p-win" aria-selected="false" tabindex="-1">Windows</button>
         <button role="tab" id="t-src" aria-controls="p-src" aria-selected="false" tabindex="-1">From source</button>
       </div>
 
       <div class="panel" role="tabpanel" id="p-mac" aria-labelledby="t-mac">
-        <p>Pick <code>darwin-arm64</code> for Apple silicon (M1 and later) or <code>darwin-amd64</code> for Intel Macs. The repository is private, so download with the GitHub CLI after <code>gh auth login</code>:</p>
-        <div class="code"><span class="label">terminal</span><pre><span class="p">$ </span>gh release download v0.1.0 --repo maxiplux/agentcanvas \
-    --pattern 'agent-canvas-darwin-arm64' --pattern SHA256SUMS
-<span class="p">$ </span>grep darwin-arm64 SHA256SUMS | shasum -a 256 -c -    <span class="c"># → agent-canvas-darwin-arm64: OK</span>
-<span class="p">$ </span>chmod +x agent-canvas-darwin-arm64
-<span class="p">$ </span>sudo mv agent-canvas-darwin-arm64 /usr/local/bin/agent-canvas
-<span class="p">$ </span>agent-canvas version                                <span class="c"># → agent-canvas v0.1.0</span></pre></div>
-        <div class="note">If you downloaded the file with a browser and macOS refuses to open it, clear the quarantine flag once: <code>xattr -d com.apple.quarantine /usr/local/bin/agent-canvas</code>.</div>
-      </div>
-
-      <div class="panel" role="tabpanel" id="p-linux" aria-labelledby="t-linux" hidden>
-        <p>Pick <code>linux-amd64</code> for x86-64 or <code>linux-arm64</code> for ARM (Graviton, Raspberry Pi 4/5 with a 64-bit OS).</p>
-        <div class="code"><span class="label">terminal</span><pre><span class="p">$ </span>gh release download v0.1.0 --repo maxiplux/agentcanvas \
-    --pattern 'agent-canvas-linux-amd64' --pattern SHA256SUMS
-<span class="p">$ </span>grep linux-amd64 SHA256SUMS | sha256sum -c -
-<span class="p">$ </span>install -m 0755 agent-canvas-linux-amd64 ~/.local/bin/agent-canvas
-<span class="p">$ </span>agent-canvas version</pre></div>
-        <p>Make sure <code>~/.local/bin</code> is on your <code>PATH</code>, or install into <code>/usr/local/bin</code> with <code>sudo</code>.</p>
+        <div class="code"><span class="label">macOS / Linux</span><pre><span class="p">$ </span>curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh</pre></div>
+        <p>It installs into the folder of an existing <code>agent-canvas</code>, else <code>/usr/local/bin</code> if writable, else <code>~/.local/bin</code>. Set <code>AGENT_CANVAS_INSTALL_DIR</code> to choose, or <code>AGENT_CANVAS_VERSION=v0.1.1</code> to pin a release.</p>
       </div>
 
       <div class="panel" role="tabpanel" id="p-win" aria-labelledby="t-win" hidden>
-        <p>Pick <code>windows-amd64.exe</code> for most PCs or <code>windows-arm64.exe</code> for ARM laptops. In PowerShell:</p>
-        <div class="code"><span class="label">powershell</span><pre><span class="p">PS> </span>gh release download v0.1.0 --repo maxiplux/agentcanvas `
-      --pattern 'agent-canvas-windows-amd64.exe' --pattern SHA256SUMS
-<span class="p">PS> </span>(Get-FileHash .\agent-canvas-windows-amd64.exe -Algorithm SHA256).Hash.ToLower()
-<span class="p">PS> </span>Select-String windows-amd64 SHA256SUMS                <span class="c"># the two hashes must match</span>
-<span class="p">PS> </span>New-Item -ItemType Directory -Force $HOME\bin | Out-Null
-<span class="p">PS> </span>Move-Item .\agent-canvas-windows-amd64.exe $HOME\bin\agent-canvas.exe
-<span class="p">PS> </span>[Environment]::SetEnvironmentVariable('Path', "$env:Path;$HOME\bin", 'User')</pre></div>
-        <p>Open a new terminal, then run <code>agent-canvas version</code>. If SmartScreen warns about an unknown publisher, choose <em>More info → Run anyway</em>.</p>
+        <div class="code"><span class="label">Windows PowerShell</span><pre><span class="p">PS> </span>irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex</pre></div>
+        <p>It installs into <code>%LOCALAPPDATA%\Programs\agent-canvas</code> and adds that folder to your user <code>PATH</code>; open a new terminal afterwards.</p>
       </div>
 
       <div class="panel" role="tabpanel" id="p-src" aria-labelledby="t-src" hidden>
-        <p>You need Go 1.25 or later and <code>make</code>. The UI's assets are vendored in the repository, so there is nothing else to install.</p>
+        <p>You need Go 1.25 or later and <code>make</code>. The UI's assets are vendored, so there is nothing else to install.</p>
         <div class="code"><span class="label">terminal</span><pre><span class="p">$ </span>git clone https://github.com/maxiplux/agentcanvas.git
 <span class="p">$ </span>cd agentcanvas
-<span class="p">$ </span>make test            <span class="c"># go vet + go test</span>
-<span class="p">$ </span>make build           <span class="c"># → dist/agent-canvas</span>
-<span class="p">$ </span>go install ./cmd/agent-canvas   <span class="c"># or put it in $(go env GOPATH)/bin</span></pre></div>
+<span class="p">$ </span>make build                       <span class="c"># → dist/agent-canvas</span>
+<span class="p">$ </span>go install ./cmd/agent-canvas    <span class="c"># or put it in $(go env GOPATH)/bin</span></pre></div>
       </div>
+
+      <h3>Stay up to date</h3>
+      <div class="code"><span class="label">terminal</span><pre><span class="p">$ </span>agent-canvas update --check    <span class="c"># is a newer release out?</span>
+<span class="p">$ </span>agent-canvas update            <span class="c"># download, verify, and replace this binary</span></pre></div>
+
+      <h3>For coding agents</h3>
+      <p>Paste this into your agent. It installs (or updates) the CLI, gives the agent the built-in skill, and starts the studio:</p>
+      <div class="code"><span class="label">prompt</span><pre>Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh`
+(on Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), then run
+`agent-canvas skills export agentcanvas --agent claude` in this project, start `agent-canvas`
+here, connect to the MCP URL it prints, and call get_canvas first.</pre></div>
 
       <table>
         <thead><tr><th>Release file</th><th>For</th></tr></thead>
         <tbody>
-          <tr><td><code>agent-canvas-darwin-arm64</code></td><td>macOS on Apple silicon</td></tr>
-          <tr><td><code>agent-canvas-darwin-amd64</code></td><td>macOS on Intel</td></tr>
+          <tr><td><code>agent-canvas-darwin-arm64</code> · <code>-darwin-amd64</code></td><td>macOS on Apple silicon or Intel</td></tr>
           <tr><td><code>agent-canvas-linux-amd64</code> · <code>-linux-arm64</code></td><td>Linux on x86-64 or ARM64</td></tr>
           <tr><td><code>agent-canvas-windows-amd64.exe</code> · <code>-windows-arm64.exe</code></td><td>Windows on x86-64 or ARM64</td></tr>
-          <tr><td><code>SHA256SUMS</code></td><td>Checksums for all six</td></tr>
+          <tr><td><code>SHA256SUMS</code></td><td>Checksums for all six, from <a href="https://github.com/maxiplux/agentcanvas/releases">GitHub releases</a></td></tr>
         </tbody>
       </table>
     </section>
@@ -554,6 +539,7 @@ agent-canvas skills list [--json]
 agent-canvas skills install PATH [--force]
 agent-canvas skills remove NAME
 agent-canvas skills export NAME (--dir PATH | --agent claude|codex [--global]) [--force]
+agent-canvas update [--check] [--version TAG]
 agent-canvas version
 agent-canvas --help</pre></div>
       <table>
@@ -606,6 +592,7 @@ agent-canvas --help</pre></div>
         <details><summary>“No AgentCanvas server for &lt;dir&gt;” from attach</summary><div><p><code>attach</code> only connects to a studio that is already running. Start <code>agent-canvas</code> in that folder, or pass <code>--url http://127.0.0.1:&lt;port&gt;/mcp</code>.</p></div></details>
         <details><summary>My project was replaced by the sample</summary><div><p>If <code>project.json</code> can't be read or contains invalid values, it is renamed to <code>project.json.bad-&lt;timestamp&gt;</code>, a warning is printed, and the sample is loaded. Your file is still there to inspect or fix.</p></div></details>
         <details><summary>“forbidden host” or “forbidden origin” (403)</summary><div><p>The server only answers pages it served itself, at <code>http://127.0.0.1:&lt;port&gt;</code> or <code>http://localhost:&lt;port&gt;</code>. This blocks other websites from reading or changing your project, so open the URL that <code>agent-canvas</code> printed.</p></div></details>
+        <details><summary>“cannot write to …” from agent-canvas update</summary><div><p>The binary lives in a folder you can't write to, such as a root-owned <code>/usr/local/bin</code>. Re-run the one-line installer instead, or move <code>agent-canvas</code> to a folder you own.</p></div></details>
         <details><summary>macOS says the app can't be opened</summary><div><p>Files downloaded through a browser are quarantined. Run <code>xattr -d com.apple.quarantine "$(command -v agent-canvas)"</code> once.</p></div></details>
       </div>
     </section>
@@ -633,7 +620,7 @@ agent-canvas --help</pre></div>
 
 <footer>
   <div class="in">
-    <span>AgentCanvas · <code>agent-canvas</code> v0.1.0</span>
+    <span>AgentCanvas · <code>agent-canvas</code> v0.1.1</span>
     <span>Set in Fraunces · <a href="https://github.com/maxiplux/agentcanvas">github.com/maxiplux/agentcanvas</a></span>
   </div>
 </footer>
@@ -688,7 +675,7 @@ agent-canvas --help</pre></div>
     });
   });
   const ua = navigator.userAgent;
-  select(document.getElementById(/Windows/.test(ua) ? 't-win' : /Mac/.test(ua) ? 't-mac' : /Linux|X11/.test(ua) ? 't-linux' : 't-mac'));
+  select(document.getElementById(/Windows/.test(ua) ? 't-win' : /Mac/.test(ua) ? 't-mac' : 't-mac'));
 
   // highlight the section being read in the contents and the masthead
   const links = [...document.querySelectorAll('.toc a, .mast nav a')];

@@ -8,40 +8,41 @@ Any coding agent that speaks [MCP](https://modelcontextprotocol.io) can drive th
 - **One project per directory.** State lives in `./.agentcanvas/` next to your code.
 - **Agent-neutral MCP.** Streamable HTTP at `/mcp`, plus stdio through `agent-canvas attach` or `agent-canvas serve --stdio`.
 
-For an illustrated guide to installing and using the CLI, open [docs/index.html](docs/index.html) in a browser. It is a single self-contained page that makes no network requests.
+Website and guide: **https://maxiplux.github.io/agentcanvas/** (source: [docs/index.html](docs/index.html)).
 
 ## Install
 
-### Download a release binary
-
-Each [GitHub release](../../releases) has six binaries and a `SHA256SUMS` file:
-
-| OS | Intel / AMD | ARM |
-|---|---|---|
-| Linux | `agent-canvas-linux-amd64` | `agent-canvas-linux-arm64` |
-| macOS | `agent-canvas-darwin-amd64` | `agent-canvas-darwin-arm64` (Apple silicon) |
-| Windows | `agent-canvas-windows-amd64.exe` | `agent-canvas-windows-arm64.exe` |
-
-On macOS or Linux, download the file for your machine and put it on your `PATH`:
+One line, no prompts, no `sudo`. Run it again at any time to update.
 
 ```sh
-# example: macOS on Apple silicon
-curl -fLO https://github.com/maxiplux/agentcanvas/releases/latest/download/agent-canvas-darwin-arm64
-shasum -a 256 -c <(curl -fsSL https://github.com/maxiplux/agentcanvas/releases/latest/download/SHA256SUMS | grep darwin-arm64)
-chmod +x agent-canvas-darwin-arm64
-sudo mv agent-canvas-darwin-arm64 /usr/local/bin/agent-canvas
-agent-canvas version
+# macOS / Linux
+curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh
 ```
 
-On Linux, use `sha256sum -c` instead of `shasum -a 256 -c`.
+```powershell
+# Windows PowerShell
+irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex
+```
 
-macOS marks downloaded binaries as quarantined. If the first run is blocked, clear the flag:
+The installer picks the right binary from the [latest release](https://github.com/maxiplux/agentcanvas/releases/latest), verifies it against `SHA256SUMS`, and installs it:
+
+- **macOS/Linux:** into the folder of an existing `agent-canvas`, else `/usr/local/bin` if writable, else `~/.local/bin`.
+- **Windows:** into `%LOCALAPPDATA%\Programs\agent-canvas`, added to your user `PATH`.
+
+Set `AGENT_CANVAS_INSTALL_DIR` to choose the folder, or `AGENT_CANVAS_VERSION=v0.1.1` to pin a release.
+
+To update from the CLI:
 
 ```sh
-xattr -d com.apple.quarantine /usr/local/bin/agent-canvas
+agent-canvas update --check   # is a newer release out?
+agent-canvas update           # download, verify, and replace this binary
 ```
 
-On Windows, download the `.exe`, rename it to `agent-canvas.exe`, and put it in a folder on your `PATH`.
+**For coding agents**, paste:
+
+> Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), run `agent-canvas skills export agentcanvas --agent claude` in this project, start `agent-canvas` here, connect to the MCP URL it prints, and call `get_canvas` first.
+
+The full guide is at **https://maxiplux.github.io/agentcanvas/**.
 
 ### Build from source
 
@@ -122,6 +123,7 @@ agent-canvas skills list [--json]
 agent-canvas skills install PATH [--force]
 agent-canvas skills remove NAME
 agent-canvas skills export NAME (--dir PATH | --agent claude|codex [--global]) [--force]
+agent-canvas update [--check] [--version TAG]
 agent-canvas version
 agent-canvas --help
 ```

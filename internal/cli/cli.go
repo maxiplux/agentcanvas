@@ -44,6 +44,7 @@ Usage:
   agent-canvas skills install PATH [--force]
   agent-canvas skills remove NAME
   agent-canvas skills export NAME (--dir PATH | --agent claude|codex [--global]) [--force]
+  agent-canvas update [--check] [--version TAG]
   agent-canvas version
   agent-canvas --help
 
@@ -53,6 +54,8 @@ serve    Start the studio for the project in DIR (default: current directory).
          --dev serves React development builds and reads web/ from disk.
 attach   Proxy MCP between stdin/stdout and the server already running for DIR.
 skills   Manage SKILL.md packages (stored in the user config dir).
+update   Replace this binary with the latest GitHub release (verified by SHA-256).
+         --check only reports whether a newer release exists.
 `
 
 // Env carries process streams so tests can run the CLI in-process.
@@ -84,6 +87,8 @@ func Run(env Env, args []string) int {
 		return attach(env, args)
 	case "skills":
 		return skillsCmd(env, args)
+	case "update":
+		return update(env, args)
 	case "version":
 		fmt.Fprintln(env.Stdout, "agent-canvas", Version)
 		return ExitOK
