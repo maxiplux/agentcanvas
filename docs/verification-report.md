@@ -2,6 +2,20 @@
 
 Build: `make test` (go vet + go test, all packages green) and `make release`. Walked on 2026-11-02 with fresh seed projects. Rows 1–33 were re-run in one scripted Chrome session against the production binary, resetting to the seed before each row; rows 38, 41 and 44 against the same server with a second window and the CLI acting from outside the page. The script drives the real UI (clicks, pointer drags, key events, inspector inputs) and reads the result from the DOM and `/api/state`.
 
+## 0b. Complete pass on the shipped `v0.1.2`
+
+After the `v0.1.2` release, every §17 row (1–44) and every §18 step (1–15) was run again, unchanged, against the `v0.1.2` binary installed by the public one-liner (`agent-canvas version` → `agent-canvas v0.1.2`). Nothing was skipped or carried over from earlier runs.
+
+| Rows / steps | Result on `v0.1.2` |
+|---|---|
+| §17 1–6, 8, 28, 29 (exports), 30–33 | 13/13 pass |
+| §17 7, 9–23 | All pass. Row 13: 51 edits → 50 undo steps, oldest "Edit 1", redo works, a Story undo leaves Web untouched. Row 23: all eleven shortcuts work |
+| §17 24–27, 29 (reload); §18 5–7 | All pass. Pins #3–#6 placed on a page, a screen, the storyboard and the draw canvas. After reload, the moved pin renders at its saved position [0.3383, 0.4254]. Tab, breakpoint, tokens, edges, doc, pins and shapes are all restored |
+| §17 38, 41, 44; §18 10, 11, 14 | All pass. The MCP edit reached the canvas 68 ms after the call, with the agent pill. Every `attach` edit was seen in the browser. Window A followed window B, and MCP `undo` reverted the browser edit. The installed skill appeared in the open drawer 671 ms after install and disappeared after remove. The SKILL.md view is read-only |
+| §17 34–37, 39, 40, 42, 43; §18 12, 13, 15 | All pass. Exit 2 when all ports are held and exit 3 when a server already runs. Projects stay independent and the view is restored after Ctrl+C. Raw curl, `serve --stdio`, the go-sdk client over HTTP and through `attach`, and `attach` with no server (exit 1) all work. A cross-channel link is refused with no change to `rev`. `/guide` matches `agentcanvas://guide`. Built-in skill protection and the skills export targets work. Offline headless Chrome loads only from 127.0.0.1, with Inter and Fraunces |
+| §18 1–4, 8 | All pass. Step 3 undo/redo sequence: `md/4/ink → md/4/muted → md/2/muted → md/4/muted → md/4/ink`. The exports open standalone and follow their edges. No pin or studio markup appears in them |
+| §18 9 | Fresh tab, UI-only walkthrough, 22 clicks: 0 console errors, only the two vendor warnings listed in §4 |
+
 ## 0a. Release re-verification (v0.1.1, then v0.1.2)
 
 Every §17 row and §18 step was re-run against the released `v0.1.1` binary, installed with the public one-liner `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh`. All passed except §18 step 9: pressing ⌘Z with an empty history sent a request the server refused (409), which Chrome logs as a console error. `v0.1.2` fixes that: the shortcut now shows "Nothing to undo in this tab." locally and sends no request.
