@@ -21,6 +21,10 @@ AgentCanvas is a local design studio: web pages, mobile story screens, connected
 - `agent-canvas attach --start` (what `init` configures) proxies MCP over stdio and starts the studio in the background first when none is running. Plain `agent-canvas attach` only connects to a studio that is already running.
 - `agent-canvas serve` runs the studio in the foreground and prints the UI URL and the MCP URL (`http://127.0.0.1:<port>/mcp`). Any streamable-HTTP MCP client connects to the MCP URL; `GET /mcp.json` returns a generic client config. `agent-canvas serve --stdio` starts the studio and speaks MCP on stdin/stdout in one process.
 
+## New projects start blank
+
+A new project has one web flow (`Website`) with an empty `Home` page, one mobile flow (`App`) with no screens, no edges, shapes, or pins, and a short `DESIGN.md` template. Build from there: `insert_block` on the page, `upsert_node` to add screens or pages, `set_doc` to write the design doc. Don't load the sample unless the user asks for it.
+
 ## Always call `get_canvas` first
 
 `get_canvas` is your screen. It returns the shared view (tab, view, breakpoint, current node, selection, toggles), history flags, tokens, flows with node ids in storyboard order, every node (blocks with their child ids, labels and targets; screens with CTA and hotspots), edges, doc headings, pins, failing checks, the open-issue count, and installed skills. Pass `full: true` for the complete project JSON. Use `get_node` for one page or screen in full.
@@ -45,7 +49,7 @@ AgentCanvas is a local design studio: web pages, mobile story screens, connected
 ### History
 
 - `undo` / `redo` — per-tab history (`web`, `story`, `draw`, `doc`); default is the current tab. Shared with the designer.
-- `reset_project` — restore the seed project; needs `confirm: true`.
+- `reset_project` — replace the whole project; needs `confirm: true`. `template: "blank"` (default) clears it; `template: "sample"` loads the Hearth sample. Only when the user asks to start over or to see the sample.
 
 ### Edit
 

@@ -18,7 +18,7 @@ func (c *clock) add(d time.Duration) { c.t = c.t.Add(d) }
 func newMem(t *testing.T) (*Store, *clock) {
 	t.Helper()
 	c := &clock{t: time.Unix(1_800_000_000, 0)}
-	s, err := Open(t.TempDir(), Options{InMemory: true, Now: c.now})
+	s, err := Open(t.TempDir(), Options{InMemory: true, Sample: true, Now: c.now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +469,7 @@ func TestChangedIDs(t *testing.T) {
 
 func TestPersistenceRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	s, err := Open(dir, Options{SaveDelay: time.Millisecond})
+	s, err := Open(dir, Options{SaveDelay: time.Millisecond, Sample: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +496,7 @@ func TestCorruptFallsBackToSeed(t *testing.T) {
 	os.WriteFile(filepath.Join(data, "project.json"), []byte(`{"key":"agentcanvas.project.v1","project":{"version":2}}`), 0o644)
 	os.WriteFile(filepath.Join(data, "ui.json"), []byte(`not json`), 0o644)
 	var log strings.Builder
-	s, err := Open(dir, Options{Log: &log})
+	s, err := Open(dir, Options{Log: &log, Sample: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,9 +513,50 @@ func TestCorruptFallsBackToSeed(t *testing.T) {
 func TestResetProject(t *testing.T) {
 	s, _ := newMem(t)
 	act(t, s, "delete_node", map[string]any{"nodeId": "pg_home"})
+	act(t, s, "reset_project", map[string]any{"template": "sample"})
+	if len(s.project.Nodes) != 9 || len(s.hist["web"].past) != 0 || s.project.PinCounter != 2 {
+		t.Fatal("reset to sample")
+	}
 	act(t, s, "reset_project", map[string]any{})
-	if len(s.project.Nodes) != 9 || len(s.hist["web"].past) != 0 {
-		t.Fatal("reset")
+	if len(s.project.Nodes) != 1 || len(s.project.Pins) != 0 || len(s.project.Draw.Shapes) != 0 || s.view.CurrentNodeID.Web != "pg_home" {
+		t.Fatalf("reset to blank: %d nodes", len(s.project.Nodes))
+	}
+	if _, err := s.Apply(Action{Type: "reset_project", Payload: json.RawMessage(`{"template":"demo"}`)}, "ui"); err == nil {
+		t.Fatal("unknown template accepted")
+	}
+}
+
+func TestNewProjectIsBlank(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "my-shop")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(dir, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := s.project
+	if len(p.Flows) != 2 || len(p.Nodes) != 1 || len(p.Nodes[0].Blocks) != 0 || len(p.Edges) != 0 ||
+		len(p.Pins) != 0 || p.PinCounter != 0 || len(p.Draw.Shapes) != 0 {
+		t.Fatalf("not blank: %d flows %d nodes %d edges %d pins %d shapes", len(p.Flows), len(p.Nodes), len(p.Edges), len(p.Pins), len(p.Draw.Shapes))
+	}
+	if !strings.HasPrefix(p.Doc.Markdown, "# my-shop — DESIGN.md") || strings.Contains(p.Doc.Markdown, "Hearth") {
+		t.Fatalf("doc: %q", p.Doc.Markdown)
+	}
+	if err := Validate(p); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, ".agentcanvas", "project.json"))
+	if err != nil || strings.Contains(string(b), "Hearth") {
+		t.Fatal("blank project not written to disk")
+	}
+	// Reopening keeps it; a mobile screen can be added to the empty App flow.
+	act(t, s, "upsert_node", map[string]any{"flowId": "fl_app"})
+	if len(s.project.Nodes) != 2 || s.project.Nodes[1].Kind != "screen" {
+		t.Fatal("could not add a screen to the blank App flow")
+	}
+	if n := OpenIssues(s.project); n != 0 {
+		t.Fatalf("blank project reports %d open issues", n)
 	}
 }
 
@@ -595,7 +636,7 @@ func TestInjectedProjectQuarantined(t *testing.T) {
 			b, _ := json.Marshal(map[string]any{"key": "agentcanvas.project.v1", "project": p})
 			os.WriteFile(filepath.Join(data, "project.json"), b, 0o644)
 			var log strings.Builder
-			s, err := Open(dir, Options{Log: &log})
+			s, err := Open(dir, Options{Log: &log, Sample: true})
 			if err != nil {
 				t.Fatal(err)
 			}

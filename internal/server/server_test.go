@@ -13,7 +13,7 @@ import (
 
 func testServer(t *testing.T) http.Handler {
 	t.Helper()
-	st, err := studio.Open(t.TempDir(), studio.Options{InMemory: true})
+	st, err := studio.Open(t.TempDir(), studio.Options{InMemory: true, Sample: true})
 	if err != nil {
 		t.Fatal(err)
 	}

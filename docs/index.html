@@ -265,7 +265,7 @@ footer a { color: var(--paper); }
 
 <header class="mast">
   <a class="mark" href="#top" aria-label="AgentCanvas, back to top"><i></i>AgentCanvas</a>
-  <span class="chip">v0.1.3</span>
+  <span class="chip">v0.1.4</span>
   <nav aria-label="Sections">
     <a class="keep" href="#install">Install</a>
     <a href="#start">Quick start</a>
@@ -437,7 +437,8 @@ MCP: http://127.0.0.1:47321/mcp
 Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run "agent-canvas attach".</pre></div>
       <ol>
         <li>Open the <strong>UI</strong> URL in your browser, or start with <code>agent-canvas --open</code>.</li>
-        <li>A new project starts from <strong>Hearth</strong>, a sample ceramics shop with two web flows, two mobile flows, a seeded <code>DESIGN.md</code> and a few flaws to fix: cramped hero text, one low-contrast button and one tap target that is too small.</li>
+        <li>A new project starts <strong>blank</strong>: one web flow with an empty Home page, one mobile flow with no screens yet, an empty drawing and a short <code>DESIGN.md</code> template.</li>
+        <li>To explore first, load <strong>Hearth</strong>, a sample ceramics shop with two web flows, two mobile flows, a full <code>DESIGN.md</code> and a few flaws to fix: start with <code>agent-canvas serve --sample</code> (or <code>init --sample</code>), or choose <em>Export ▾ → Load the Hearth sample…</em>. <em>Start over (blank)…</em> clears it again.</li>
         <li>Press <kbd>Ctrl</kbd> + <kbd>C</kbd> in the terminal to stop. Unsaved changes are flushed first; everything is saved in <code>.agentcanvas/</code> as you work.</li>
       </ol>
       <div class="note"><strong>Local only.</strong> The server listens on <code>127.0.0.1</code> and nothing else. It starts at port 47321 and tries the next 20 if that one is taken; <code>--port 8080</code> uses exactly that port.</div>
@@ -477,7 +478,7 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
       <table>
         <thead><tr><th>Writes</th><th>For</th></tr></thead>
         <tbody>
-          <tr><td><code>.agentcanvas/project.json</code></td><td>The design project, seeded with Hearth if missing. Never overwritten.</td></tr>
+          <tr><td><code>.agentcanvas/project.json</code></td><td>The design project: blank if missing, or the Hearth sample with <code>--sample</code>. Never overwritten.</td></tr>
           <tr><td><code>.claude/skills/</code> · <code>.mcp.json</code></td><td>Claude Code: every skill, plus an <code>agentcanvas</code> MCP server</td></tr>
           <tr><td><code>.agents/skills/</code> · <code>.codex/config.toml</code></td><td>Codex: every skill, plus <code>[mcp_servers.agentcanvas]</code> (read in trusted projects)</td></tr>
           <tr><td><code>.gitignore</code></td><td>The per-machine <code>.agentcanvas</code> files, in git repositories</td></tr>
@@ -550,8 +551,8 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
     <section id="reference" aria-labelledby="h-ref">
       <div class="num"><big>07</big>reference</div>
       <h2 id="h-ref">CLI reference</h2>
-      <div class="code"><span class="label">synopsis</span><pre>agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-agent-canvas init [DIR] [--agent claude,codex]
+      <div class="code"><span class="label">synopsis</span><pre>agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--sample] [--dev]
+agent-canvas init [DIR] [--agent claude,codex] [--sample]
 agent-canvas open [DIR] [--no-browser]
 agent-canvas attach [--project DIR [--start] | --url URL]
 agent-canvas skills list [--json]
@@ -567,6 +568,7 @@ agent-canvas --help</pre></div>
           <tr><td><code>--project DIR</code></td><td>Project folder (default: the current folder). Data lives in <code>DIR/.agentcanvas/</code>.</td></tr>
           <tr><td><code>--port N</code></td><td>Use exactly port N instead of scanning 47321–47341.</td></tr>
           <tr><td><code>--open</code></td><td>Open the UI in your default browser.</td></tr>
+          <tr><td><code>--sample</code></td><td><code>serve</code> and <code>init</code>: create a new project from the Hearth sample instead of a blank canvas.</td></tr>
           <tr><td><code>--stdio</code></td><td>Also serve MCP on stdin/stdout; startup lines go to stderr.</td></tr>
           <tr><td><code>--dev</code></td><td>For contributors: serve React's development builds and read <code>web/</code> from disk.</td></tr>
           <tr><td><code>--url URL</code></td><td><code>attach</code> only: connect to this MCP URL instead of the current folder's server.</td></tr>
@@ -612,7 +614,7 @@ agent-canvas --help</pre></div>
         <details><summary>“a server is already running for …” (exit 3)</summary><div><p>Only one process may serve a project. The message prints that server's UI and MCP URLs, so open those, or stop the other process first.</p></div></details>
         <details><summary>The top bar says “Reconnecting…”</summary><div><p>The page lost its connection to the server, so editing pauses. Start <code>agent-canvas</code> again in the same folder. The page reconnects by itself and reloads the latest state.</p></div></details>
         <details><summary>“No AgentCanvas server for &lt;dir&gt;” from attach</summary><div><p>Plain <code>attach</code> only connects to a studio that is already running. Use <code>attach --start</code> (what <code>init</code> configures), run <code>agent-canvas open</code> in that folder, or pass <code>--url http://127.0.0.1:&lt;port&gt;/mcp</code>.</p></div></details>
-        <details><summary>My project was replaced by the sample</summary><div><p>If <code>project.json</code> can't be read or contains invalid values, it is renamed to <code>project.json.bad-&lt;timestamp&gt;</code>, a warning is printed, and the sample is loaded. Your file is still there to inspect or fix.</p></div></details>
+        <details><summary>My project was replaced by a blank one</summary><div><p>If <code>project.json</code> can't be read or contains invalid values, it is renamed to <code>project.json.bad-&lt;timestamp&gt;</code>, a warning is printed, and a blank project is loaded. Your file is still there to inspect or fix.</p></div></details>
         <details><summary>“forbidden host” or “forbidden origin” (403)</summary><div><p>The server only answers pages it served itself, at <code>http://127.0.0.1:&lt;port&gt;</code> or <code>http://localhost:&lt;port&gt;</code>. This blocks other websites from reading or changing your project, so open the URL that <code>agent-canvas</code> printed.</p></div></details>
         <details><summary>“cannot write to …” from agent-canvas update</summary><div><p>The binary lives in a folder you can't write to, such as a root-owned <code>/usr/local/bin</code>. Re-run the one-line installer instead, or move <code>agent-canvas</code> to a folder you own.</p></div></details>
         <details><summary>macOS says the app can't be opened</summary><div><p>Files downloaded through a browser are quarantined. Run <code>xattr -d com.apple.quarantine "$(command -v agent-canvas)"</code> once.</p></div></details>
@@ -642,7 +644,7 @@ agent-canvas --help</pre></div>
 
 <footer>
   <div class="in">
-    <span>AgentCanvas · <code>agent-canvas</code> v0.1.3</span>
+    <span>AgentCanvas · <code>agent-canvas</code> v0.1.4</span>
     <span>Set in Fraunces · <a href="https://github.com/maxiplux/agentcanvas">github.com/maxiplux/agentcanvas</a></span>
   </div>
 </footer>

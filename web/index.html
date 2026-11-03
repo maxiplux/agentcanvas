@@ -888,9 +888,13 @@ function ExportMenu() {
             <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#EFE8DB] text-[12px]">{label}</button>
           ))}
           <div className="h-px bg-[#DDD5C4] my-1" />
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#EFE8DB] text-[12px]"
+            onClick={() => { setOpen(false); if (window.confirm('Replace the whole project with the Hearth sample? Your current project and every undo history are cleared.')) act('reset_project', { template: 'sample' }); }}>
+            Load the Hearth sample…
+          </button>
           <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F7DDD7] text-[12px] text-[#9A2C19]"
-            onClick={() => { setOpen(false); if (window.confirm('Reset the whole project to the Hearth seed? This clears every undo history.')) act('reset_project', {}); }}>
-            Reset to seed…
+            onClick={() => { setOpen(false); if (window.confirm('Start over with a blank project? Your current project and every undo history are cleared.')) act('reset_project', {}); }}>
+            Start over (blank)…
           </button>
         </div>
       )}
@@ -1221,6 +1225,27 @@ function ContentPanel() {
 }
 
 function Empty({ text }) { return <div className="px-3 py-6 text-[12px] text-[#6B665C] leading-5">{text}</div>; }
+
+// Shown when a channel has no page or screen yet (a blank project's App flow starts empty).
+function StartChannel({ channel }) {
+  const { state, act } = useS();
+  const flow = state.project.flows.find(f => f.channel === channel);
+  const what = channel === 'web' ? 'page' : 'screen';
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="max-w-[360px] text-center font-ui">
+        <div className="font-serif text-[22px] text-[#232220] mb-2">No {what}s yet</div>
+        <p className="text-[13px] leading-5 text-[#6B665C] mb-4">
+          Add the first {what}{flow ? <> to <b className="font-semibold text-[#232220]">{flow.name}</b></> : null}, or ask your agent to design one.
+        </p>
+        <button type="button" className="h-8 px-3 rounded bg-[#232220] text-[#F4EFE6] text-[12px]"
+          onClick={() => flow ? act('upsert_node', { flowId: flow.id }) : act('upsert_flow', { channel })}>
+          + Add a {what}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function NodeHeader({ node, children }) {
   const { state } = useS();
@@ -2132,7 +2157,7 @@ function StoryboardView({ channel }) {
         {lanes.map(l => (
           <div key={l.flow.id} style={{ position: 'absolute', left: 0, right: 0, top: l.y - 8, height: HEAD + T.h + 24, borderTop: '1px dashed #CFC6B5' }}>
             <div style={{ position: 'absolute', left: MARGIN + LANE.left, top: 10, font: '600 12px/16px Inter, sans-serif', color: '#232220' }}>
-              {l.flow.name} <span style={{ fontWeight: 400, color: CH.muted }}>· {l.nodes.length} {channel === 'web' ? 'pages' : 'screens'}</span>
+              {l.flow.name} <span style={{ fontWeight: 400, color: CH.muted }}>· {l.nodes.length} {(channel === 'web' ? 'page' : 'screen') + (l.nodes.length === 1 ? '' : 's')}</span>
             </div>
           </div>
         ))}
@@ -2280,7 +2305,7 @@ function WebEditor() {
   const v = state.view;
   if (v.view.web === 'board') return <StoryboardView channel="web" />;
   const node = findNode(state.project, v.currentNodeId.web);
-  if (!node) return <Empty text="No web pages. Create a flow from the Outline." />;
+  if (!node) return <StartChannel channel="web" />;
   return <WebPage node={node} />;
 }
 
@@ -2373,7 +2398,7 @@ function WebPage({ node }) {
           style={{ width: BREAKPOINTS[bp], background: p.tokens.colors.paper, minHeight: 240 }}
           onClickCapture={onAnnotate} onClick={e => { e.stopPropagation(); if (!ui.annotate) act('set_selection', { selection: { kind: 'node', nodeId: node.id } }); }}>
           {node.blocks.map(b => renderBlock(b, ctx))}
-          {!node.blocks.length && <div className="h-60 flex items-center justify-center text-[13px] font-ui text-[#6B665C]">Empty page — add blocks from the Palette.</div>}
+          {!node.blocks.length && <div className="h-60 flex items-center justify-center text-[13px] font-ui text-[#6B665C]">Empty page — add blocks from the Palette, or ask your agent to design it.</div>}
           {v.showGrid && <GridOverlay bp={bp} />}
           {drop && <div style={{ position: 'absolute', left: 0, right: 0, top: drop.y - 1, height: 2, background: V, zIndex: 35 }} />}
           <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
@@ -2388,7 +2413,7 @@ function StoryEditor() {
   const v = state.view;
   if (v.view.story === 'board') return <StoryboardView channel="mobile" />;
   const node = findNode(state.project, v.currentNodeId.mobile);
-  if (!node) return <Empty text="No mobile screens. Create a flow from the Outline." />;
+  if (!node) return <StartChannel channel="mobile" />;
   return <StoryPage node={node} />;
 }
 
@@ -2718,7 +2743,7 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { error }; }
   componentDidCatch(error, info) { console.warn('AgentCanvas UI error', error, info && info.componentStack); }
   reset = async () => {
-    if (!window.confirm('Reset the project to the Hearth seed? Your current project is replaced.')) return;
+    if (!window.confirm('Start over with a blank project? Your current project is replaced.')) return;
     try { await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'reset_project', payload: {} }) }); } catch (e) { /* reload anyway */ }
     window.location.reload();
   };
@@ -2731,7 +2756,7 @@ class ErrorBoundary extends React.Component {
           <pre className="text-[12px] whitespace-pre-wrap text-[#9A2C19] mb-4">{String(this.state.error && this.state.error.message || this.state.error)}</pre>
           <div className="flex gap-2">
             <button type="button" className="h-8 px-3 rounded bg-[#232220] text-[#F4EFE6]" onClick={() => window.location.reload()}>Reload</button>
-            <button type="button" className="h-8 px-3 rounded border border-[#D8432A] text-[#9A2C19]" onClick={this.reset}>Reset project to seed</button>
+            <button type="button" className="h-8 px-3 rounded border border-[#D8432A] text-[#9A2C19]" onClick={this.reset}>Start over (blank)</button>
           </div>
         </div>
       </div>

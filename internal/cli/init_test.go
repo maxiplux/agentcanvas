@@ -118,6 +118,16 @@ func TestInitAgentChoiceAndRefusals(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(proj, ".gitignore")); !os.IsNotExist(err) {
 		t.Fatal(".gitignore created outside a git repository")
 	}
+	if pj := readFile(t, filepath.Join(proj, ".agentcanvas", "project.json")); strings.Contains(pj, "Hearth") || !strings.Contains(pj, `"fl_web"`) {
+		t.Fatal("a new project is not blank")
+	}
+	sample := t.TempDir()
+	if code, out, errs := run(t, "init", sample, "--agent", "claude", "--sample"); code != 0 || !strings.Contains(out, "Hearth sample") {
+		t.Fatalf("init --sample: %d %q %q", code, out, errs)
+	}
+	if pj := readFile(t, filepath.Join(sample, ".agentcanvas", "project.json")); !strings.Contains(pj, "Everyday ceramics") {
+		t.Fatal("--sample did not load the Hearth sample")
+	}
 	if code, _, errs := run(t, "init", proj, "--agent", "cursor"); code != 1 || !strings.Contains(errs, "unknown --agent") {
 		t.Fatalf("unknown agent: %d %q", code, errs)
 	}

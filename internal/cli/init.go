@@ -23,10 +23,11 @@ import (
 // skills); the §14.4 `--agent codex` export preset keeps its .codex/skills path.
 
 const initUsage = `Usage:
-  agent-canvas init [DIR] [--agent claude,codex]
+  agent-canvas init [DIR] [--agent claude,codex] [--sample]
 
 Sets DIR (default: the current directory) up for AgentCanvas and coding agents:
-  .agentcanvas/project.json   the design project (seeded if missing, never overwritten)
+  .agentcanvas/project.json   the design project: blank if missing (--sample: the Hearth
+                              sample); an existing project is never overwritten
   .claude/skills/<skill>/     every skill, for Claude Code         (--agent claude)
   .mcp.json                   MCP server "agentcanvas" for Claude Code
   .agents/skills/<skill>/     every skill, for Codex               (--agent codex)
@@ -66,6 +67,7 @@ func initCmd(env Env, args []string) int {
 	fs := newFlags(env, "init")
 	agentList := fs.String("agent", "claude,codex", "agents to set up, comma-separated: claude, codex")
 	project := fs.String("project", "", "project directory (default: current directory)")
+	sample := fs.Bool("sample", false, "create the project from the Hearth sample instead of a blank canvas")
 	if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
 		fmt.Fprint(env.Stdout, initUsage)
 		return ExitOK
@@ -89,7 +91,7 @@ func initCmd(env Env, args []string) int {
 	out := env.Stdout
 	fmt.Fprintf(out, "Setting up AgentCanvas in %s\n", dir)
 
-	msg, err := initProject(env, dir)
+	msg, err := initProject(env, dir, *sample)
 	if err != nil {
 		fmt.Fprintln(env.Stderr, "agent-canvas:", err)
 		return ExitErr
@@ -195,19 +197,22 @@ func pickAgents(list string) ([]agentTarget, error) {
 }
 
 // initProject seeds .agentcanvas/project.json unless the project already exists.
-func initProject(env Env, dir string) (string, error) {
+func initProject(env Env, dir string, sample bool) (string, error) {
 	if si, ok := runningServer(dir); ok {
 		return "studio already running at " + si.UIURL, nil
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".agentcanvas", "project.json")); err == nil {
 		return "kept the existing .agentcanvas/project.json", nil
 	}
-	st, err := studio.Open(dir, studio.Options{Log: env.Stderr})
+	st, err := studio.Open(dir, studio.Options{Log: env.Stderr, Sample: sample})
 	if err != nil {
 		return "", err
 	}
 	st.Flush()
-	return "created .agentcanvas/project.json (the Hearth sample project)", nil
+	if sample {
+		return "created .agentcanvas/project.json from the Hearth sample", nil
+	}
+	return "created .agentcanvas/project.json (a blank canvas)", nil
 }
 
 func skillNames(sk *skills.Store) []string {

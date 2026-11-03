@@ -38,7 +38,7 @@ type fixture struct {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	st, err := studio.Open(t.TempDir(), studio.Options{InMemory: true})
+	st, err := studio.Open(t.TempDir(), studio.Options{InMemory: true, Sample: true})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -38,8 +38,8 @@ const (
 const usage = `agent-canvas — a local design studio that people and MCP agents edit together.
 
 Usage:
-  agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-  agent-canvas init [DIR] [--agent claude,codex]
+  agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--sample] [--dev]
+  agent-canvas init [DIR] [--agent claude,codex] [--sample]
   agent-canvas open [DIR] [--no-browser]
   agent-canvas attach [--project DIR [--start] | --url URL]
   agent-canvas skills list [--json]
@@ -53,6 +53,7 @@ Usage:
 serve    Start the studio for the project in DIR (default: current directory).
          The project lives in DIR/.agentcanvas/. Prints the UI URL and the MCP URL.
          --stdio also speaks MCP on stdin/stdout (logs go to stderr).
+         A new project starts blank; --sample starts it from the Hearth sample.
          --dev serves React development builds and reads web/ from disk.
 init     Set a project up for coding agents: the .agentcanvas project, every skill in
          .claude/skills and .agents/skills, and an "agentcanvas" MCP server in
@@ -242,6 +243,7 @@ func serve(env Env, args []string) int {
 	open := fs.Bool("open", false, "open the UI in the default browser")
 	stdio := fs.Bool("stdio", false, "also serve MCP on stdin/stdout")
 	dev := fs.Bool("dev", false, "serve development React builds and read web/ from disk")
+	sample := fs.Bool("sample", false, "start a new project from the Hearth sample instead of a blank canvas")
 	if ok, code := parse(env, fs, args); !ok {
 		return code
 	}
@@ -272,7 +274,7 @@ func serve(env Env, args []string) int {
 		fmt.Fprintln(env.Stderr, "agent-canvas:", err)
 		return ExitNoPort
 	}
-	store, err := studio.Open(dir, studio.Options{Log: env.Stderr})
+	store, err := studio.Open(dir, studio.Options{Log: env.Stderr, Sample: *sample})
 	if err != nil {
 		ln.Close()
 		fmt.Fprintln(env.Stderr, "agent-canvas:", err)

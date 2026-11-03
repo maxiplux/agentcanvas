@@ -75,7 +75,7 @@ MCP: http://127.0.0.1:47321/mcp
 Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run "agent-canvas attach".
 ```
 
-Open the UI URL; `agent-canvas --open` does that for you. A new project starts from the **Hearth** sample: two web flows, two mobile flows, a seeded `DESIGN.md`, and a few deliberate design flaws to fix.
+Open the UI URL; `agent-canvas --open` does that for you. A new project starts **blank**: one web flow with an empty Home page, one mobile flow with no screens yet, an empty drawing, and a short `DESIGN.md` template. To explore first, start from the **Hearth** sample (two web flows, two mobile flows, a full `DESIGN.md`, and a few deliberate design flaws to fix) with `agent-canvas serve --sample` or `agent-canvas init --sample`, or choose **Export ▾ → Load the Hearth sample…** in the studio. **Export ▾ → Start over (blank)…** clears the project again.
 
 - The server binds `127.0.0.1` only. It starts at port 47321 and tries the next 20 ports. `--port N` uses exactly `N`.
 - Running `serve` again for a project that already has a server prints that server's URLs and exits with code 3.
@@ -92,7 +92,7 @@ agent-canvas init                  # or: agent-canvas init path/to/project --age
 
 | Writes | For |
 |---|---|
-| `.agentcanvas/project.json` | the design project (seeded with Hearth if missing; never overwritten) |
+| `.agentcanvas/project.json` | the design project (blank if missing, or the Hearth sample with `--sample`; never overwritten) |
 | `.claude/skills/<skill>/` and `.mcp.json` | Claude Code: every skill, plus an `agentcanvas` MCP server |
 | `.agents/skills/<skill>/` and `.codex/config.toml` | Codex: every skill, plus `[mcp_servers.agentcanvas]` |
 | `.gitignore` | the per-machine `.agentcanvas` files, in git repositories |
@@ -142,8 +142,8 @@ A skill folder holds `SKILL.md` (with YAML front matter `name` and `description`
 ## Command reference
 
 ```text
-agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-agent-canvas init [DIR] [--agent claude,codex]
+agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--sample] [--dev]
+agent-canvas init [DIR] [--agent claude,codex] [--sample]
 agent-canvas open [DIR] [--no-browser]
 agent-canvas attach [--project DIR [--start] | --url URL]
 agent-canvas skills list [--json]
@@ -167,7 +167,7 @@ Exit codes: `0` ok · `1` usage or runtime error · `2` no free port · `3` proj
 | `.agentcanvas/exports/` | Files written by the MCP `export` tool with `write: true` |
 | `DESIGN.md` | Written by *Export › Save DESIGN.md to project* or `export design-md write:true` |
 
-If `project.json` is corrupt, it is renamed to `project.json.bad-<timestamp>` and the studio starts from the sample.
+If `project.json` is corrupt, it is renamed to `project.json.bad-<timestamp>` and the studio starts with a blank project.
 
 ## Development
 

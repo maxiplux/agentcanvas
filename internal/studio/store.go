@@ -59,6 +59,7 @@ type Store struct {
 	mu      sync.Mutex
 	dir     string // project directory (absolute)
 	data    string // <dir>/.agentcanvas
+	sample  bool   // new projects start from the Hearth sample
 	project *Project
 	view    SharedView
 	tabSel  map[string]*Selection
@@ -86,6 +87,7 @@ type Options struct {
 	SaveDelay time.Duration // debounce (default 300ms)
 	Now       func() time.Time
 	InMemory  bool // never touch disk (tests)
+	Sample    bool // start a new (or unreadable) project from the Hearth sample instead of blank
 }
 
 // Open loads (or seeds) the project in <dir>/.agentcanvas.
@@ -94,7 +96,7 @@ func Open(dir string, o Options) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{dir: abs, data: filepath.Join(abs, ".agentcanvas"), now: o.Now, logw: o.Log, saveDelay: o.SaveDelay,
+	s := &Store{dir: abs, data: filepath.Join(abs, ".agentcanvas"), now: o.Now, logw: o.Log, saveDelay: o.SaveDelay, sample: o.Sample,
 		tabSel: map[string]*Selection{}, hist: map[string]*history{}}
 	if s.now == nil {
 		s.now = time.Now
@@ -111,7 +113,7 @@ func Open(dir string, o Options) (*Store, error) {
 	s.view = DefaultView()
 	if o.InMemory {
 		s.data = ""
-		s.project = MakeSeed()
+		s.project = s.starter()
 		return s, nil
 	}
 	if err := noSymlink(s.data); err != nil {
@@ -202,21 +204,29 @@ func parseProject(b []byte) (*Project, error) {
 	return q, nil
 }
 
+// starter is the project a new store begins with: blank, or the Hearth sample.
+func (s *Store) starter() *Project {
+	if s.sample {
+		return MakeSeed()
+	}
+	return MakeBlank(filepath.Base(s.dir))
+}
+
 func (s *Store) loadProject() *Project {
 	path := filepath.Join(s.data, "project.json")
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return MakeSeed()
+		return s.starter()
 	}
 	if err != nil {
 		s.warnf("reading %s: %v", path, err)
-		return MakeSeed()
+		return s.starter()
 	}
 	p, err := parseProject(b)
 	if err != nil {
 		s.warnf("project.json: %v", err)
 		s.quarantine(path)
-		return MakeSeed()
+		return s.starter()
 	}
 	return p
 }
@@ -417,8 +427,21 @@ func (s *Store) Apply(a Action, source string) (*Result, error) {
 		}
 		out = o
 	case "reset_project":
-		// SPEC: reset replaces the whole project with the seed, so pinCounter returns to 2.
-		s.project = MakeSeed()
+		// SPEC: reset replaces the whole project with a template: blank by default,
+		// or the Hearth sample (whose pinCounter is 2).
+		var pl struct {
+			Template string `json:"template,omitempty"`
+		}
+		if len(a.Payload) > 0 && string(a.Payload) != "null" {
+			if err := json.Unmarshal(a.Payload, &pl); err != nil {
+				return nil, errInvalid("reset_project payload must be {template?: \"blank\" | \"sample\"}", "send {} or {\"template\": \"sample\"}")
+			}
+		}
+		np, err := MakeTemplate(pl.Template, filepath.Base(s.dir))
+		if err != nil {
+			return nil, err
+		}
+		s.project = np
 		for _, t := range Tabs {
 			s.hist[t] = &history{}
 		}
@@ -426,7 +449,10 @@ func (s *Store) Apply(a Action, source string) (*Result, error) {
 		s.view.Preview = false
 		s.tabSel = map[string]*Selection{}
 		fixView(s.project, &s.view, s.tabSel)
-		out = Outcome{Summary: "Reset the project to the Hearth seed"}
+		out = Outcome{Summary: "Started over with a blank project"}
+		if pl.Template == TemplateSample {
+			out.Summary = "Loaded the Hearth sample project"
+		}
 	default:
 		p := s.project.Clone()
 		v := s.view.clone()

@@ -269,7 +269,8 @@ type tabIn struct {
 }
 
 type resetIn struct {
-	Confirm bool `json:"confirm" jsonschema:"must be true"`
+	Confirm  bool   `json:"confirm" jsonschema:"must be true"`
+	Template string `json:"template,omitempty" jsonschema:"blank (default): an empty project; sample: the Hearth sample project"`
 }
 
 type typePatch struct {
@@ -535,12 +536,14 @@ func (s *Server) registerTools() {
 		map[string][]string{"tab": enumTab}, false,
 		func(_ context.Context, in tabIn) *sdk.CallToolResult { return s.apply("redo", in, "") })
 	add(s, "History", "reset_project",
-		"Replace the whole project with the starter seed and clear all histories. Input: confirm=true; refused otherwise.",
-		nil, false, func(_ context.Context, in resetIn) *sdk.CallToolResult {
+		"Replace the whole project and clear all histories. template: blank (default, an empty project) or sample (the Hearth sample with deliberate flaws to fix). Input: confirm=true; refused otherwise.",
+		map[string][]string{"template": studio.Templates}, false, func(_ context.Context, in resetIn) *sdk.CallToolResult {
 			if !in.Confirm {
 				return refused("reset_project replaces the whole project and needs confirm: true", "call reset_project with {\"confirm\": true} only if the user asked to start over")
 			}
-			return s.apply("reset_project", struct{}{}, "")
+			return s.apply("reset_project", struct {
+				Template string `json:"template,omitempty"`
+			}{in.Template}, "")
 		})
 
 	// Edit

@@ -1,5 +1,7 @@
 package studio
 
+import "fmt"
+
 // SeedMarkdown is the §7.5 DESIGN.md.
 const SeedMarkdown = `# Hearth — DESIGN.md
 
@@ -215,4 +217,57 @@ func MakeSeed() *Project {
 	p.PinCounter = 2
 	p.normalize()
 	return p
+}
+
+// SPEC: new projects start blank (owner's decision, superseding §7's "a new
+// project starts from the seed"). The Hearth seed above stays available as the
+// sample: `serve --sample`, `init --sample`, or reset_project {template: "sample"}.
+
+// Templates are the starting points reset_project accepts.
+const (
+	TemplateBlank  = "blank"
+	TemplateSample = "sample"
+)
+
+// Templates lists the reset_project templates.
+var Templates = []string{TemplateBlank, TemplateSample}
+
+// BlankMarkdown is the DESIGN.md of a new blank project named name.
+func BlankMarkdown(name string) string {
+	if name == "" {
+		name = "Untitled"
+	}
+	return "# " + name + " — DESIGN.md\n\n" +
+		"## Product\n\nWhat this is, who it is for, and how it should feel.\n\n" +
+		"## Principles\n\n- \n\n" +
+		"## Decisions\n\n- \n"
+}
+
+// MakeBlank returns an empty project: default tokens, one web flow holding one
+// empty page, one mobile flow with no screens yet, no edges, shapes, or pins.
+func MakeBlank(name string) *Project {
+	return &Project{
+		Version: 1,
+		Tokens:  DefaultTokens(),
+		Flows: []*Flow{
+			{ID: "fl_web", Name: "Website", Channel: ChanWeb, StartID: "pg_home"},
+			{ID: "fl_app", Name: "App", Channel: ChanMobile},
+		},
+		Nodes: []*Node{{Kind: "page", ID: "pg_home", FlowID: "fl_web", Name: "Home", Blocks: []*Block{}}},
+		Edges: []*Edge{},
+		Draw:  Draw{Shapes: []*Shape{}, View: DrawView{X: 0, Y: 0, Zoom: 1}},
+		Doc:   Doc{Markdown: BlankMarkdown(name)},
+		Pins:  []*Pin{},
+	}
+}
+
+// MakeTemplate returns a fresh project for template ("" means blank).
+func MakeTemplate(template, name string) (*Project, error) {
+	switch template {
+	case "", TemplateBlank:
+		return MakeBlank(name), nil
+	case TemplateSample:
+		return MakeSeed(), nil
+	}
+	return nil, errInvalid(fmt.Sprintf("template %q is not one of %v", template, Templates), `use "blank" or "sample"`)
 }
