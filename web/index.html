@@ -15,19 +15,48 @@ tailwind.config = {
   theme: {
     extend: {
       fontFamily: { ui: ['Inter', 'system-ui', 'sans-serif'], serif: ['Fraunces', 'Georgia', 'serif'] },
-      colors: { paper: '#F4EFE6', ink: '#1C1B19', muted: '#6B665C', accent: '#D8432A', wash: '#E9E2D4', line: '#CFC6B5' },
+      colors: {
+        // project token names (designed content)
+        paper: '#F4EFE6', wash: '#E9E2D4', line: '#CFC6B5',
+        // studio chrome tokens (spec §8.1)
+        canvas: '#F3F2EF', dot: '#D9D6CF', panel: '#FFFFFF', hair: '#E3E0D9', ink: '#1C1B19', muted: '#7A766D', faint: '#A8A49B',
+        bar: '#1C1B19', accent: '#D8432A', accentSoft: '#FBE8E3', edge: '#8E8A80', ok: '#2E7D4F', warn: '#B23A1E',
+      },
+      borderRadius: { panel: '12px' },
+      boxShadow: { float: '0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08)', art: '0 1px 2px rgba(20,18,14,.04), 0 6px 18px rgba(20,18,14,.06)' },
     },
   },
 };
 </script>
 <style>
+  :root {
+    --ac-canvas: #F3F2EF; --ac-dot: #D9D6CF; --ac-panel: #FFFFFF; --ac-hair: #E3E0D9; --ac-ink: #1C1B19; --ac-muted: #7A766D; --ac-faint: #A8A49B;
+    --ac-bar: #1C1B19; --ac-accent: #D8432A; --ac-accent-soft: #FBE8E3; --ac-edge: #8E8A80; --ac-ok: #2E7D4F; --ac-warn: #B23A1E;
+    --ac-shadow: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08);
+    --ac-shadow-art: 0 1px 2px rgba(20,18,14,.04), 0 6px 18px rgba(20,18,14,.06);
+  }
   html, body, #root { height: 100%; margin: 0; }
-  body { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; color: #232220; background: #E7E0D2; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; color: var(--ac-ink); background: var(--ac-canvas); overflow: hidden; -webkit-font-smoothing: antialiased; }
   * { box-sizing: border-box; }
   button { font: inherit; cursor: pointer; }
   button:disabled { cursor: default; opacity: .45; }
   input, select, textarea { font: inherit; color: inherit; }
-  :focus-visible { outline: 2px solid #D8432A; outline-offset: 1px; }
+  :focus-visible { outline: 2px solid var(--ac-accent); outline-offset: 2px; }
+  /* floating chrome (spec §8.1) */
+  .ac-float { background: var(--ac-panel); border: 1px solid var(--ac-hair); border-radius: 12px; box-shadow: var(--ac-shadow); }
+  .ac-ibtn { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--ac-muted); position: relative; background: none; border: 0; }
+  .ac-ibtn:hover { background: #F3F2EF; color: var(--ac-ink); }
+  .ac-ibtn.on { background: var(--ac-ink); color: #fff; }
+  .ac-ibtn svg, .ac-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .ac-tip { position: absolute; background: var(--ac-ink); color: #fff; font: 11px/1 'Inter', sans-serif; padding: 5px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 120ms; z-index: 95; }
+  .ac-tip kbd { font: inherit; opacity: .55; margin-left: 6px; }
+  .ac-tip-host:hover > .ac-tip { opacity: 1; transition-delay: 300ms; }
+  .ac-art { position: absolute; background: var(--ac-panel); border: 1px solid #E6E3DC; box-shadow: var(--ac-shadow-art); }
+  .ac-art.sel { outline: 2px solid var(--ac-accent); outline-offset: 0; }
+  .ac-dim { opacity: .6; transition: opacity 180ms; }
+  .ac-zoomanim { transition: transform 220ms cubic-bezier(.2,.7,.2,1); }
+  @media (prefers-reduced-motion: reduce) { .ac-zoomanim, .ac-dim, .ac-tip, .ac-frame { transition: none !important; } .ac-fade { animation: none !important; } }
+  .ac-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ac-muted); font-weight: 600; }
   .ac-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
   .ac-scroll::-webkit-scrollbar-thumb { background: #CFC6B5; border-radius: 4px; }
   .ac-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -82,7 +111,7 @@ const PIN_KINDS = ['issue', 'suggestion', 'question'];
 const PIN_GLYPH = { issue: '!', suggestion: '✦', question: '?' };
 const PIN_NAME = { issue: 'Issue', suggestion: 'Suggestion', question: 'Question' };
 const V = '#D8432A'; // vermillion: selection, pins, cross edges — never the project accent
-const CH = { bar: '#232220', barText: '#F4EFE6', panel: '#FBF8F2', hair: '#DDD5C4', backdrop: '#E7E0D2', ink: '#1C1B19', muted: '#6B665C', stage: '#1A1917' };
+const CH = { bar: '#1C1B19', barText: '#F4F2EC', panel: '#FFFFFF', hair: '#E3E0D9', backdrop: '#F3F2EF', ink: '#1C1B19', muted: '#7A766D', faint: '#A8A49B', edge: '#8E8A80', stage: '#141311' };
 const SERIF = "'Fraunces', Georgia, serif";
 const PHONE_W = 390, PHONE_H = 844;
 const THUMB = { web: { w: 220, h: 140 }, mobile: { w: 110, h: 220 } };
