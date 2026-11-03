@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build, tag, and publish (for example v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # Tag pushes use the tag name; manual runs use the input. Passed through env, never
+      # interpolated into shell, so the input cannot inject commands.
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+    steps:
+      - name: Validate version
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'; then
+            echo "Version must look like v1.2.3 or v1.2.3-rc.1 (got: $VERSION)"; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify vendored assets
+        run: make vendor-verify
+
+      - name: Vet and test
+        run: make test
+
+      - name: Build six binaries
+        run: make release VERSION="$VERSION"
+
+      - name: Check the version is stamped
+        run: ./dist/agent-canvas-linux-amd64 version | grep -F "$VERSION"
+
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum agent-canvas-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            gh release upload "$VERSION" dist/agent-canvas-* dist/SHA256SUMS --clobber
+          else
+            gh release create "$VERSION" dist/agent-canvas-* dist/SHA256SUMS \
+              --title "AgentCanvas $VERSION" \
+              --target "$GITHUB_SHA" \
+              --generate-notes
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-canvas-${{ env.VERSION }}
+          path: |
+            dist/agent-canvas-*
+            dist/SHA256SUMS
+          if-no-files-found: error

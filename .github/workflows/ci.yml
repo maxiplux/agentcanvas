@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: |
+          out="$(gofmt -l cmd internal skills web)"
+          if [ -n "$out" ]; then
+            echo "These files need gofmt:"; echo "$out"; exit 1
+          fi
+
+      - name: Verify vendored assets against web/vendor/VERSIONS
+        run: make vendor-verify
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Babel errors in web/index.html are silent until the browser console is opened,
+      # so compile the single JSX block with the vendored Babel on every commit.
+      - name: Compile web/index.html JSX
+        run: |
+          node -e '
+            const fs = require("fs");
+            const Babel = require("./web/vendor/babel-standalone@7.24.7/babel.min.js");
+            const html = fs.readFileSync("web/index.html", "utf8");
+            const blocks = [...html.matchAll(/<script type="text\/babel" data-presets="react">([\s\S]*?)<\/script>/g)];
+            if (blocks.length !== 1) { console.error("expected exactly one Babel script block, found " + blocks.length); process.exit(1); }
+            Babel.transform(blocks[0][1], { presets: ["react"] });
+            console.log("web/index.html compiles");
+          '
+
+      - name: Vet and test
+        run: make test
+
+  build:
+    name: Build binaries
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe stamps the version
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cross-build six binaries
+        run: make release
+
+      - name: Smoke-test the linux/amd64 binary
+        run: |
+          set -euo pipefail
+          ./dist/agent-canvas-linux-amd64 version
+          mkdir -p /tmp/ac && cd /tmp/ac
+          "$GITHUB_WORKSPACE/dist/agent-canvas-linux-amd64" serve --port 47321 > serve.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat serve.log' EXIT
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:47321/healthz && break; sleep 0.5; done
+          curl -fsS -o /dev/null http://127.0.0.1:47321/
+          curl -fsS -o /dev/null http://127.0.0.1:47321/assets/fonts.css
+          curl -fsS -X POST http://127.0.0.1:47321/mcp \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_canvas","arguments":{}}}' > canvas.json
+          grep -q 'pg_home' canvas.json
+          if grep -q '"isError":true' canvas.json; then echo "get_canvas returned an error"; exit 1; fi
+          test -f .agentcanvas/project.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-canvas-binaries
+          path: dist/agent-canvas-*
+          if-no-files-found: error
+          retention-days: 14

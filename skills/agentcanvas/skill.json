@@ -1,0 +1,5 @@
+{
+  "name": "agentcanvas",
+  "version": "1.0.0",
+  "description": "Drive the AgentCanvas design studio over MCP: read the canvas, edit pages, screens, flows, drawings, DESIGN.md, and review pins."
+}

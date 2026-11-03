@@ -1,0 +1,2876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCanvas</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/assets/fonts.css"> <!-- @font-face for the vendored woff2 files -->
+<script src="/assets/react@18.3.1/react.production.min.js"></script>
+<script src="/assets/react-dom@18.3.1/react-dom.production.min.js"></script>
+<script src="/assets/babel-standalone@7.24.7/babel.min.js"></script>
+<script src="/assets/tailwindcss-play@3.4/tailwind.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { ui: ['Inter', 'system-ui', 'sans-serif'], serif: ['Fraunces', 'Georgia', 'serif'] },
+      colors: { paper: '#F4EFE6', ink: '#1C1B19', muted: '#6B665C', accent: '#D8432A', wash: '#E9E2D4', line: '#CFC6B5' },
+    },
+  },
+};
+</script>
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; color: #232220; background: #E7E0D2; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  button { font: inherit; cursor: pointer; }
+  button:disabled { cursor: default; opacity: .45; }
+  input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid #D8432A; outline-offset: 1px; }
+  .ac-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .ac-scroll::-webkit-scrollbar-thumb { background: #CFC6B5; border-radius: 4px; }
+  .ac-scroll::-webkit-scrollbar-track { background: transparent; }
+  /* linked elements in edit mode show a pointer and a tiny ↗ badge */
+  .ac-edit .ac-link { position: relative; cursor: pointer; }
+  .ac-edit .ac-link:hover::after { content: '↗'; position: absolute; top: -9px; right: -11px; width: 15px; height: 15px; border-radius: 3px; background: #D8432A; color: #F4EFE6; font: 600 10px/15px Inter, sans-serif; text-align: center; pointer-events: none; z-index: 5; }
+  .ac-preview .ac-link { cursor: pointer; }
+  .ac-annotate, .ac-annotate * { cursor: crosshair !important; }
+  .ac-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #D8432A; color: #F4EFE6; box-shadow: 0 0 0 1.5px #F4EFE6, 0 2px 6px rgba(0,0,0,.35); font: 600 11px/22px Inter, sans-serif; text-align: center; z-index: 40; cursor: grab; user-select: none; touch-action: none; }
+  .ac-pin.resolved { background: #6B665C; }
+  .ac-pin.selected { box-shadow: 0 0 0 1.5px #F4EFE6, 0 0 0 3.5px #D8432A, 0 2px 6px rgba(0,0,0,.35); }
+  .ac-pin .ac-pin-kind { display: none; }
+  .ac-pin:hover .ac-pin-n { display: none; }
+  .ac-pin:hover .ac-pin-kind { display: inline; }
+  .ac-fade { animation: acfade 150ms ease-out; }
+  @keyframes acfade { from { opacity: 0; } to { opacity: 1; } }
+  .ac-frame { transition: width 150ms ease; }
+  .md h1 { font-size: 30px; line-height: 38px; font-weight: 600; margin: 0 0 16px; }
+  .md h2 { font-size: 22px; line-height: 30px; font-weight: 600; margin: 28px 0 10px; }
+  .md h3 { font-size: 18px; line-height: 26px; font-weight: 600; margin: 22px 0 8px; }
+  .md p { margin: 0 0 12px; }
+  .md ul, .md ol { margin: 0 0 12px; padding-left: 22px; }
+  .md ul { list-style: disc; }
+  .md ol { list-style: decimal; }
+  .md li { margin: 3px 0; }
+  .md code { font-family: ui-monospace, Menlo, monospace; font-size: .86em; background: rgba(28,27,25,.07); padding: 1px 4px; border-radius: 3px; }
+  .md-ui h1 { font-size: 20px; line-height: 26px; }
+  .md-ui h2 { font-size: 15px; line-height: 21px; margin-top: 18px; }
+  .md-ui h3 { font-size: 13px; line-height: 19px; }
+  .ac-hatch { background-image: repeating-linear-gradient(45deg, var(--h1) 0 14px, var(--h2) 14px 28px); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+// ===== Section 1: Constants & helpers =====
+const { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, memo, createContext, useContext, Fragment } = React;
+
+const ORDER = ['xs', 'sm', 'md', 'lg', 'xl', 'display'];
+const COLOR_KEYS = ['paper', 'ink', 'muted', 'accent', 'wash', 'line'];
+const SPACE = [0, 4, 8, 16, 24, 32, 48, 64];
+const BREAKPOINTS = { desktop: 1280, tablet: 768, phone: 390 };
+const BLOCK_TYPES = ['nav', 'hero', 'features', 'quote', 'cta', 'footer'];
+const BLOCK_LABEL = { nav: 'Nav', hero: 'Hero', features: 'Features', quote: 'Quote', cta: 'CTA band', footer: 'Footer' };
+const ARCHETYPES = ['title', 'photo', 'quote', 'cta', 'split'];
+const ARCH_LABEL = { title: 'Title', photo: 'Photo', quote: 'Quote', cta: 'CTA', split: 'Split' };
+const LAYOUTS = ['center', 'bottom', 'split'];
+const WEIGHTS = [400, 500, 600];
+const DRAW_TOOLS = ['select', 'pan', 'rect', 'ellipse', 'line', 'arrow', 'text', 'pen'];
+const STROKE_WIDTHS = [1, 1.5, 2, 3];
+const PIN_KINDS = ['issue', 'suggestion', 'question'];
+const PIN_GLYPH = { issue: '!', suggestion: '✦', question: '?' };
+const PIN_NAME = { issue: 'Issue', suggestion: 'Suggestion', question: 'Question' };
+const V = '#D8432A'; // vermillion: selection, pins, cross edges — never the project accent
+const CH = { bar: '#232220', barText: '#F4EFE6', panel: '#FBF8F2', hair: '#DDD5C4', backdrop: '#E7E0D2', ink: '#1C1B19', muted: '#6B665C', stage: '#1A1917' };
+const SERIF = "'Fraunces', Georgia, serif";
+const PHONE_W = 390, PHONE_H = 844;
+const THUMB = { web: { w: 220, h: 140 }, mobile: { w: 110, h: 220 } };
+const LANE = { gap: 64, laneGap: 56, left: 32, head: 30 };
+const TAB_CHANNEL = { web: 'web', story: 'mobile' };
+const CHANNEL_TAB = { web: 'web', mobile: 'story' };
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = isMac ? '⌘' : 'Ctrl+';
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const slug = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_-]+/g, '-') || 'untitled';
+
+// §9.1 type step-down
+function effectiveRole(role, bp) {
+  const i = ORDER.indexOf(role);
+  if (bp === 'tablet' && i >= 4) return ORDER[i - 1];
+  if (bp === 'phone' && i >= 3) return ORDER[Math.max(0, i - 1)];
+  return role;
+}
+function effectivePad(padIdx, bp) { return bp === 'phone' ? Math.max(3, padIdx - 1) : padIdx; }
+
+// §9.6 snap
+const snap = (v, on) => (on ? Math.round(v / 8) * 8 : v);
+const ctaHeight = s => ({ sm: 36, md: 44, lg: 52 }[s] || 44);
+const col = (tokens, key) => (key === 'none' ? 'none' : tokens.colors[key] || '#000');
+
+function typeStyle(tokens, role, weight) {
+  const t = tokens.type[role] || tokens.type.md;
+  return { fontFamily: SERIF, fontSize: t.size, lineHeight: t.lh + 'px', fontWeight: weight || t.weight };
+}
+const specOf = (tokens, role) => { const t = tokens.type[role] || tokens.type.md; return `${t.size}/${t.lh}`; };
+
+// §9.5 storyboard BFS order
+function laneOrder(flow, nodes, edges) {
+  const inFlow = nodes.filter(n => n.flowId === flow.id);
+  const seen = new Set(), out = [];
+  const q = flow.startId ? [flow.startId] : [];
+  while (q.length) {
+    const id = q.shift(); if (seen.has(id)) continue;
+    const n = inFlow.find(n => n.id === id); if (!n) continue;
+    seen.add(id); out.push(n);
+    edges.filter(e => e.fromId === id && e.kind !== 'back').forEach(e => q.push(e.toId));
+  }
+  inFlow.forEach(n => { if (!seen.has(n.id)) out.push(n); });
+  return out;
+}
+
+function downloadExport(kind, query) {
+  const qs = query ? '?' + new URLSearchParams(query).toString() : '';
+  const a = document.createElement('a');
+  a.href = `/api/export/${kind}${qs}`;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function isTyping(el) {
+  if (!el) return false;
+  const t = el.tagName;
+  return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || el.isContentEditable;
+}
+const stripFrontmatter = md => md.replace(/^---\n[\s\S]*?\n---\n?/, '');
+const wordCount = md => (md.match(/\S+/g) || []).length;
+const firstLine = s => String(s || '').split('\n')[0];
+const nodeChannel = n => (n.kind === 'screen' ? 'mobile' : 'web');
+
+// §8.6 minimal, safe markdown renderer (never dangerouslySetInnerHTML)
+function renderInline(text, kb) {
+  const out = []; const re = /(\*\*([^*]+)\*\*|\*([^*\s][^*]*?)\*|`([^`]+)`)/g;
+  let last = 0, m, i = 0;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m[2] != null) out.push(<strong key={kb + 'b' + i++}>{m[2]}</strong>);
+    else if (m[3] != null) out.push(<em key={kb + 'i' + i++}>{m[3]}</em>);
+    else out.push(<code key={kb + 'c' + i++}>{m[4]}</code>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+function renderMd(md) {
+  const lines = String(md || '').split('\n'); const out = []; let i = 0;
+  const isUl = l => /^\s*[-*]\s+/.test(l), isOl = l => /^\s*\d+\.\s+/.test(l), isH = l => /^#{1,3}\s+/.test(l);
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    const h = /^(#{1,3})\s+(.*)$/.exec(line);
+    if (h) { const Tag = 'h' + h[1].length; out.push(<Tag key={'h' + i} id={'md-line-' + i} data-line={i}>{renderInline(h[2], 'h' + i)}</Tag>); i++; continue; }
+    if (isUl(line) || isOl(line)) {
+      const ordered = isOl(line), start = i, items = [];
+      while (i < lines.length && (ordered ? isOl(lines[i]) : isUl(lines[i]))) { items.push(lines[i].replace(ordered ? /^\s*\d+\.\s+/ : /^\s*[-*]\s+/, '')); i++; }
+      const Tag = ordered ? 'ol' : 'ul';
+      out.push(<Tag key={'l' + start}>{items.map((t, k) => <li key={k}>{renderInline(t, 'l' + start + '-' + k)}</li>)}</Tag>);
+      continue;
+    }
+    const start = i, para = [];
+    while (i < lines.length && lines[i].trim() && !isH(lines[i]) && !isUl(lines[i]) && !isOl(lines[i])) { para.push(lines[i].trim()); i++; }
+    out.push(<p key={'p' + start}>{renderInline(para.join(' '), 'p' + start)}</p>);
+  }
+  return out;
+}
+function mdHeadings(md) {
+  const out = [];
+  String(md || '').split('\n').forEach((l, i) => { const m = /^(#{1,3})\s+(.*)$/.exec(l); if (m) out.push({ level: m[1].length, text: m[2].trim(), line: i }); });
+  return out;
+}
+
+// project lookups
+const findNode = (p, id) => p.nodes.find(n => n.id === id) || null;
+const findFlow = (p, id) => p.flows.find(f => f.id === id) || null;
+function linkOwners(node) {
+  // every link-like owner on a node: {key, id, label, toId, owner, blockId}
+  const out = [];
+  if (node.kind === 'page') {
+    node.blocks.forEach(b => {
+      (b.links || []).forEach(l => out.push({ id: l.id, label: l.label, toId: l.toId, blockId: b.id, owner: { blockId: b.id, childId: l.id } }));
+      if (b.type === 'hero' && b.cta) out.push({ id: b.cta.id, label: b.cta.label, toId: b.cta.toId, blockId: b.id, owner: { blockId: b.id, field: 'cta' } });
+      if (b.type === 'hero' && b.secondary) out.push({ id: b.secondary.id, label: b.secondary.label, toId: b.secondary.toId, blockId: b.id, owner: { blockId: b.id, field: 'secondary' } });
+      if (b.type === 'cta' && b.button) out.push({ id: b.button.id, label: b.button.label, toId: b.button.toId, blockId: b.id, owner: { blockId: b.id, field: 'button' } });
+    });
+  } else {
+    if (node.cta) out.push({ id: 'cta', label: node.cta.label, toId: node.cta.toId, owner: { cta: true } });
+    node.hotspots.forEach(h => out.push({ id: h.id, label: h.label, toId: h.toId, owner: { hotspotId: h.id } }));
+  }
+  return out;
+}
+
+// ===== Section 2: Sync =====
+const Studio = createContext(null);
+const useS = () => useContext(Studio);
+
+// structural sharing: keep previous objects that did not change so memoized components skip work
+function share(prev, next) {
+  if (prev === next) return prev;
+  if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object' || Array.isArray(prev) !== Array.isArray(next)) return next;
+  let same = true, out;
+  if (Array.isArray(next)) {
+    const byId = next.length && next[0] && typeof next[0] === 'object' && 'id' in next[0] ? new Map(prev.map(x => [x && x.id, x])) : null;
+    out = next.map((v, i) => {
+      const p = byId && v && typeof v === 'object' ? byId.get(v.id) : prev[i];
+      const s = share(p, v);
+      if (s !== prev[i]) same = false;
+      return s;
+    });
+    if (prev.length !== next.length) same = false;
+  } else {
+    out = {};
+    const nk = Object.keys(next);
+    if (nk.length !== Object.keys(prev).length) same = false;
+    for (const k of nk) { const s = share(prev[k], next[k]); out[k] = s; if (s !== prev[k]) same = false; }
+  }
+  return same ? prev : out;
+}
+
+function useStudio() {
+  const [state, setState] = useState(null);
+  const [conn, setConn] = useState('connecting');
+  const [toast, setToast] = useState(null);
+  const [agent, setAgent] = useState(null);
+  const [epoch, setEpoch] = useState(0);
+  const stRef = useRef(null), resync = useRef(true), syncRev = useRef(0);
+  const toastT = useRef(0), agentT = useRef(0);
+  const queue = useRef([]), running = useRef(false);
+
+  const showToast = useCallback((msg, ms = 4000) => {
+    setToast({ msg, at: Date.now() });
+    clearTimeout(toastT.current);
+    toastT.current = setTimeout(() => setToast(null), ms);
+  }, []);
+
+  const accept = useCallback(next => {
+    const cur = stRef.current;
+    if (!resync.current && cur && next.rev <= cur.rev) return;
+    resync.current = false;
+    const { source, summary, ...st } = next;
+    const merged = share(cur, st);
+    stRef.current = merged;
+    setState(merged);
+    if (syncRev.current && next.rev >= syncRev.current) { syncRev.current = 0; setEpoch(e => e + 1); }
+    if (source === 'mcp' && summary) {
+      setAgent(summary);
+      clearTimeout(agentT.current);
+      agentT.current = setTimeout(() => setAgent(null), 3000);
+    }
+  }, []);
+
+  useEffect(() => {
+    let es = null, timer = 0, delay = 500, dead = false;
+    const open = () => {
+      es = new EventSource('/api/events');
+      es.addEventListener('state', e => { try { accept(JSON.parse(e.data)); } catch (err) { /* ignore malformed frame */ } });
+      es.onopen = async () => {
+        try {
+          const r = await fetch('/api/state');
+          const st = await r.json();
+          resync.current = true;
+          accept(st);
+          setConn('live');
+          delay = 500;
+        } catch (err) { /* the error handler reconnects */ }
+      };
+      es.onerror = () => {
+        es.close();
+        if (dead) return;
+        resync.current = true;
+        setConn('reconnecting');
+        clearTimeout(timer);
+        timer = setTimeout(open, delay);
+        delay = Math.min(delay * 2, 5000);
+      };
+    };
+    open();
+    return () => { dead = true; if (es) es.close(); clearTimeout(timer); };
+  }, [accept]);
+
+  const send = useCallback(async body => {
+    let res;
+    try {
+      const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      res = await r.json();
+    } catch (err) { res = { ok: false, error: 'The AgentCanvas server is unreachable.' }; }
+    if (!res.ok) showToast(res.error || 'Refused');
+    else if (body.type === 'undo' || body.type === 'redo') {
+      if (stRef.current && stRef.current.rev >= res.rev) setEpoch(e => e + 1); else syncRev.current = res.rev;
+    }
+    return res;
+  }, [showToast]);
+
+  const pump = useCallback(async () => {
+    if (running.current) return;
+    running.current = true;
+    while (queue.current.length) {
+      const it = queue.current.shift();
+      const res = await send(it.body);
+      it.done.forEach(f => f(res));
+    }
+    running.current = false;
+  }, [send]);
+
+  // act(type, payload, {tab, coalesce, commit}) — serialized so keystrokes arrive in order
+  const act = useCallback((type, payload = {}, opts = {}) => new Promise(resolve => {
+    const cur = stRef.current;
+    const body = { type, payload, tab: opts.tab || (cur ? cur.view.tab : 'web') };
+    if (opts.coalesce) body.coalesce = opts.coalesce;
+    if (opts.commit) body.commit = true;
+    const last = queue.current[queue.current.length - 1];
+    if (opts.coalesce && last && !last.body.commit && last.body.type === type && last.body.coalesce === opts.coalesce) {
+      last.body = body; last.done.push(resolve);
+    } else {
+      queue.current.push({ body, done: [resolve] });
+    }
+    pump();
+  }), [pump]);
+
+  return { state, conn, toast, agent, epoch, act, showToast };
+}
+
+// A text field that keeps a local draft while focused (§12.2): sends one action per
+// animation frame with a coalesce key, and commit on blur.
+function useDraft(value, send, coalesce) {
+  const { epoch } = useS();
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false), dirty = useRef(false), raf = useRef(0), latest = useRef(value);
+  useEffect(() => { if (!focused.current) { setDraft(value); latest.current = value; } }, [value]);
+  useEffect(() => { setDraft(value); latest.current = value; }, [epoch]); // undo/redo wins over drafts
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const onChange = v => {
+    setDraft(v); latest.current = v; dirty.current = true;
+    if (!raf.current) raf.current = requestAnimationFrame(() => { raf.current = 0; send(latest.current, { coalesce }); });
+  };
+  const flush = () => {
+    if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0; }
+    if (dirty.current) { dirty.current = false; send(latest.current, { coalesce, commit: true }); }
+  };
+  return { draft, onChange, onFocus: () => { focused.current = true; }, onBlur: () => { focused.current = false; flush(); }, flush };
+}
+
+// ===== Section 3: Primitives =====
+function Seg({ options, value, onChange, disabled, small }) {
+  return (
+    <div className="inline-flex rounded overflow-hidden border border-[#DDD5C4] bg-white">
+      {options.map(o => {
+        const v = typeof o === 'object' ? o.value : o;
+        const label = typeof o === 'object' ? o.label : String(o);
+        const on = v === value;
+        return (
+          <button key={String(v)} type="button" disabled={disabled} title={typeof o === 'object' ? o.title : undefined}
+            onClick={() => onChange(v)}
+            className={(small ? 'px-1.5 h-6 text-[11px] ' : 'px-2 h-6 text-[11px] ') + 'border-r last:border-r-0 border-[#DDD5C4] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'text-[#232220] hover:bg-[#F1EBDF]')}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TokenSwatches({ value, onChange, allowNone, disabled }) {
+  const { state } = useS();
+  const tokens = state.project.tokens;
+  const keys = allowNone ? [...COLOR_KEYS, 'none'] : COLOR_KEYS;
+  return (
+    <div className="flex gap-1.5 items-center">
+      {keys.map(k => (
+        <button key={k} type="button" disabled={disabled} title={k} onClick={() => onChange(k)}
+          className="w-5 h-5 rounded-[3px] border border-[#CFC6B5] relative"
+          style={{ background: k === 'none' ? 'linear-gradient(135deg, #fff 45%, #D8432A 47%, #D8432A 53%, #fff 55%)' : tokens.colors[k], boxShadow: value === k ? `0 0 0 2px #FBF8F2, 0 0 0 3.5px ${V}` : 'none' }} />
+      ))}
+    </div>
+  );
+}
+
+function SpaceScale({ value, onChange, disabled }) {
+  return <Seg small disabled={disabled} value={value} onChange={onChange} options={SPACE.map((px, i) => ({ value: i, label: String(px), title: `index ${i} = ${px}px` }))} />;
+}
+
+function Field({ label, children, hint, row }) {
+  return (
+    <label className={'block mb-2.5 ' + (row ? 'flex items-center justify-between gap-2' : '')}>
+      <span className="block text-[11px] text-[#6B665C] mb-1 select-none">{label}</span>
+      {children}
+      {hint && <span className="block text-[11px] text-[#6B665C] mt-1">{hint}</span>}
+    </label>
+  );
+}
+
+const inputCls = 'w-full rounded border border-[#DDD5C4] bg-white px-2 py-1 text-[12px] outline-none focus:border-[#D8432A] disabled:opacity-50';
+
+// TextInput: draft-aware (§12.2). onSend(value, {coalesce, commit})
+function TextInput({ value, onSend, coalesce, multiline, rows, placeholder, disabled, onEnter, autoFocus, className }) {
+  const d = useDraft(value || '', onSend, coalesce);
+  const props = {
+    value: d.draft, disabled, placeholder, autoFocus,
+    onChange: e => d.onChange(e.target.value), onFocus: d.onFocus, onBlur: d.onBlur,
+    className: (className || inputCls),
+    onKeyDown: e => {
+      if (e.key === 'Enter' && !multiline) { d.flush(); if (onEnter) onEnter(); e.currentTarget.blur(); }
+      if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur(); }
+    },
+  };
+  return multiline ? <textarea rows={rows || 3} {...props} /> : <input type="text" {...props} />;
+}
+
+function NumberInput({ value, onCommit, min, max, step, disabled, width }) {
+  const [d, setD] = useState(String(value));
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setD(String(value)); }, [value]);
+  const commit = () => { const n = Number(d); if (Number.isFinite(n) && n !== value) onCommit(clamp(n, min ?? -1e9, max ?? 1e9)); else setD(String(value)); };
+  return (
+    <input type="number" value={d} min={min} max={max} step={step || 1} disabled={disabled}
+      onFocus={() => { focused.current = true; }} onBlur={() => { focused.current = false; commit(); }}
+      onChange={e => setD(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.stopPropagation(); setD(String(value)); e.currentTarget.blur(); } }}
+      className={inputCls + ' tabular-nums'} style={{ width: width || 64 }} />
+  );
+}
+
+function IconButton({ title, onClick, children, active, disabled, dark, className }) {
+  return (
+    <button type="button" title={title} disabled={disabled} onClick={onClick}
+      className={'h-7 px-2 rounded text-[12px] inline-flex items-center gap-1 whitespace-nowrap ' +
+        (dark ? (active ? 'bg-[#F4EFE6] text-[#232220]' : 'text-[#F4EFE6] hover:bg-white/10') : (active ? 'bg-[#232220] text-[#F4EFE6]' : 'text-[#232220] hover:bg-[#EFE8DB]')) + ' ' + (className || '')}>
+      {children}
+    </button>
+  );
+}
+
+function Pill({ children, tone }) {
+  const tones = { pass: 'bg-[#E3EEDF] text-[#2F5A2A]', fail: 'bg-[#F7DDD7] text-[#9A2C19]', dark: 'bg-[#232220] text-[#F4EFE6]', neutral: 'bg-[#EFE8DB] text-[#232220]' };
+  return <span className={'inline-flex items-center rounded px-1.5 h-[18px] text-[10px] font-semibold ' + (tones[tone] || tones.neutral)}>{children}</span>;
+}
+
+function Section({ title, children, right }) {
+  return (
+    <div className="px-3 py-3 border-b border-[#DDD5C4]">
+      {title && <div className="flex items-center justify-between mb-2"><div className="text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">{title}</div>{right}</div>}
+      {children}
+    </div>
+  );
+}
+
+// Popover anchored at (x, y) in its positioned parent; Esc and outside click close it.
+function Popover({ x, y, onClose, children, width }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const down = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    const t = setTimeout(() => window.addEventListener('pointerdown', down), 0);
+    return () => { clearTimeout(t); window.removeEventListener('pointerdown', down); };
+  }, [onClose]);
+  return (
+    <div ref={ref} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
+      className="absolute z-[60] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-lg p-2.5 text-[12px] font-ui text-[#232220]"
+      style={{ left: x, top: y, width: width || 240 }}>
+      {children}
+    </div>
+  );
+}
+
+function Toast({ msg }) {
+  return <div className="absolute left-1/2 -translate-x-1/2 bottom-5 z-[70] max-w-[560px] bg-[#232220] text-[#F4EFE6] text-[12px] px-3 py-2 rounded shadow-lg">{msg}</div>;
+}
+
+// Target dropdown grouped by flow: "Marketing › Home", plus "No link".
+function TargetSelect({ channel, value, onChange, disabled }) {
+  const { state } = useS();
+  const p = state.project;
+  return (
+    <select value={value || ''} disabled={disabled} onChange={e => onChange(e.target.value || null)} className={inputCls}>
+      <option value="">No link</option>
+      {p.flows.filter(f => f.channel === channel).map(f => (
+        <optgroup key={f.id} label={f.name}>
+          {p.nodes.filter(n => n.flowId === f.id).map(n => <option key={n.id} value={n.id}>{f.name} › {n.name}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+function Warn({ title }) { return <span title={title} className="text-[#D8432A] text-[11px] font-semibold">⚠</span>; }
+
+// ===== Section 4: Renderers (pure, reused by editor, storyboard thumbnails, and preview) =====
+const dashed = { outline: `1.5px dashed ${V}`, outlineOffset: 3 };
+
+// renderBlock(block, ctx): ctx = {tokens, bp, mode: 'edit'|'preview'|'thumb', onNavigate, selection, onSelect, nodeId, showSpecs, onChipDown}
+function renderBlock(block, ctx) {
+  const s = ctx.selection;
+  const mine = s && s.kind === 'block' && s.blockId === block.id;
+  return <BlockView key={block.id} block={block} nodeId={ctx.nodeId} tokens={ctx.tokens} bp={ctx.bp} mode={ctx.mode}
+    selBlock={!!(mine && !s.childId)} selChild={mine ? s.childId || null : null} showSpecs={!!ctx.showSpecs}
+    onSelect={ctx.onSelect} onNavigate={ctx.onNavigate} onChipDown={ctx.onChipDown} />;
+}
+
+const BlockView = memo(function BlockView({ block, nodeId, tokens, bp, mode, selBlock, selChild, showSpecs, onSelect, onNavigate, onChipDown }) {
+  const ref = useRef(null);
+  const [menu, setMenu] = useState(false);
+  const edit = mode === 'edit';
+  const phone = bp === 'phone';
+  const padPx = SPACE[effectivePad(block.pad, bp)];
+  const gap = SPACE[block.gap];
+  const T = (role, weight) => typeStyle(tokens, effectiveRole(role, bp), weight);
+  const sp = role => specOf(tokens, effectiveRole(role, bp));
+  const center = block.align === 'center';
+
+  const linkProps = (l, extraStyle) => ({
+    'data-child-id': l.id,
+    className: l.toId ? 'ac-link' : undefined,
+    onClick: e => {
+      if (edit) { e.stopPropagation(); onSelect && onSelect(nodeId, block.id, l.id); }
+      else if (mode === 'preview') { e.stopPropagation(); if (l.toId && onNavigate) onNavigate(l.toId); }
+    },
+    style: { ...extraStyle, ...(selChild === l.id ? dashed : null) },
+  });
+  const button = (l, fill, ink) => l && (
+    <span {...linkProps(l, { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 44, padding: '0 20px', borderRadius: 4, background: col(tokens, fill), color: col(tokens, ink), whiteSpace: 'nowrap', ...T('sm', 600), fontSize: tokens.type.sm.size, lineHeight: '20px' })} data-spec={sp('sm')}>{l.label}</span>
+  );
+  const inner = { maxWidth: 1120, margin: '0 auto', display: 'flex', flexDirection: 'column', gap, textAlign: center ? 'center' : 'left', alignItems: center ? 'center' : 'stretch' };
+
+  let body = null;
+  if (block.type === 'nav') {
+    const links = block.links.map(l => <span key={l.id} data-spec={sp(block.typeRole)} {...linkProps(l, { ...T(block.typeRole, block.weight), color: 'inherit' })}>{l.label}</span>);
+    body = (
+      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap }}>
+          <span data-main data-spec={sp(block.typeRole)} style={T(block.typeRole, 600)}>{block.brand}</span>
+          {phone
+            ? <button type="button" onClick={e => { e.stopPropagation(); setMenu(m => !m); }} style={{ ...T('sm', 600), background: 'transparent', color: 'inherit', border: '1px solid currentColor', borderRadius: 4, height: 32, padding: '0 12px' }}>Menu</button>
+            : <div style={{ display: 'flex', gap, alignItems: 'center' }}>{links}</div>}
+        </div>
+        {phone && menu && <div style={{ display: 'flex', flexDirection: 'column', gap, marginTop: 12 }}>{links}</div>}
+      </div>
+    );
+  } else if (block.type === 'hero') {
+    body = (
+      <div style={inner}>
+        <div style={{ maxWidth: center ? 880 : 720, display: 'flex', flexDirection: 'column', gap, alignItems: center ? 'center' : 'flex-start' }}>
+          {block.eyebrow && <span data-spec={sp('sm')} style={{ ...T('sm', 500), textTransform: 'uppercase', letterSpacing: '.12em', color: tokens.colors.muted }}>{block.eyebrow}</span>}
+          <h1 data-main data-spec={sp(block.typeRole)} style={{ ...T(block.typeRole, block.weight), margin: 0 }}>{block.headline}</h1>
+          <p data-main data-spec={sp(block.bodyRole)} style={{ ...T(block.bodyRole), margin: 0 }}>{block.body}</p>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', justifyContent: center ? 'center' : 'flex-start' }}>
+            {button(block.cta, 'accent', 'paper')}
+            {block.secondary && <span data-spec={sp('sm')} {...linkProps(block.secondary, { ...T('sm', 600), textDecoration: 'underline', textUnderlineOffset: 3 })}>{block.secondary.label}</span>}
+          </div>
+        </div>
+      </div>
+    );
+  } else if (block.type === 'features') {
+    const cols = bp === 'desktop' ? 3 : bp === 'tablet' ? 2 : 1;
+    body = (
+      <div style={inner}>
+        <h2 data-main data-spec={sp(block.typeRole)} style={{ ...T(block.typeRole, block.weight), margin: 0 }}>{block.heading}</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap, textAlign: 'left', width: '100%' }}>
+          {block.items.map(it => (
+            <div key={it.id} data-child-id={it.id} data-spec={sp('md')}
+              onClick={edit ? e => { e.stopPropagation(); onSelect && onSelect(nodeId, block.id, it.id); } : undefined}
+              style={{ borderTop: `1px solid ${tokens.colors.line}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 4, ...(selChild === it.id ? dashed : null) }}>
+              <div style={T('md', 600)}>{it.title}</div>
+              <div style={T('sm')}>{it.body}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  } else if (block.type === 'quote') {
+    body = (
+      <div style={inner}>
+        <blockquote data-main data-spec={sp(block.typeRole)} style={{ ...T(block.typeRole, block.weight), margin: 0 }}>“{block.text}”</blockquote>
+        <cite data-spec={sp('sm')} style={{ ...T('sm'), fontStyle: 'normal', color: tokens.colors.muted }}>— {block.cite}</cite>
+      </div>
+    );
+  } else if (block.type === 'cta') {
+    body = (
+      <div style={inner}>
+        <h2 data-main data-spec={sp(block.typeRole)} style={{ ...T(block.typeRole, block.weight), margin: 0 }}>{block.headline}</h2>
+        <p data-main data-spec={sp('md')} style={{ ...T('md'), margin: 0 }}>{block.body}</p>
+        <div>{button(block.button, block.buttonFill, block.buttonInk)}</div>
+      </div>
+    );
+  } else if (block.type === 'footer') {
+    body = (
+      <div style={{ ...inner, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexDirection: phone ? 'column' : 'row', justifyContent: 'space-between', alignItems: phone ? 'flex-start' : 'center', gap }}>
+          <span data-main data-spec={sp(block.typeRole)} style={T(block.typeRole, 600)}>{block.brand}</span>
+          <div style={{ display: 'flex', flexDirection: phone ? 'column' : 'row', gap }}>
+            {block.links.map(l => <span key={l.id} data-spec={sp(block.typeRole)} {...linkProps(l, { ...T(block.typeRole, block.weight), color: 'inherit' })}>{l.label}</span>)}
+          </div>
+        </div>
+        <div data-spec={sp('xs')} style={{ ...T('xs'), color: tokens.colors.muted }}>{block.note}</div>
+      </div>
+    );
+  }
+
+  const selected = edit && (selBlock || selChild);
+  return (
+    <section ref={ref} data-block-id={block.id} data-node-id={nodeId}
+      onClick={edit ? e => { e.stopPropagation(); onSelect && onSelect(nodeId, block.id, null); } : undefined}
+      style={{ position: 'relative', background: col(tokens, block.fill), color: col(tokens, block.ink), padding: `${padPx}px ${Math.max(padPx, 24)}px`, outline: selected ? `2px solid ${V}` : 'none', outlineOffset: -2 }}>
+      {body}
+      {selected && (
+        <div onPointerDown={e => { e.stopPropagation(); onChipDown && onChipDown(e, block.id); }} onClick={e => e.stopPropagation()}
+          title="Drag to reorder"
+          style={{ position: 'absolute', left: 0, top: 0, background: V, color: '#F4EFE6', font: '600 10px/18px Inter, sans-serif', padding: '0 6px', cursor: 'grab', zIndex: 30, userSelect: 'none' }}>
+          {BLOCK_LABEL[block.type]}
+        </div>
+      )}
+      {selected && showSpecs && <SpecsOverlay containerRef={ref} childId={selChild} padTop={padPx} padLeft={Math.max(padPx, 24)} gap={gap} sig={JSON.stringify(block) + bp + JSON.stringify(tokens.type)} />}
+    </section>
+  );
+});
+
+// renderScreen(screen, ctx): ctx = {tokens, mode, selection, onSelect, onTap, onHotspotEdit}
+function renderScreen(screen, ctx) {
+  const s = ctx.selection;
+  return <ScreenView key={screen.id} screen={screen} tokens={ctx.tokens} mode={ctx.mode}
+    selHotspot={s && s.kind === 'hotspot' && s.nodeId === screen.id ? s.hotspotId : null}
+    onSelect={ctx.onSelect} onTap={ctx.onTap} onHotspotEdit={ctx.onHotspotEdit} />;
+}
+
+const ScreenView = memo(function ScreenView({ screen, tokens, mode, selHotspot, onSelect, onTap, onHotspotEdit }) {
+  const edit = mode === 'edit', play = mode === 'preview';
+  const pad = SPACE[screen.pad] ?? 24, gap = SPACE[screen.gap] ?? 16;
+  const fill = col(tokens, screen.fill), ink = col(tokens, screen.ink);
+  const center = screen.align === 'center';
+  const quote = screen.archetype === 'quote';
+  const titleText = quote ? '“' + screen.title.replace(/^[“"]+|[”"]+$/g, '') + '”' : screen.title;
+  const title = <h1 data-main data-spec={specOf(tokens, screen.typeRole)} style={{ ...typeStyle(tokens, screen.typeRole, screen.weight), margin: 0 }}>{titleText}</h1>;
+  const body = quote
+    ? <p data-main data-spec={specOf(tokens, 'sm')} style={{ ...typeStyle(tokens, 'sm'), margin: 0, color: tokens.colors.muted }}>{screen.body}</p>
+    : <p data-main data-spec={specOf(tokens, 'md')} style={{ ...typeStyle(tokens, 'md'), margin: 0 }}>{screen.body}</p>;
+  const c = screen.cta;
+  // SPEC: mobile CTA labels render at lg weight 600 (large text), matching the server contrast check.
+  const cta = c && (
+    <button type="button" data-cta="1"
+      onClick={e => { e.stopPropagation(); if (play) onTap && onTap(c.toId); else if (edit) onSelect && onSelect(screen.id, null); }}
+      className={c.toId ? 'ac-link' : undefined}
+      style={{ height: ctaHeight(c.size), width: PHONE_W - 2 * pad, alignSelf: 'center', flex: 'none', background: col(tokens, c.fill), color: col(tokens, c.ink), border: 0, borderRadius: 4, fontFamily: SERIF, fontWeight: 600, fontSize: tokens.type.lg.size, lineHeight: 1, cursor: play ? 'pointer' : undefined }}>
+      {c.label}
+    </button>
+  );
+  const textCol = <div style={{ display: 'flex', flexDirection: 'column', gap, alignItems: center ? 'center' : 'flex-start', textAlign: center ? 'center' : 'left' }}>{title}{body}</div>;
+  const area = { position: 'absolute', top: 64, bottom: 34, left: pad, right: pad, display: 'flex', flexDirection: 'column', gap };
+  let content;
+  if (screen.layout === 'split') {
+    content = (
+      <>
+        <div className="ac-split-top" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: PHONE_H / 2, background: tokens.colors.wash, color: tokens.colors.ink, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: `0 ${pad}px ${pad}px`, textAlign: center ? 'center' : 'left' }}>{title}</div>
+        <div style={{ ...area, top: PHONE_H / 2 + pad }}>{body}<div style={{ flex: 1 }} />{cta}</div>
+      </>
+    );
+  } else if (screen.layout === 'bottom' && screen.archetype === 'cta') {
+    content = <div style={area}>{textCol}<div style={{ flex: 1 }} />{cta}</div>;
+  } else if (screen.layout === 'bottom') {
+    content = <div style={area}><div style={{ flex: 1 }} />{textCol}{cta}</div>;
+  } else {
+    content = <div style={area}><div style={{ flex: 1 }} />{textCol}<div style={{ flex: 1 }} />{cta}</div>;
+  }
+  return (
+    <div data-screen-id={screen.id} onClick={edit ? e => { e.stopPropagation(); onSelect && onSelect(screen.id, null); } : undefined}
+      style={{ position: 'relative', width: PHONE_W, height: PHONE_H, background: fill, color: ink, overflow: 'hidden', fontFamily: SERIF }}>
+      {screen.archetype === 'photo' && (
+        <>
+          <div className="ac-hatch" style={{ position: 'absolute', inset: 0, '--h1': tokens.colors.wash, '--h2': tokens.colors.line }} />
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 35%, ${fill}E6 68%, ${fill} 100%)` }} />
+        </>
+      )}
+      {content}
+      {screen.hotspots.map(h => (
+        <HotspotBox key={h.id} h={h} mode={mode} selected={selHotspot === h.id}
+          onSelect={() => onSelect && onSelect(screen.id, h.id)} onTap={() => onTap && onTap(h.toId)}
+          onEdit={g => onHotspotEdit && onHotspotEdit(screen.id, h.id, g)} />
+      ))}
+    </div>
+  );
+});
+
+function HotspotBox({ h, mode, selected, onSelect, onTap, onEdit }) {
+  const [drag, setDrag] = useState(null); // {x,y,w,h}
+  const g = drag || h;
+  if (mode === 'thumb') return null;
+  if (mode === 'preview') {
+    return <button type="button" data-hotspot="1" aria-label={h.label} onClick={e => { e.stopPropagation(); onTap(); }}
+      style={{ position: 'absolute', left: h.x, top: h.y, width: h.w, height: h.h, background: 'transparent', border: 0, padding: 0, zIndex: 10 }} />;
+  }
+  const start = (e, resize) => {
+    e.stopPropagation(); e.preventDefault();
+    onSelect();
+    const sx = e.clientX, sy = e.clientY, o = { x: h.x, y: h.y, w: h.w, h: h.h };
+    let cur = o, moved = false;
+    const move = ev => {
+      const dx = Math.round(ev.clientX - sx), dy = Math.round(ev.clientY - sy);
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      cur = resize
+        ? { ...o, w: clamp(o.w + dx, 8, PHONE_W - o.x), h: clamp(o.h + dy, 8, PHONE_H - o.y) }
+        : { ...o, x: clamp(o.x + dx, 0, PHONE_W - o.w), y: clamp(o.y + dy, 0, PHONE_H - o.h) };
+      setDrag(cur);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      if (moved) onEdit(cur);
+      setTimeout(() => setDrag(null), 120);
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  return (
+    <div data-hotspot-id={h.id} onPointerDown={e => start(e, false)} onClick={e => e.stopPropagation()}
+      style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `1.5px dashed ${V}`, background: selected ? 'rgba(216,67,42,.12)' : 'rgba(216,67,42,.05)', zIndex: 10, cursor: 'move', touchAction: 'none' }}>
+      <span style={{ position: 'absolute', left: -1, top: -17, background: V, color: '#F4EFE6', font: '600 10px/16px Inter, sans-serif', padding: '0 5px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>{h.label}{h.toId ? ' ↗' : ''}</span>
+      {selected && <span onPointerDown={e => start(e, true)} style={{ position: 'absolute', right: -5, bottom: -5, width: 10, height: 10, background: '#F4EFE6', border: `1.5px solid ${V}`, cursor: 'nwse-resize' }} />}
+    </div>
+  );
+}
+
+// ===== Section 5: Chrome =====
+function TabSwitch() {
+  const { state, act } = useS();
+  const tabs = [['web', 'Web'], ['story', 'Story'], ['draw', 'Draw'], ['doc', 'Doc']];
+  return (
+    <div className="inline-flex rounded overflow-hidden border border-white/15">
+      {tabs.map(([t, l]) => (
+        <button key={t} type="button" onClick={() => act('set_tab', { tab: t })}
+          className={'px-3 h-7 text-[12px] ' + (state.view.tab === t ? 'bg-[#F4EFE6] text-[#232220] font-semibold' : 'text-[#F4EFE6] hover:bg-white/10')}>{l}</button>
+      ))}
+    </div>
+  );
+}
+
+function DarkSeg({ options, value, onChange }) {
+  return (
+    <div className="inline-flex rounded overflow-hidden border border-white/15">
+      {options.map(o => (
+        <button key={o.value} type="button" title={o.title} onClick={() => onChange(o.value)}
+          className={'px-2 h-7 text-[12px] ' + (value === o.value ? 'bg-[#F4EFE6] text-[#232220]' : 'text-[#F4EFE6] hover:bg-white/10')}>{o.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function IssueBadge() {
+  const { state, conn, setUi } = useS();
+  if (conn !== 'live') return <span className="text-[12px] text-[#F4EFE6]/80 px-2">Reconnecting…</span>;
+  const n = state.openIssues;
+  return (
+    <button type="button" title="Open issues — show in Review"
+      onClick={() => setUi(u => ({ ...u, inspectorTab: 'review', reviewFilter: { kind: 'issue', status: 'open' }, skillsOpen: false }))}
+      className="h-7 px-2 rounded inline-flex items-center gap-1.5 text-[12px] text-[#F4EFE6] hover:bg-white/10">
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F4EFE6' }}>{n}</span>
+      <span>open {n === 1 ? 'issue' : 'issues'}</span>
+    </button>
+  );
+}
+
+function AnnotateControls() {
+  const { state, act, ui, setUi } = useS();
+  return (
+    <>
+      <IconButton dark active={ui.annotate} title="Annotate: click to place a pin (Esc to stop)" onClick={() => setUi(u => ({ ...u, annotate: !u.annotate }))}>Annotate</IconButton>
+      {ui.annotate && (
+        <DarkSeg value={ui.pinKind} onChange={k => setUi(u => ({ ...u, pinKind: k }))}
+          options={PIN_KINDS.map(k => ({ value: k, label: PIN_GLYPH[k] + ' ' + PIN_NAME[k] }))} />
+      )}
+      <IconButton dark active={state.view.showPins} title="Show pins while designing" onClick={() => act('set_toggles', { showPins: !state.view.showPins })}>Show pins</IconButton>
+    </>
+  );
+}
+
+function TopBar() {
+  const { state, act, agent, ui, setUi, drawView, setDrawView } = useS();
+  const v = state.view, tab = v.tab;
+  const h = state.history[tab] || {};
+  const sep = <span className="w-px h-5 bg-white/15 mx-1" />;
+  let ctx = null;
+  if (tab === 'web' || tab === 'story') {
+    const vt = tab === 'web' ? v.view.web : v.view.story;
+    ctx = (
+      <>
+        <DarkSeg value={vt} onChange={x => act('set_view', { tab, view: x })} options={[{ value: 'page', label: 'Page' }, { value: 'board', label: 'Storyboard' }]} />
+        {tab === 'web' && <DarkSeg value={v.breakpoint} onChange={b => act('set_breakpoint', { breakpoint: b })}
+          options={[{ value: 'desktop', label: '1280', title: 'Desktop 1280' }, { value: 'tablet', label: '768', title: 'Tablet 768' }, { value: 'phone', label: '390', title: 'Phone 390' }]} />}
+        {tab === 'web' && <IconButton dark active={v.showGrid} title="12-column grid overlay" onClick={() => act('set_toggles', { showGrid: !v.showGrid })}>Grid</IconButton>}
+        <IconButton dark active={v.showSpecs} title="Specs overlay (px sizes on the selection)" onClick={() => act('set_toggles', { showSpecs: !v.showSpecs })}>Specs</IconButton>
+        <IconButton dark title={tab === 'web' ? 'Preview the current page (Esc exits)' : 'Play the current flow (Esc exits)'} onClick={() => act('set_preview', { on: true })}>
+          {tab === 'web' ? '▶ Preview' : '▶ Play'}
+        </IconButton>
+        {sep}
+        <AnnotateControls />
+      </>
+    );
+  } else if (tab === 'draw') {
+    const tools = [['select', 'Select', 'V'], ['pan', 'Pan', 'Space'], ['rect', 'Rect', 'R'], ['ellipse', 'Ellipse', 'O'], ['line', 'Line', 'L'], ['arrow', 'Arrow', 'A'], ['text', 'Text', 'T'], ['pen', 'Pen', 'P']];
+    const zoomTo = z => setDrawView(dv => ({ ...dv, zoom: clamp(z, 0.25, 4) }), true);
+    ctx = (
+      <>
+        <DarkSeg value={ui.drawTool} onChange={t => setUi(u => ({ ...u, drawTool: t }))} options={tools.map(([value, label, k]) => ({ value, label, title: label + ' (' + k + ')' }))} />
+        {sep}
+        <IconButton dark title="Zoom out" onClick={() => zoomTo(drawView.zoom / 1.25)}>−</IconButton>
+        <button type="button" title={`Reset zoom (${MOD}0)`} onClick={() => setDrawView(() => ({ x: 0, y: 0, zoom: 1 }), true)} className="text-[12px] text-[#F4EFE6] w-12 tabular-nums">{Math.round(drawView.zoom * 100)}%</button>
+        <IconButton dark title="Zoom in" onClick={() => zoomTo(drawView.zoom * 1.25)}>+</IconButton>
+        {sep}
+        <AnnotateControls />
+      </>
+    );
+  } else {
+    ctx = (
+      <>
+        <span className="text-[12px] text-[#F4EFE6]/80 px-1 tabular-nums">{wordCount(state.project.doc.markdown)} words</span>
+        <IconButton dark title="Download DESIGN.md with generated appendices" onClick={() => downloadExport('design-md')}>Export DESIGN.md</IconButton>
+      </>
+    );
+  }
+  return (
+    <header className="h-12 flex-none flex items-center gap-2 px-3 bg-[#232220] text-[#F4EFE6] select-none relative z-[50]">
+      <span className="font-serif text-[15px] font-semibold mr-1 tracking-tight">AgentCanvas</span>
+      <TabSwitch />
+      {sep}
+      <div className="flex items-center gap-1.5 min-w-0">{ctx}<IssueBadge /></div>
+      <div className="flex-1" />
+      {agent && (
+        <span className="inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-[#3A3835] text-[#F4EFE6] text-[11px] max-w-[360px]" title={agent}>
+          <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: V }} />
+          <span className="truncate">Agent · {agent}</span>
+        </span>
+      )}
+      <IconButton dark title={`Undo (${MOD}Z)`} disabled={!h.canUndo} onClick={() => act('undo', { tab })}>⟲</IconButton>
+      <IconButton dark title={`Redo (${MOD}⇧Z)`} disabled={!h.canRedo} onClick={() => act('redo', { tab })}>⟳</IconButton>
+      <ExportMenu />
+      <IconButton dark active={ui.skillsOpen} title="Installed skills" onClick={() => setUi(u => ({ ...u, skillsOpen: !u.skillsOpen }))}>Skills · {state.skills.length}</IconButton>
+    </header>
+  );
+}
+
+function ExportMenu() {
+  const { state, act, showToast } = useS();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    window.addEventListener('pointerdown', down);
+    return () => window.removeEventListener('pointerdown', down);
+  }, [open]);
+  const p = state.project, v = state.view;
+  const mnode = findNode(p, v.currentNodeId.mobile);
+  const items = [
+    ['Current web page → HTML', () => downloadExport('page', v.currentNodeId.web ? { nodeId: v.currentNodeId.web } : null)],
+    ['Web flows → HTML', () => downloadExport('web-flows')],
+    ['Current mobile flow → HTML', () => downloadExport('mobile-flow', mnode ? { flowId: mnode.flowId } : null)],
+    ['Draw → SVG', () => downloadExport('draw-svg')],
+    ['Doc → DESIGN.md', () => downloadExport('design-md')],
+    ['Save DESIGN.md to project', async () => {
+      try {
+        const r = await fetch('/api/export/design-md/write', { method: 'POST' });
+        const j = await r.json();
+        showToast(j.ok ? `Saved ${j.rel || j.path}` : j.error);
+      } catch (e) { showToast('Could not save DESIGN.md'); }
+    }],
+  ];
+  return (
+    <div className="relative" ref={ref}>
+      <IconButton dark active={open} title="Export" onClick={() => setOpen(o => !o)}>Export ▾</IconButton>
+      {open && (
+        <div className="absolute right-0 top-9 w-64 bg-[#FBF8F2] text-[#232220] border border-[#DDD5C4] rounded shadow-lg py-1 z-[60]">
+          {items.map(([label, fn]) => (
+            <button key={label} type="button" onClick={() => { setOpen(false); fn(); }} className="w-full text-left px-3 py-1.5 hover:bg-[#EFE8DB] text-[12px]">{label}</button>
+          ))}
+          <div className="h-px bg-[#DDD5C4] my-1" />
+          <button type="button" className="w-full text-left px-3 py-1.5 hover:bg-[#F7DDD7] text-[12px] text-[#9A2C19]"
+            onClick={() => { setOpen(false); if (window.confirm('Reset the whole project to the Hearth seed? This clears every undo history.')) act('reset_project', {}); }}>
+            Reset to seed…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkillsDrawer() {
+  const { state, setUi } = useS();
+  const [open, setOpen] = useState(null);
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    if (!open) { setDetail(null); return; }
+    let live = true;
+    fetch('/api/skills/' + encodeURIComponent(open)).then(r => r.json()).then(j => { if (live) setDetail(j); }).catch(() => {});
+    return () => { live = false; };
+  }, [open, state.skills]);
+  return (
+    <aside className="absolute right-0 top-0 bottom-0 w-[300px] bg-[#FBF8F2] border-l border-[#DDD5C4] z-[45] flex flex-col shadow-xl">
+      <div className="h-10 flex-none flex items-center justify-between px-3 border-b border-[#DDD5C4]">
+        {open ? <button type="button" className="text-[12px] hover:underline" onClick={() => setOpen(null)}>← Skills</button> : <span className="text-[12px] font-semibold">Skills · {state.skills.length}</span>}
+        <button type="button" title="Close (Esc)" className="text-[14px] px-1" onClick={() => setUi(u => ({ ...u, skillsOpen: false }))}>×</button>
+      </div>
+      <div className="flex-1 overflow-auto ac-scroll">
+        {!open && state.skills.map(s => (
+          <button key={s.name} type="button" onClick={() => setOpen(s.name)} className="w-full text-left px-3 py-2.5 border-b border-[#DDD5C4] hover:bg-[#EFE8DB]">
+            <div className="flex items-center gap-1.5"><span className="font-semibold text-[12px]">{s.name}</span><span className="text-[11px] text-[#6B665C]">v{s.version}</span>{s.builtin && <Pill tone="dark">built-in</Pill>}</div>
+            <div className="text-[11px] text-[#6B665C] mt-0.5">{s.description}</div>
+          </button>
+        ))}
+        {open && (
+          <div className="px-3 py-3 md md-ui text-[12px] leading-[18px]">
+            {detail ? renderMd(stripFrontmatter(detail.body || '')) : <span className="text-[#6B665C]">Loading…</span>}
+          </div>
+        )}
+      </div>
+      <div className="flex-none px-3 py-2 border-t border-[#DDD5C4] text-[11px] text-[#6B665C]">Manage skills with: <code>agent-canvas skills --help</code></div>
+    </aside>
+  );
+}
+
+// ---- Left panel ----
+function LeftPanel() {
+  const { state } = useS();
+  const tab = state.view.tab;
+  return (
+    <aside className="w-[260px] flex-none bg-[#FBF8F2] border-r border-[#DDD5C4] flex flex-col min-h-0 select-none">
+      {(tab === 'web' || tab === 'story') && <><Palette /><div className="flex-1 min-h-0 overflow-auto ac-scroll"><Outline channel={TAB_CHANNEL[tab]} /></div></>}
+      {tab === 'draw' && <DrawPanel />}
+      {tab === 'doc' && <DocRail />}
+    </aside>
+  );
+}
+
+function Palette() {
+  const { state, act } = useS();
+  const [open, setOpen] = useState(true);
+  const tab = state.view.tab, p = state.project, v = state.view;
+  const insertBlock = type => {
+    const nodeId = v.currentNodeId.web;
+    if (!nodeId) return;
+    const s = v.selection;
+    const after = s && s.kind === 'block' && s.nodeId === nodeId ? s.blockId : undefined;
+    act('insert_block', { nodeId, type, afterBlockId: after });
+  };
+  const addScreen = archetype => {
+    const cur = findNode(p, v.currentNodeId.mobile);
+    const flowId = cur ? cur.flowId : (p.flows.find(f => f.channel === 'mobile') || {}).id;
+    if (!flowId) return;
+    act('upsert_node', { flowId, archetype });
+  };
+  return (
+    <div className="flex-none border-b border-[#DDD5C4]">
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-3 h-8 text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold hover:bg-[#EFE8DB]">
+        <span>Palette</span><span>{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="grid grid-cols-2 gap-1 px-2 pb-2">
+          {tab === 'web' && BLOCK_TYPES.map(t => (
+            <button key={t} type="button" title={`Insert ${BLOCK_LABEL[t]} after the selected block`} onClick={() => insertBlock(t)}
+              className="h-8 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px] text-left px-2">+ {BLOCK_LABEL[t]}</button>
+          ))}
+          {tab === 'story' && ARCHETYPES.map(a => (
+            <button key={a} type="button" title={`Append a ${ARCH_LABEL[a]} screen to the current flow`} onClick={() => addScreen(a)}
+              className="h-8 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px] text-left px-2">+ {ARCH_LABEL[a]}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InlineRename({ value, onDone, onCancel }) {
+  const [d, setD] = useState(value);
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) { ref.current.focus(); ref.current.select(); } }, []);
+  return (
+    <input ref={ref} value={d} onChange={e => setD(e.target.value)} onClick={e => e.stopPropagation()}
+      onBlur={() => (d.trim() && d !== value ? onDone(d.trim()) : onCancel())}
+      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setD(value); onCancel(); } }}
+      className="flex-1 min-w-0 rounded border border-[#D8432A] bg-white px-1 h-6 text-[12px] outline-none" />
+  );
+}
+
+function useFailing() {
+  const { state } = useS();
+  return useMemo(() => {
+    const blocks = new Map(), nodes = new Map();
+    state.checks.contrast.filter(c => !c.pass).forEach(c => {
+      if (c.blockId) blocks.set(c.blockId, (blocks.get(c.blockId) ? blocks.get(c.blockId) + '; ' : '') + `${c.label}: ${c.ratio}:1`);
+      nodes.set(c.nodeId, (nodes.get(c.nodeId) ? nodes.get(c.nodeId) + '; ' : '') + `${c.label}: ${c.ratio}:1`);
+    });
+    state.checks.tap.filter(c => !c.pass).forEach(c => nodes.set(c.nodeId, (nodes.get(c.nodeId) ? nodes.get(c.nodeId) + '; ' : '') + c.label));
+    return { blocks, nodes };
+  }, [state.checks]);
+}
+
+function Outline({ channel }) {
+  const { state, act } = useS();
+  const p = state.project, v = state.view;
+  const [renaming, setRenaming] = useState(null);
+  const [expanded, setExpanded] = useState({});
+  const failing = useFailing();
+  const flows = p.flows.filter(f => f.channel === channel);
+  const cur = v.currentNodeId[channel];
+  const sel = v.selection;
+  const unit = channel === 'web' ? 'page' : 'screen';
+  const rowCls = on => 'group flex items-center gap-1 h-7 pr-2 cursor-pointer text-[12px] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'hover:bg-[#EFE8DB]');
+
+  const addFlow = async () => {
+    const res = await act('upsert_flow', { channel });
+    if (res.ok && res.createdId) setRenaming(res.createdId);
+  };
+  const delNode = n => {
+    const pins = p.pins.filter(x => x.target.nodeId === n.id).length;
+    const has = (n.kind === 'page' ? n.blocks.length : 1) + pins;
+    if (has && !window.confirm(`Delete ${unit} "${n.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) return;
+    act('delete_node', { nodeId: n.id });
+  };
+  return (
+    <div className="pb-6">
+      <div className="flex items-center justify-between px-3 h-8">
+        <span className="text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Outline</span>
+        <button type="button" onClick={addFlow} className="text-[12px] px-1.5 h-6 rounded hover:bg-[#EFE8DB]" title="Create a flow">+ Flow</button>
+      </div>
+      {flows.map(f => {
+        const nodes = laneOrder(f, p.nodes, p.edges);
+        return (
+          <div key={f.id} className="mb-1">
+            <div className={rowCls(false) + ' pl-2'} onDoubleClick={() => setRenaming(f.id)}>
+              <span className="text-[10px] text-[#6B665C] w-3">▾</span>
+              {renaming === f.id
+                ? <InlineRename value={f.name} onDone={name => { setRenaming(null); act('upsert_flow', { id: f.id, name }); }} onCancel={() => setRenaming(null)} />
+                : <span className="flex-1 truncate font-semibold" title="Double-click to rename">{f.name}</span>}
+              <span className="text-[11px] text-[#6B665C]">{nodes.length}</span>
+              <button type="button" title={`Add a ${unit}`} className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]"
+                onClick={e => { e.stopPropagation(); act('upsert_node', { flowId: f.id }); }}>+</button>
+              <button type="button" title={flows.length <= 1 ? 'A channel must keep at least one flow' : 'Delete flow'} disabled={flows.length <= 1}
+                className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]"
+                onClick={e => { e.stopPropagation(); if (window.confirm(`Delete flow "${f.name}" and its ${nodes.length} ${unit}(s)?`)) act('delete_flow', { flowId: f.id }); }}>×</button>
+            </div>
+            {nodes.map(n => {
+              const isCur = n.id === cur;
+              const isSel = sel && sel.kind === 'node' && sel.nodeId === n.id;
+              const open = expanded[n.id] ?? isCur;
+              const kids = n.kind === 'page' ? n.blocks : n.hotspots;
+              return (
+                <div key={n.id}>
+                  <div className={rowCls(isSel) + ' pl-4 ' + (isCur && !isSel ? 'bg-[#EFE8DB] font-semibold' : '')}
+                    onClick={() => act('set_selection', { selection: { kind: 'node', nodeId: n.id } })} onDoubleClick={e => { e.stopPropagation(); setRenaming(n.id); }}>
+                    <button type="button" className="w-3 text-[10px] text-[#6B665C]" onClick={e => { e.stopPropagation(); setExpanded(x => ({ ...x, [n.id]: !open })); }}>{kids.length ? (open ? '▾' : '▸') : ''}</button>
+                    <button type="button" title={f.startId === n.id ? 'Start of flow' : 'Set as start'}
+                      className={f.startId === n.id ? 'text-[#D8432A]' : 'opacity-0 group-hover:opacity-100 text-[#6B665C] hover:text-[#D8432A]'}
+                      onClick={e => { e.stopPropagation(); if (f.startId !== n.id) act('upsert_flow', { id: f.id, startId: n.id }); }}>{f.startId === n.id ? '★' : '☆'}</button>
+                    {renaming === n.id
+                      ? <InlineRename value={n.name} onDone={name => { setRenaming(null); act('upsert_node', { id: n.id, name }); }} onCancel={() => setRenaming(null)} />
+                      : <span className="flex-1 truncate" title="Double-click to rename">{n.name}</span>}
+                    {failing.nodes.has(n.id) && <Warn title={failing.nodes.get(n.id)} />}
+                    <button type="button" title={`Delete ${unit}`} className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]" onClick={e => { e.stopPropagation(); delNode(n); }}>×</button>
+                  </div>
+                  {open && n.kind === 'page' && n.blocks.map(b => {
+                    const bSel = sel && sel.kind === 'block' && sel.blockId === b.id && !sel.childId;
+                    const children = b.type === 'features' ? b.items.map(i => ({ id: i.id, label: i.title })) : (b.links || []).map(l => ({ id: l.id, label: l.label, toId: l.toId }));
+                    return (
+                      <div key={b.id}>
+                        <div className={rowCls(bSel) + ' pl-10'} onClick={() => act('set_selection', { selection: { kind: 'block', nodeId: n.id, blockId: b.id } })}>
+                          <span className="flex-1 truncate">{BLOCK_LABEL[b.type]}</span>
+                          {failing.blocks.has(b.id) && <Warn title={failing.blocks.get(b.id)} />}
+                        </div>
+                        {children.map(c => {
+                          const cSel = sel && sel.kind === 'block' && sel.blockId === b.id && sel.childId === c.id;
+                          return (
+                            <div key={c.id} className={rowCls(cSel) + ' pl-14'} onClick={() => act('set_selection', { selection: { kind: 'block', nodeId: n.id, blockId: b.id, childId: c.id } })}>
+                              <span className="flex-1 truncate">{c.label || <i className="opacity-60">empty</i>}</span>
+                              {c.toId && <span className="text-[10px] opacity-60">↗ {(findNode(p, c.toId) || {}).name || ''}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                  {open && n.kind === 'screen' && n.hotspots.map(h => {
+                    const hSel = sel && sel.kind === 'hotspot' && sel.hotspotId === h.id;
+                    return (
+                      <div key={h.id} className={rowCls(hSel) + ' pl-10'} onClick={() => act('set_selection', { selection: { kind: 'hotspot', nodeId: n.id, hotspotId: h.id } })}>
+                        <span className="flex-1 truncate">▭ {h.label}</span>
+                        {h.toId && <span className="text-[10px] opacity-60">↗ {(findNode(p, h.toId) || {}).name || ''}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DrawPanel() {
+  const { state, act, ui, setUi } = useS();
+  const shapes = state.project.draw.shapes;
+  const sel = state.view.selection;
+  const label = s => s.type === 'text' ? `Text “${s.text}”` : s.type[0].toUpperCase() + s.type.slice(1);
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Palette</div>
+      <div className="grid grid-cols-2 gap-1 px-2 pb-2 border-b border-[#DDD5C4]">
+        {DRAW_TOOLS.map(t => (
+          <button key={t} type="button" onClick={() => setUi(u => ({ ...u, drawTool: t }))}
+            className={'h-8 rounded border text-[12px] text-left px-2 ' + (ui.drawTool === t ? 'bg-[#232220] text-[#F4EFE6] border-[#232220]' : 'bg-white border-[#DDD5C4] hover:border-[#232220]')}>
+            {t[0].toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Shapes · {shapes.length}</div>
+      <div className="flex-1 overflow-auto ac-scroll pb-4">
+        {shapes.map(s => {
+          const on = sel && sel.kind === 'shape' && sel.shapeId === s.id;
+          return (
+            <div key={s.id} onClick={() => act('set_selection', { selection: { kind: 'shape', shapeId: s.id } })}
+              className={'flex items-center gap-2 h-7 px-3 cursor-pointer text-[12px] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'hover:bg-[#EFE8DB]')}>
+              <span className="w-2.5 h-2.5 rounded-sm border" style={{ borderColor: state.project.tokens.colors[s.stroke || s.ink] }} />
+              <span className="truncate">{label(s)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="px-3 py-2 border-t border-[#DDD5C4] text-[11px] text-[#6B665C] leading-4">Snaps to 8px — hold Alt to place freely. Hold Space to pan, scroll to zoom.</div>
+    </div>
+  );
+}
+
+function DocRail() {
+  const { state, docRef } = useS();
+  const heads = mdHeadings(state.project.doc.markdown);
+  const jump = h => {
+    const el = document.getElementById('md-line-' + h.line);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const ta = docRef.current.textarea;
+    if (ta) {
+      const lines = ta.value.split('\n');
+      let off = 0;
+      for (let i = 0; i < h.line && i < lines.length; i++) off += lines[i].length + 1;
+      ta.focus();
+      ta.setSelectionRange(off, off);
+      ta.scrollTop = Math.max(0, h.line * 20 - 40);
+    }
+  };
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Headings</div>
+      <div className="flex-1 overflow-auto ac-scroll pb-4">
+        {heads.map(h => (
+          <button key={h.line} type="button" onClick={() => jump(h)} className="w-full text-left h-7 hover:bg-[#EFE8DB] text-[12px] truncate"
+            style={{ paddingLeft: 12 + (h.level - 1) * 12, fontWeight: h.level === 1 ? 600 : 400 }}>{h.text}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- Inspector ----
+function Inspector() {
+  const { state, ui, setUi } = useS();
+  const sel = state.view.selection;
+  const edge = sel && sel.kind === 'edge' ? state.project.edges.find(e => e.id === sel.edgeId) : null;
+  const tabs = [['content', 'Content'], ['design', 'Design'], ['review', 'Review']];
+  return (
+    <aside className="w-[300px] flex-none bg-[#FBF8F2] border-l border-[#DDD5C4] flex flex-col min-h-0">
+      <div className="h-10 flex-none flex items-end gap-4 px-3 border-b border-[#DDD5C4]">
+        {tabs.map(([k, l]) => (
+          <button key={k} type="button" onClick={() => setUi(u => ({ ...u, inspectorTab: k }))}
+            className={'h-10 text-[12px] border-b-2 -mb-px ' + (ui.inspectorTab === k ? 'border-[#D8432A] font-semibold' : 'border-transparent text-[#6B665C] hover:text-[#232220]')}>
+            {l}{k === 'review' && state.openIssues ? ` · ${state.openIssues}` : ''}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto ac-scroll">
+        {ui.inspectorTab === 'review' ? <ReviewPanel /> : edge ? <EdgePanel edge={edge} /> : ui.inspectorTab === 'design' ? <DesignPanel /> : <ContentPanel />}
+      </div>
+    </aside>
+  );
+}
+
+function ContentPanel() {
+  const { state } = useS();
+  const p = state.project, v = state.view, sel = v.selection, tab = v.tab;
+  if (tab === 'web') {
+    if (sel && sel.kind === 'block') {
+      const n = findNode(p, sel.nodeId), b = n && n.blocks.find(x => x.id === sel.blockId);
+      if (b) return <BlockContent node={n} block={b} childId={sel.childId} />;
+    }
+    const n = findNode(p, (sel && sel.kind === 'node' && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'page') ? sel.nodeId : v.currentNodeId.web);
+    return n ? <NodeContent node={n} /> : <Empty text="No page yet. Add one from the Outline." />;
+  }
+  if (tab === 'story') {
+    const id = sel && (sel.kind === 'hotspot' || sel.kind === 'node') && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'screen' ? sel.nodeId : v.currentNodeId.mobile;
+    const n = findNode(p, id);
+    return n ? <ScreenContent node={n} hotspotId={sel && sel.kind === 'hotspot' ? sel.hotspotId : null} /> : <Empty text="No screen yet." />;
+  }
+  if (tab === 'draw') {
+    const s = sel && sel.kind === 'shape' ? p.draw.shapes.find(x => x.id === sel.shapeId) : null;
+    return s ? <ShapeContent shape={s} /> : <Empty text="Select a shape, or pick a tool in the top bar and drag on the canvas." />;
+  }
+  return <DocContent />;
+}
+
+function Empty({ text }) { return <div className="px-3 py-6 text-[12px] text-[#6B665C] leading-5">{text}</div>; }
+
+function NodeHeader({ node, children }) {
+  const { state } = useS();
+  const f = findFlow(state.project, node.flowId);
+  return (
+    <div className="px-3 pt-3 pb-2 border-b border-[#DDD5C4]">
+      <div className="text-[11px] text-[#6B665C]">{f ? f.name : ''} › {node.kind === 'page' ? 'Page' : 'Screen'}{f && f.startId === node.id ? ' · ★ start' : ''}</div>
+      <div className="font-semibold text-[14px] mt-0.5 flex items-center justify-between gap-2"><span className="truncate">{node.name}</span>{children}</div>
+    </div>
+  );
+}
+
+function NodeContent({ node }) {
+  const { state, act } = useS();
+  const p = state.project;
+  const out = p.edges.filter(e => e.fromId === node.id), inn = p.edges.filter(e => e.toId === node.id);
+  return (
+    <div>
+      <NodeHeader node={node} />
+      <Section title="Page">
+        <Field label="Name"><TextInput value={node.name} coalesce={`text:${node.id}.name`} onSend={(val, o) => val.trim() && act('upsert_node', { id: node.id, name: val }, o)} /></Field>
+        <div className="text-[11px] text-[#6B665C]">{node.blocks.length} blocks. Click a block on the canvas or in the Outline to edit it.</div>
+      </Section>
+      <EdgeList title="Outbound" edges={out} dir="to" />
+      <EdgeList title="Inbound" edges={inn} dir="from" />
+    </div>
+  );
+}
+
+function EdgeList({ title, edges, dir }) {
+  const { state, act } = useS();
+  if (!edges.length) return null;
+  return (
+    <Section title={`${title} · ${edges.length}`}>
+      {edges.map(e => {
+        const other = findNode(state.project, dir === 'to' ? e.toId : e.fromId);
+        return (
+          <button key={e.id} type="button" onClick={() => act('set_selection', { selection: { kind: 'edge', edgeId: e.id } })}
+            className="w-full flex items-center gap-1.5 text-left text-[12px] py-1 hover:text-[#D8432A]">
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: e.kind === 'cross' ? V : '#232220' }} />
+            <span className="truncate flex-1">“{e.label}” {dir === 'to' ? '→' : '←'} {other ? other.name : '?'}</span>
+            <span className="text-[10px] text-[#6B665C]">{e.kind}</span>
+          </button>
+        );
+      })}
+    </Section>
+  );
+}
+
+function BlockActions({ node, block }) {
+  const { act } = useS();
+  const i = node.blocks.findIndex(b => b.id === block.id);
+  const move = d => {
+    const ids = node.blocks.map(b => b.id);
+    const j = i + d;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    act('reorder_blocks', { nodeId: node.id, blockIds: ids });
+  };
+  return (
+    <div className="flex items-center gap-0.5">
+      <IconButton title="Move up" disabled={i <= 0} onClick={() => move(-1)}>↑</IconButton>
+      <IconButton title="Move down" disabled={i >= node.blocks.length - 1} onClick={() => move(1)}>↓</IconButton>
+      <IconButton title={`Duplicate (${MOD}D)`} onClick={() => act('duplicate_block', { nodeId: node.id, blockId: block.id })}>Duplicate</IconButton>
+      <IconButton title="Delete (Del)" onClick={() => act('delete_block', { nodeId: node.id, blockId: block.id })}>Delete</IconButton>
+    </div>
+  );
+}
+
+function LinkRow({ node, block, link, removable, labelField }) {
+  const { act } = useS();
+  const owner = labelField ? { blockId: block.id, field: labelField } : { blockId: block.id, childId: link.id };
+  const sendLabel = (val, o) => act('update_block', labelField
+    ? { nodeId: node.id, blockId: block.id, patch: { [labelField]: { label: val } } }
+    : { nodeId: node.id, blockId: block.id, childId: link.id, patch: { label: val } }, o);
+  return (
+    <div className="mb-2 p-2 rounded border border-[#DDD5C4] bg-white/60">
+      <div className="flex gap-1.5 items-center mb-1.5">
+        <TextInput value={link.label} coalesce={`text:${link.id}.label`} onSend={sendLabel} />
+        {removable && <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => removable()}>×</button>}
+      </div>
+      <div className="flex items-center gap-1.5"><span className="text-[11px] text-[#6B665C] w-10">Target</span>
+        <TargetSelect channel="web" value={link.toId} onChange={to => act('set_link_target', { nodeId: node.id, owner, toId: to })} />
+      </div>
+    </div>
+  );
+}
+
+function BlockContent({ node, block, childId }) {
+  const { act } = useS();
+  const b = block;
+  const set = field => (val, o) => act('update_block', { nodeId: node.id, blockId: b.id, patch: { [field]: val } }, o);
+  const tf = (label, field, multiline) => (
+    <Field label={label}><TextInput value={b[field]} multiline={multiline} rows={multiline ? 3 : undefined} coalesce={`text:${b.id}.${field}`} onSend={set(field)} /></Field>
+  );
+  const addChild = () => act('upsert_child', { nodeId: node.id, blockId: b.id });
+  const delChild = id => act('delete_child', { nodeId: node.id, blockId: b.id, childId: id });
+  let child = null;
+  if (childId) {
+    const link = (b.links || []).find(l => l.id === childId) || [b.cta, b.secondary, b.button].find(l => l && l.id === childId);
+    const item = (b.items || []).find(i => i.id === childId);
+    if (link) {
+      const field = b.cta && b.cta.id === childId ? 'cta' : b.secondary && b.secondary.id === childId ? 'secondary' : b.button && b.button.id === childId ? 'button' : null;
+      child = <Section title="Selected link"><LinkRow node={node} block={b} link={link} labelField={field} /></Section>;
+    } else if (item) {
+      child = (
+        <Section title="Selected card">
+          <Field label="Title"><TextInput value={item.title} coalesce={`text:${item.id}.title`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: item.id, patch: { title: val } }, o)} /></Field>
+          <Field label="Body"><TextInput multiline rows={2} value={item.body} coalesce={`text:${item.id}.body`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: item.id, patch: { body: val } }, o)} /></Field>
+        </Section>
+      );
+    }
+  }
+  let fields = null;
+  if (b.type === 'nav' || b.type === 'footer') {
+    fields = (
+      <>
+        {tf('Brand', 'brand')}
+        {b.type === 'footer' && tf('Note', 'note')}
+        <div className="text-[11px] text-[#6B665C] mb-1">Links</div>
+        {b.links.map(l => <LinkRow key={l.id} node={node} block={b} link={l} removable={() => delChild(l.id)} />)}
+        <button type="button" className="text-[12px] hover:text-[#D8432A]" onClick={addChild}>+ add link</button>
+      </>
+    );
+  } else if (b.type === 'hero') {
+    fields = (
+      <>
+        {tf('Eyebrow', 'eyebrow')}{tf('Headline', 'headline')}{tf('Body', 'body', true)}
+        <div className="text-[11px] text-[#6B665C] mb-1">Button</div>
+        <LinkRow node={node} block={b} link={b.cta} labelField="cta" />
+        <div className="text-[11px] text-[#6B665C] mb-1 flex items-center justify-between">Secondary link
+          {b.secondary
+            ? <button type="button" className="hover:text-[#D8432A]" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: null } })}>remove</button>
+            : <button type="button" className="hover:text-[#D8432A]" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: { label: 'Learn more' } } })}>+ add</button>}
+        </div>
+        {b.secondary && <LinkRow node={node} block={b} link={b.secondary} labelField="secondary" />}
+      </>
+    );
+  } else if (b.type === 'features') {
+    fields = (
+      <>
+        {tf('Heading', 'heading')}
+        <div className="text-[11px] text-[#6B665C] mb-1">Cards</div>
+        {b.items.map(it => (
+          <div key={it.id} className="mb-2 p-2 rounded border border-[#DDD5C4] bg-white/60">
+            <div className="flex gap-1.5 mb-1.5">
+              <TextInput value={it.title} coalesce={`text:${it.id}.title`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: it.id, patch: { title: val } }, o)} />
+              <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => delChild(it.id)}>×</button>
+            </div>
+            <TextInput multiline rows={2} value={it.body} coalesce={`text:${it.id}.body`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: it.id, patch: { body: val } }, o)} />
+          </div>
+        ))}
+        <button type="button" className="text-[12px] hover:text-[#D8432A]" onClick={addChild}>+ add card</button>
+      </>
+    );
+  } else if (b.type === 'quote') {
+    fields = <>{tf('Quote', 'text', true)}{tf('Cite', 'cite')}</>;
+  } else if (b.type === 'cta') {
+    fields = (
+      <>
+        {tf('Headline', 'headline')}{tf('Body', 'body', true)}
+        <div className="text-[11px] text-[#6B665C] mb-1">Button</div>
+        <LinkRow node={node} block={b} link={b.button} labelField="button" />
+      </>
+    );
+  }
+  return (
+    <div>
+      <NodeHeader node={node} />
+      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+        <span className="font-semibold text-[12px]">{BLOCK_LABEL[b.type]}</span>
+        <BlockActions node={node} block={b} />
+      </div>
+      {child}
+      <Section title="Content">{fields}</Section>
+    </div>
+  );
+}
+
+function ScreenContent({ node, hotspotId }) {
+  const { act } = useS();
+  const n = node;
+  const set = field => (val, o) => act('update_screen', { nodeId: n.id, patch: { [field]: val } }, o);
+  const hs = hotspotId ? n.hotspots.find(h => h.id === hotspotId) : null;
+  const geo = (h, k) => <label className="flex items-center gap-1 text-[11px] text-[#6B665C]">{k}<NumberInput value={h[k]} width={52} min={0} max={k === 'y' || k === 'h' ? 844 : 390} onCommit={val => act('upsert_hotspot', { nodeId: n.id, hotspotId: h.id, [k]: val })} /></label>;
+  const hotspotRow = h => (
+    <div key={h.id} className={'mb-2 p-2 rounded border bg-white/60 ' + (h.id === hotspotId ? 'border-[#D8432A]' : 'border-[#DDD5C4]')}>
+      <div className="flex gap-1.5 mb-1.5">
+        <TextInput value={h.label} coalesce={`text:${h.id}.label`} onSend={(val, o) => act('upsert_hotspot', { nodeId: n.id, hotspotId: h.id, label: val }, o)} />
+        <button type="button" title="Delete hotspot" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => act('delete_hotspot', { nodeId: n.id, hotspotId: h.id })}>×</button>
+      </div>
+      <div className="flex items-center gap-1.5 mb-1.5"><span className="text-[11px] text-[#6B665C] w-10">Target</span>
+        <TargetSelect channel="mobile" value={h.toId} onChange={to => act('set_link_target', { nodeId: n.id, owner: { hotspotId: h.id }, toId: to })} /></div>
+      <div className="grid grid-cols-2 gap-1">{geo(h, 'x')}{geo(h, 'y')}{geo(h, 'w')}{geo(h, 'h')}</div>
+    </div>
+  );
+  return (
+    <div>
+      <NodeHeader node={n} />
+      {hs && <Section title="Selected hotspot">{hotspotRow(hs)}</Section>}
+      <Section title="Screen">
+        <Field label="Name"><TextInput value={n.name} coalesce={`text:${n.id}.name`} onSend={(val, o) => val.trim() && act('update_screen', { nodeId: n.id, patch: { name: val } }, o)} /></Field>
+        <Field label="Title"><TextInput value={n.title} coalesce={`text:${n.id}.title`} onSend={set('title')} /></Field>
+        <Field label="Body"><TextInput multiline rows={3} value={n.body} coalesce={`text:${n.id}.body`} onSend={set('body')} /></Field>
+      </Section>
+      <Section title="CTA" right={n.cta
+        ? <button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: null } })}>remove</button>
+        : <button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: { label: 'Continue' } } })}>+ add</button>}>
+        {n.cta ? (
+          <>
+            <Field label="Label"><TextInput value={n.cta.label} coalesce={`text:${n.id}.cta`} onSend={(val, o) => act('update_screen', { nodeId: n.id, patch: { cta: { label: val } } }, o)} /></Field>
+            <Field label="Target"><TargetSelect channel="mobile" value={n.cta.toId} onChange={to => act('set_link_target', { nodeId: n.id, owner: { cta: true }, toId: to })} /></Field>
+            <Field label="Size"><Seg value={n.cta.size} onChange={s => act('update_screen', { nodeId: n.id, patch: { cta: { size: s } } })} options={[{ value: 'sm', label: 'sm 36' }, { value: 'md', label: 'md 44' }, { value: 'lg', label: 'lg 52' }]} /></Field>
+          </>
+        ) : <div className="text-[11px] text-[#6B665C]">No CTA on this screen.</div>}
+      </Section>
+      <Section title={`Hotspots · ${n.hotspots.length}`} right={<button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('upsert_hotspot', { nodeId: n.id })}>+ Hotspot</button>}>
+        {n.hotspots.filter(h => h.id !== hotspotId).map(hotspotRow)}
+        {!n.hotspots.length && <div className="text-[11px] text-[#6B665C]">Hotspots are tappable rectangles that link to another screen.</div>}
+      </Section>
+    </div>
+  );
+}
+
+function ShapeContent({ shape }) {
+  const { act } = useS();
+  const s = shape;
+  const num = k => <label className="flex items-center gap-1 text-[11px] text-[#6B665C]">{k}<NumberInput value={Math.round(s[k] * 100) / 100} width={60} onCommit={val => act('update_shape', { shapeId: s.id, patch: { [k]: val } })} /></label>;
+  const keys = s.type === 'rect' || s.type === 'ellipse' ? ['x', 'y', 'w', 'h'] : s.type === 'line' || s.type === 'arrow' ? ['x1', 'y1', 'x2', 'y2'] : s.type === 'text' ? ['x', 'y'] : [];
+  return (
+    <div>
+      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+        <span className="font-semibold text-[12px] capitalize">{s.type}</span>
+        <div className="flex gap-0.5">
+          <IconButton title={`Duplicate (${MOD}D)`} onClick={() => act('duplicate_shape', { shapeId: s.id })}>Duplicate</IconButton>
+          <IconButton title="Delete (Del)" onClick={() => act('delete_shape', { shapeId: s.id })}>Delete</IconButton>
+        </div>
+      </div>
+      {s.type === 'text' && <Section title="Text"><TextInput value={s.text} coalesce={`text:${s.id}.text`} onSend={(val, o) => act('update_shape', { shapeId: s.id, patch: { text: val } }, o)} /></Section>}
+      {keys.length > 0 && <Section title="Geometry"><div className="grid grid-cols-2 gap-1">{keys.map(num)}</div></Section>}
+      {s.type === 'pen' && <Section title="Stroke"><div className="text-[11px] text-[#6B665C]">{s.points.length} points</div></Section>}
+    </div>
+  );
+}
+
+function DocContent() {
+  const { state, showToast } = useS();
+  const md = state.project.doc.markdown;
+  return (
+    <div>
+      <Section title="DESIGN.md">
+        <div className="text-[12px] mb-3">{wordCount(md)} words · {mdHeadings(md).length} headings</div>
+        <div className="flex flex-col gap-1.5">
+          <button type="button" className="h-7 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px]" onClick={() => downloadExport('design-md')}>Export DESIGN.md</button>
+          <button type="button" className="h-7 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px]" onClick={async () => {
+            const r = await fetch('/api/export/design-md/write', { method: 'POST' }); const j = await r.json(); showToast(j.ok ? `Saved ${j.rel || j.path}` : j.error);
+          }}>Save DESIGN.md to project</button>
+        </div>
+        <div className="text-[11px] text-[#6B665C] mt-3 leading-4">The export appends generated Flows and Open issues sections.</div>
+      </Section>
+    </div>
+  );
+}
+
+// ---- Design panel ----
+function ContrastReadout({ items }) {
+  if (!items.length) return null;
+  return (
+    <Section title="Contrast">
+      {items.map((c, i) => (
+        <div key={i} className="flex items-center justify-between text-[12px] py-0.5">
+          <span>{c.part === 'body' ? 'Body text' : c.part === 'button' ? 'Button' : 'CTA'} <span className="text-[#6B665C]">({c.role})</span></span>
+          <span className="flex items-center gap-1.5"><span className="tabular-nums">{c.ratio.toFixed(1)}:1</span>{!c.pass && <Warn title="Below WCAG AA" />}<Pill tone={c.pass ? 'pass' : 'fail'}>{c.pass ? 'Passes AA' : 'Fails AA'}</Pill></span>
+        </div>
+      ))}
+    </Section>
+  );
+}
+
+function DesignPanel() {
+  const { state } = useS();
+  const p = state.project, v = state.view, sel = v.selection, tab = v.tab;
+  if (tab === 'web') {
+    const n = sel && sel.kind === 'block' ? findNode(p, sel.nodeId) : null;
+    const b = n && n.blocks.find(x => x.id === sel.blockId);
+    return <div>{b ? <BlockDesign node={n} block={b} /> : <Empty text="Select a block to style it. Project tokens below are global." />}<ProjectTokens /></div>;
+  }
+  if (tab === 'story') {
+    const n = findNode(p, sel && (sel.kind === 'node' || sel.kind === 'hotspot') && findNode(p, sel.nodeId) && findNode(p, sel.nodeId).kind === 'screen' ? sel.nodeId : v.currentNodeId.mobile);
+    return <div>{n ? <ScreenDesign node={n} /> : <Empty text="No screen." />}<ProjectTokens /></div>;
+  }
+  if (tab === 'draw') {
+    const s = sel && sel.kind === 'shape' ? p.draw.shapes.find(x => x.id === sel.shapeId) : null;
+    return s ? <ShapeDesign shape={s} /> : <Empty text="Select a shape to style it." />;
+  }
+  return <ProjectTokens />;
+}
+
+function BlockDesign({ node, block }) {
+  const { state, act } = useS();
+  const b = block;
+  const set = (k, val) => act('update_block', { nodeId: node.id, blockId: b.id, patch: { [k]: val } });
+  const checks = state.checks.contrast.filter(c => c.blockId === b.id);
+  return (
+    <div>
+      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px]">{node.name} › {BLOCK_LABEL[b.type]}</div>
+      <Section title="Type">
+        <Field label="Type role"><Seg small value={b.typeRole} onChange={x => set('typeRole', x)} options={ORDER} /></Field>
+        {b.type === 'hero' && <Field label="Body role"><Seg small value={b.bodyRole} onChange={x => set('bodyRole', x)} options={ORDER} /></Field>}
+        <Field label="Weight"><Seg value={b.weight} onChange={x => set('weight', x)} options={WEIGHTS} /></Field>
+        <Field label="Align"><Seg value={b.align} onChange={x => set('align', x)} options={['left', 'center']} /></Field>
+      </Section>
+      <Section title="Space">
+        <Field label="Padding (px)"><SpaceScale value={b.pad} onChange={x => set('pad', x)} /></Field>
+        <Field label="Gap (px)"><SpaceScale value={b.gap} onChange={x => set('gap', x)} /></Field>
+      </Section>
+      <Section title="Color">
+        <Field label="Fill"><TokenSwatches value={b.fill} onChange={x => set('fill', x)} /></Field>
+        <Field label="Ink"><TokenSwatches value={b.ink} onChange={x => set('ink', x)} /></Field>
+        {b.type === 'cta' && <Field label="Button fill"><TokenSwatches value={b.buttonFill} onChange={x => set('buttonFill', x)} /></Field>}
+        {b.type === 'cta' && <Field label="Button ink"><TokenSwatches value={b.buttonInk} onChange={x => set('buttonInk', x)} /></Field>}
+      </Section>
+      <ContrastReadout items={checks} />
+    </div>
+  );
+}
+
+function ScreenDesign({ node }) {
+  const { state, act } = useS();
+  const n = node;
+  const set = (k, val) => act('update_screen', { nodeId: n.id, patch: { [k]: val } });
+  const contrast = state.checks.contrast.filter(c => c.nodeId === n.id);
+  const tap = state.checks.tap.filter(c => c.nodeId === n.id);
+  return (
+    <div>
+      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px]">{n.name}</div>
+      <Section title="Layout">
+        <Field label="Archetype"><Seg small value={n.archetype} onChange={x => set('archetype', x)} options={ARCHETYPES.map(a => ({ value: a, label: ARCH_LABEL[a] }))} /></Field>
+        <Field label="Layout"><Seg value={n.layout} onChange={x => set('layout', x)} options={LAYOUTS} /></Field>
+      </Section>
+      <Section title="Type">
+        <Field label="Type role"><Seg small value={n.typeRole} onChange={x => set('typeRole', x)} options={ORDER} /></Field>
+        <Field label="Weight"><Seg value={n.weight} onChange={x => set('weight', x)} options={WEIGHTS} /></Field>
+        <Field label="Align"><Seg value={n.align} onChange={x => set('align', x)} options={['left', 'center']} /></Field>
+      </Section>
+      <Section title="Space">
+        <Field label="Padding (px)"><SpaceScale value={n.pad} onChange={x => set('pad', x)} /></Field>
+        <Field label="Gap (px)"><SpaceScale value={n.gap} onChange={x => set('gap', x)} /></Field>
+      </Section>
+      <Section title="Color">
+        <Field label="Fill"><TokenSwatches value={n.fill} onChange={x => set('fill', x)} /></Field>
+        <Field label="Ink"><TokenSwatches value={n.ink} onChange={x => set('ink', x)} /></Field>
+        {n.cta && <Field label="CTA fill"><TokenSwatches value={n.cta.fill} onChange={x => set('cta', { fill: x })} /></Field>}
+        {n.cta && <Field label="CTA ink"><TokenSwatches value={n.cta.ink} onChange={x => set('cta', { ink: x })} /></Field>}
+      </Section>
+      <ContrastReadout items={contrast} />
+      <Section title="Tap targets">
+        {tap.map(t => (
+          <div key={t.ref} className="flex items-center justify-between text-[12px] py-0.5 gap-2">
+            <span className="truncate" title={t.label}>{t.label.replace(n.name + ' › ', '')}</span>
+            <span className="flex items-center gap-1">{!t.pass && <Warn title="Under 44px" />}<Pill tone={t.pass ? 'pass' : 'fail'}>{t.pass ? 'OK' : 'Too small'}</Pill></span>
+          </div>
+        ))}
+        {!tap.length && <div className="text-[11px] text-[#6B665C]">No CTA or hotspots.</div>}
+      </Section>
+    </div>
+  );
+}
+
+function ShapeDesign({ shape }) {
+  const { act } = useS();
+  const s = shape;
+  const set = (k, val) => act('update_shape', { shapeId: s.id, patch: { [k]: val } });
+  return (
+    <div>
+      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px] capitalize">{s.type}</div>
+      <Section title="Style">
+        {s.type === 'text' ? (
+          <>
+            <Field label="Ink"><TokenSwatches value={s.ink} onChange={x => set('ink', x)} /></Field>
+            <Field label="Text role"><Seg small value={s.role} onChange={x => set('role', x)} options={ORDER} /></Field>
+          </>
+        ) : (
+          <>
+            <Field label="Stroke"><TokenSwatches value={s.stroke} onChange={x => set('stroke', x)} /></Field>
+            {(s.type === 'rect' || s.type === 'ellipse') && <Field label="Fill"><TokenSwatches allowNone value={s.fill} onChange={x => set('fill', x)} /></Field>}
+            <Field label="Stroke width"><Seg value={s.sw} onChange={x => set('sw', x)} options={STROKE_WIDTHS} /></Field>
+          </>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+function ColorToken({ k, value }) {
+  const { act } = useS();
+  const d = useDraft(value, (val, o) => { if (/^#[0-9a-fA-F]{6}$/.test(val)) act('update_tokens', { colors: { [k]: val } }, o); }, `color:${k}`);
+  return (
+    <div className="flex items-center gap-2 mb-1.5">
+      <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(d.draft) ? d.draft : value} onChange={e => d.onChange(e.target.value.toUpperCase())} onFocus={d.onFocus} onBlur={d.onBlur}
+        className="w-7 h-6 p-0 border border-[#DDD5C4] rounded bg-white cursor-pointer" title={k} />
+      <span className="w-14 text-[12px]">{k}</span>
+      <input type="text" value={d.draft} onChange={e => d.onChange(e.target.value)} onFocus={d.onFocus} onBlur={d.onBlur}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} className={inputCls + ' font-mono uppercase'} style={{ width: 90 }} />
+    </div>
+  );
+}
+
+function ProjectTokens() {
+  const { state, act } = useS();
+  const t = state.project.tokens;
+  return (
+    <Section title="Project tokens">
+      <div className="text-[11px] text-[#6B665C] mb-2">Edits here are global and undo from the current tab.</div>
+      {COLOR_KEYS.map(k => <ColorToken key={k} k={k} value={t.colors[k]} />)}
+      <div className="mt-3 grid grid-cols-[48px_1fr_1fr] gap-1 items-center text-[11px] text-[#6B665C]">
+        <span>role</span><span>size</span><span>line-height</span>
+        {ORDER.map(r => (
+          <Fragment key={r}>
+            <span className="text-[#232220]">{r}</span>
+            <NumberInput value={t.type[r].size} min={6} max={200} width={70} onCommit={val => act('update_tokens', { type: { [r]: { size: val } } })} />
+            <NumberInput value={t.type[r].lh} min={6} max={300} width={70} onCommit={val => act('update_tokens', { type: { [r]: { lh: val } } })} />
+          </Fragment>
+        ))}
+      </div>
+      <div className="mt-3 text-[11px] text-[#6B665C]">Space (fixed): {t.space.join(' · ')}</div>
+    </Section>
+  );
+}
+
+// ---- Edge panel ----
+function EdgePanel({ edge }) {
+  const { state, act } = useS();
+  const p = state.project;
+  const from = findNode(p, edge.fromId), to = findNode(p, edge.toId);
+  const cross = edge.kind === 'cross';
+  const toFlow = to && findFlow(p, to.flowId);
+  return (
+    <div>
+      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+        <span className="font-semibold text-[12px]">Edge</span>
+        <IconButton title="Delete edge (Del)" onClick={() => act('delete_edge', { edgeId: edge.id })}>Delete edge</IconButton>
+      </div>
+      <Section title="Connection">
+        <div className="text-[12px] mb-2">{from ? from.name : '?'} → {to ? to.name : '?'}{cross && toFlow ? <span className="text-[#6B665C]"> ({toFlow.name})</span> : null}</div>
+        <Field label="Label"><TextInput value={edge.label} coalesce={`text:${edge.id}.label`} onSend={(val, o) => act('upsert_edge', { id: edge.id, label: val }, o)} /></Field>
+        <div className="text-[11px] text-[#6B665C] mb-1">Kind</div>
+        {cross ? (
+          <div>
+            <label className="flex items-center gap-2 text-[12px]"><input type="radio" checked readOnly disabled /> <span style={{ color: V }} className="font-semibold">cross</span></label>
+            <div className="text-[11px] text-[#6B665C] mt-1 leading-4">This edge connects two different flows, so its kind is always cross (read-only).</div>
+          </div>
+        ) : ['primary', 'alt', 'back'].map(k => (
+          <label key={k} className="flex items-center gap-2 text-[12px] py-0.5">
+            <input type="radio" name={'kind-' + edge.id} checked={edge.kind === k} onChange={() => act('upsert_edge', { id: edge.id, kind: k })} /> {k}
+          </label>
+        ))}
+      </Section>
+    </div>
+  );
+}
+
+// ---- Review panel ----
+function pinWhere(p, pin) {
+  if (pin.target.type === 'draw') return 'Draw';
+  const n = findNode(p, pin.target.nodeId);
+  if (!n) return '?';
+  if (pin.target.type === 'board') return 'Storyboard › ' + n.name;
+  const b = pin.target.blockId && n.blocks ? n.blocks.find(x => x.id === pin.target.blockId) : null;
+  return n.name + (b ? ' › ' + BLOCK_LABEL[b.type] : '');
+}
+
+function ReviewPanel() {
+  const { state, act, ui, setUi } = useS();
+  const p = state.project;
+  const f = ui.reviewFilter;
+  const setF = patch => setUi(u => ({ ...u, reviewFilter: { ...u.reviewFilter, ...patch } }));
+  const pins = p.pins.filter(x => (f.kind === 'all' || x.kind === f.kind) && (f.status === 'all' || (f.status === 'open' ? !x.resolved : x.resolved))).sort((a, b) => a.n - b.n);
+  const sel = state.view.selection;
+  const failC = state.checks.contrast.filter(c => !c.pass), failT = state.checks.tap.filter(c => !c.pass);
+  const jumpCheck = c => {
+    if (c.blockId) act('set_selection', { selection: { kind: 'block', nodeId: c.nodeId, blockId: c.blockId } });
+    else if (c.ref && c.ref !== 'cta') act('set_selection', { selection: { kind: 'hotspot', nodeId: c.nodeId, hotspotId: c.ref } });
+    else act('set_selection', { selection: { kind: 'node', nodeId: c.nodeId } }).then(() => act('set_tab', { tab: 'story', view: 'page' }));
+    setUi(u => ({ ...u, inspectorTab: 'design' }));
+  };
+  return (
+    <div>
+      <Section title="Pins">
+        <div className="flex flex-col gap-1.5 mb-2">
+          <Seg small value={f.kind} onChange={k => setF({ kind: k })} options={[{ value: 'all', label: 'All' }, ...PIN_KINDS.map(k => ({ value: k, label: PIN_NAME[k] }))]} />
+          <Seg small value={f.status} onChange={s => setF({ status: s })} options={[{ value: 'open', label: 'Open' }, { value: 'resolved', label: 'Resolved' }, { value: 'all', label: 'All' }]} />
+        </div>
+        {pins.map(x => {
+          const on = sel && sel.kind === 'pin' && sel.pinId === x.id;
+          return (
+            <button key={x.id} type="button" data-review-pin={x.id}
+              onClick={() => act('set_selection', { selection: { kind: 'pin', pinId: x.id } })}
+              className={'w-full text-left flex gap-2 py-1.5 px-1 rounded ' + (on ? 'bg-[#EFE8DB]' : 'hover:bg-[#EFE8DB]')}>
+              <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F4EFE6' }}>{x.resolved ? '✓' : x.n}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] truncate"><b className="mr-1">{PIN_GLYPH[x.kind]}</b>{firstLine(x.body)}</span>
+                <span className="block text-[11px] text-[#6B665C]">#{x.n} · {pinWhere(p, x)}</span>
+              </span>
+            </button>
+          );
+        })}
+        {!pins.length && <div className="text-[11px] text-[#6B665C]">No pins match. Turn on Annotate in the top bar and click the canvas to add one.</div>}
+      </Section>
+      <Section title={`Checks · ${failC.length + failT.length}`}>
+        {failC.map((c, i) => (
+          <button key={'c' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-[#D8432A] flex gap-1.5">
+            <Warn /> <span>{c.label}: contrast {c.ratio.toFixed(1)}:1 (needs {['lg', 'xl', 'display'].includes(c.role) ? '3.0' : '4.5'})</span>
+          </button>
+        ))}
+        {failT.map((c, i) => (
+          <button key={'t' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-[#D8432A] flex gap-1.5">
+            <Warn /> <span>{c.label}</span>
+          </button>
+        ))}
+        {!failC.length && !failT.length && <div className="text-[11px] text-[#6B665C]">All contrast and tap-target checks pass at this breakpoint.</div>}
+      </Section>
+    </div>
+  );
+}
+
+// ===== Section 6: Shared views =====
+
+// ---- Pins (§10) ----
+function pinVisible(pin, state, ui) {
+  const sel = state.view.selection;
+  if (sel && sel.kind === 'pin' && sel.pinId === pin.id) return true;
+  if (!state.view.showPins) return false;
+  if (pin.resolved && ui.reviewFilter.status === 'open') return false;
+  return true;
+}
+
+function SpecLabel({ x, y, text }) {
+  return <span style={{ position: 'absolute', left: x, top: y, background: '#FBF8F2', color: V, font: '500 10px/14px Inter, sans-serif', padding: '0 3px', border: `1px solid ${V}`, borderRadius: 2, whiteSpace: 'nowrap' }}>{text}</span>;
+}
+
+// items: [{pin, left, top, coords(clientX, clientY) -> {x, y}}] in container px
+function PinsLayer({ items, draft, onDraftDone }) {
+  const { state } = useS();
+  const sel = state.view.selection;
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 40 }}>
+      {items.map(it => <PinMarker key={it.pin.id} {...it} selected={!!(sel && sel.kind === 'pin' && sel.pinId === it.pin.id)} />)}
+      {draft && <DraftPin draft={draft} onDone={onDraftDone} />}
+    </div>
+  );
+}
+
+function PinMarker({ pin, left, top, coords, selected }) {
+  const { act } = useS();
+  const [drag, setDrag] = useState(null);
+  const ref = useRef(null);
+  useEffect(() => { if (selected && ref.current) ref.current.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [selected]);
+  const down = e => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); e.preventDefault();
+    const sx = e.clientX, sy = e.clientY;
+    let moved = false;
+    const move = ev => {
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved && Math.hypot(dx, dy) < 3) return;
+      moved = true;
+      setDrag({ left: left + dx, top: top + dy });
+    };
+    const up = ev => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      if (moved) {
+        const c = coords(ev.clientX, ev.clientY);
+        act('update_pin', { pinId: pin.id, x: c.x, y: c.y }).then(() => setDrag(null));
+      } else act('set_selection', { selection: { kind: 'pin', pinId: pin.id } });
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const pos = drag || { left, top };
+  return (
+    <>
+      <div ref={ref} data-pin-id={pin.id} title={`${PIN_NAME[pin.kind]} #${pin.n}: ${firstLine(pin.body)}`}
+        className={'ac-pin' + (pin.resolved ? ' resolved' : '') + (selected ? ' selected' : '')}
+        style={{ left: pos.left, top: pos.top, pointerEvents: 'auto' }} onPointerDown={down} onClick={e => e.stopPropagation()}>
+        {pin.resolved ? '✓' : <><span className="ac-pin-n">{pin.n}</span><span className="ac-pin-kind">{PIN_GLYPH[pin.kind]}</span></>}
+      </div>
+      {selected && !drag && <PinPopover pin={pin} anchorRef={ref} />}
+    </>
+  );
+}
+
+function useAnchor(anchorRef, deps) {
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    const place = () => {
+      if (!anchorRef.current) return;
+      const r = anchorRef.current.getBoundingClientRect();
+      const left = r.right + 270 > window.innerWidth ? r.left - 268 : r.right + 8;
+      setPos({ left: Math.max(8, left), top: clamp(r.top - 6, 56, window.innerHeight - 220) });
+    };
+    place();
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
+  }, deps); // eslint-disable-line
+  return pos;
+}
+
+function PinPopover({ pin, anchorRef }) {
+  const { state, act } = useS();
+  const pos = useAnchor(anchorRef, [pin.x, pin.y, pin.id]);
+  const [body, setBody] = useState(pin.body);
+  useEffect(() => setBody(pin.body), [pin.body]);
+  if (!pos) return null;
+  return ReactDOM.createPortal(
+    <div className="ac-pop fixed z-[90] w-[260px] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-xl p-2.5 text-[12px] text-[#232220] font-ui"
+      style={pos} onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="flex items-center gap-1.5 font-semibold"><span className="w-5 h-5 rounded-full text-center leading-5 text-[11px]" style={{ background: V, color: '#F4EFE6' }}>{PIN_GLYPH[pin.kind]}</span>{PIN_NAME[pin.kind]} #{pin.n}</span>
+        <select value={pin.kind} onChange={e => act('update_pin', { pinId: pin.id, kind: e.target.value })} className="text-[11px] bg-transparent">
+          {PIN_KINDS.map(k => <option key={k} value={k}>{PIN_GLYPH[k]} {PIN_NAME[k]}</option>)}
+        </select>
+      </div>
+      <textarea value={body} rows={3} className={inputCls} onChange={e => setBody(e.target.value)}
+        onBlur={() => { if (body.trim() && body !== pin.body) act('update_pin', { pinId: pin.id, body }); }}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (body.trim() && body !== pin.body) act('update_pin', { pinId: pin.id, body }); e.currentTarget.blur(); }
+          if (e.key === 'Escape') { e.stopPropagation(); setBody(pin.body); e.currentTarget.blur(); }
+        }} />
+      <div className="text-[11px] text-[#6B665C] mt-1">{pinWhere(state.project, pin)}</div>
+      <div className="flex gap-1.5 mt-2">
+        <button type="button" className="flex-1 h-7 rounded bg-[#232220] text-[#F4EFE6] text-[12px]" onClick={() => act('update_pin', { pinId: pin.id, resolved: !pin.resolved })}>{pin.resolved ? 'Reopen' : 'Resolve'}</button>
+        <button type="button" className="h-7 px-3 rounded border border-[#DDD5C4] text-[12px] hover:text-[#D8432A]" onClick={() => act('delete_pin', { pinId: pin.id })}>Delete</button>
+      </div>
+    </div>,
+    document.body);
+}
+
+// A pin being placed: local until Enter saves it with add_pin (§10).
+function DraftPin({ draft, onDone }) {
+  const { act, ui } = useS();
+  const ref = useRef(null);
+  const [body, setBody] = useState('');
+  const pos = useAnchor(ref, [draft.left, draft.top]);
+  const save = async () => {
+    if (!body.trim()) { onDone(); return; }
+    const res = await act('add_pin', { kind: ui.pinKind, body, target: draft.target, x: draft.x, y: draft.y });
+    onDone(res);
+  };
+  return (
+    <>
+      <div ref={ref} className="ac-pin" style={{ left: draft.left, top: draft.top, opacity: .85 }}>{PIN_GLYPH[ui.pinKind]}</div>
+      {pos && ReactDOM.createPortal(
+        <div className="ac-pop fixed z-[90] w-[260px] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-xl p-2.5 text-[12px] font-ui text-[#232220]"
+          style={pos} onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          <div className="font-semibold mb-1.5">{PIN_GLYPH[ui.pinKind]} New {PIN_NAME[ui.pinKind].toLowerCase()}</div>
+          <textarea autoFocus value={body} rows={3} className={inputCls} placeholder="Type a note — Enter saves, Shift+Enter for a new line"
+            onChange={e => setBody(e.target.value)} onBlur={() => { if (!body.trim()) onDone(); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onDone(); }
+            }} />
+        </div>, document.body)}
+    </>
+  );
+}
+
+// Measures child rects (by data attribute) relative to a container, in the container's unscaled px.
+function useRects(containerRef, attr, sig) {
+  const [rects, setRects] = useState({});
+  const measure = useCallback(() => {
+    const c = containerRef.current;
+    if (!c) return;
+    const base = c.getBoundingClientRect();
+    const out = {};
+    c.querySelectorAll(`[${attr}]`).forEach(el => {
+      const r = el.getBoundingClientRect();
+      out[el.getAttribute(attr)] = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+    });
+    setRects(prev => (JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
+  }, [containerRef, attr]);
+  useLayoutEffect(() => { measure(); }, [measure, sig]);
+  useEffect(() => {
+    const c = containerRef.current;
+    if (!c || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(c);
+    window.addEventListener('resize', measure);
+    document.fonts && document.fonts.ready.then(measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [measure, containerRef]);
+  return [rects, measure];
+}
+
+// ---- Specs and grid overlays (§8.3) ----
+function SpecsOverlay({ containerRef, childId, padTop, padLeft, gap, sig }) {
+  const [labels, setLabels] = useState([]);
+  const [secW, setSecW] = useState(0);
+  const measure = useCallback(() => {
+    const sec = containerRef.current;
+    if (!sec) return;
+    const base = sec.getBoundingClientRect();
+    const k = sec.offsetWidth ? base.width / sec.offsetWidth : 1;
+    const els = childId ? [sec.querySelector(`[data-child-id="${childId}"]`)].filter(Boolean) : [...sec.querySelectorAll('[data-main]')];
+    setSecW(sec.offsetWidth);
+    setLabels(els.map(el => {
+      const r = el.getBoundingClientRect();
+      const spec = el.getAttribute('data-spec') || (el.querySelector('[data-spec]') || { getAttribute: () => '' }).getAttribute('data-spec');
+      return { x: (r.left - base.left) / k, y: (r.top - base.top) / k, w: r.width / k, h: r.height / k, text: spec };
+    }));
+  }, [containerRef, childId]);
+  useLayoutEffect(() => { measure(); }, [measure, sig]);
+  useEffect(() => {
+    const sec = containerRef.current;
+    if (!sec || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => measure()); // the frame animates its width for 150 ms
+    ro.observe(sec);
+    return () => ro.disconnect();
+  }, [measure, containerRef]);
+  const first = labels[0];
+  const topX = padLeft + 64; // clear of the block label chip
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 25 }}>
+      <div style={{ position: 'absolute', left: topX, top: 0, height: padTop, borderLeft: `1px solid ${V}` }} />
+      <SpecLabel x={topX + 4} y={Math.max(1, padTop / 2 - 7)} text={String(padTop)} />
+      <div style={{ position: 'absolute', left: 0, top: padTop + 14, width: padLeft, borderTop: `1px solid ${V}` }} />
+      <SpecLabel x={2} y={padTop + 16} text={String(padLeft)} />
+      {labels.map((l, i) => (
+        <Fragment key={i}>
+          <div style={{ position: 'absolute', left: l.x, top: l.y, width: l.w, height: l.h, outline: `1px dashed ${V}`, opacity: .7 }} />
+          <SpecLabel x={l.x + l.w + 64 < secW ? l.x + l.w + 6 : Math.max(0, l.x)} y={l.x + l.w + 64 < secW ? l.y : Math.max(0, l.y - 16)} text={l.text} />
+        </Fragment>
+      ))}
+      {first && !childId && gap > 0 && (
+        <>
+          <div style={{ position: 'absolute', left: first.x + 10, top: first.y + first.h, height: gap, borderLeft: `1px solid ${V}` }} />
+          <SpecLabel x={first.x + 14} y={first.y + first.h + gap / 2 - 7} text={`gap ${gap}`} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function GridOverlay({ bp }) {
+  const margin = bp === 'desktop' ? 24 : 16;
+  return (
+    <div data-grid-overlay="1" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20, display: 'grid', gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', columnGap: 24, padding: `0 ${margin}px` }}>
+      {Array.from({ length: 12 }).map((_, i) => <div key={i} style={{ background: 'rgba(216,67,42,.09)', borderLeft: '1px solid rgba(216,67,42,.22)', borderRight: '1px solid rgba(216,67,42,.22)' }} />)}
+    </div>
+  );
+}
+
+// ---- Phone bezel (§8.4) ----
+function Bezel({ children, flowNodes, currentId, onScreenClick }) {
+  const idx = flowNodes.findIndex(n => n.id === currentId);
+  return (
+    <div style={{ padding: 24, background: CH.stage, borderRadius: 64, boxShadow: '0 24px 60px rgba(28,27,25,.28)', flex: 'none' }}>
+      <div onClick={onScreenClick} style={{ position: 'relative', width: PHONE_W, height: PHONE_H, borderRadius: 40, overflow: 'hidden', background: '#000' }}>
+        {children}
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 28px', font: '600 15px/1 Inter, sans-serif', color: 'currentColor', pointerEvents: 'none', zIndex: 15, mixBlendMode: 'difference' }}>
+          <span style={{ color: '#fff' }}>9:41</span>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>{[5, 7, 9, 11].map(h => <span key={h} style={{ width: 3, height: h, background: '#fff', borderRadius: 1 }} />)}</span>
+            <span style={{ width: 24, height: 11, border: '1.5px solid #fff', borderRadius: 3, padding: 1.5, display: 'flex' }}><span style={{ flex: 1, background: '#fff', borderRadius: 1 }} /></span>
+          </span>
+        </div>
+        <div style={{ position: 'absolute', left: 16, right: 16, top: 48, display: 'flex', gap: 4, zIndex: 15, pointerEvents: 'none' }}>
+          {flowNodes.map((n, i) => <span key={n.id} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= idx ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.35)', mixBlendMode: 'difference' }} />)}
+        </div>
+        <div style={{ position: 'absolute', left: '50%', bottom: 9, width: 134, height: 5, marginLeft: -67, borderRadius: 3, background: '#fff', mixBlendMode: 'difference', zIndex: 15, pointerEvents: 'none' }} />
+      </div>
+    </div>
+  );
+}
+
+// ---- Storyboard (§8.2) ----
+const Thumb = memo(function Thumb({ node, tokens, channel, selected, current, pins, showPins, onDown, onDbl, ui }) {
+  const T = THUMB[channel];
+  const ref = useRef(null);
+  const [rects] = useRects(ref, 'data-block-id', node);
+  const k = channel === 'web' ? T.w / 1280 : T.h / PHONE_H;
+  const inner = channel === 'web'
+    ? <div style={{ width: 1280, transform: `scale(${k})`, transformOrigin: '0 0', pointerEvents: 'none' }}>{node.blocks.map(b => renderBlock(b, { tokens, bp: 'desktop', mode: 'thumb', nodeId: node.id }))}{!node.blocks.length && <div style={{ height: 800, background: tokens.colors.paper }} />}</div>
+    : <div style={{ width: PHONE_W, transform: `scale(${k})`, transformOrigin: '0 0', marginLeft: (T.w - PHONE_W * k) / 2, pointerEvents: 'none' }}>{renderScreen(node, { tokens, mode: 'thumb' })}</div>;
+  return (
+    <div ref={ref} data-thumb-id={node.id} onPointerDown={onDown} onDoubleClick={onDbl}
+      style={{ position: 'relative', width: T.w, height: T.h, overflow: 'hidden', background: channel === 'web' ? tokens.colors.paper : '#1A1917', cursor: 'pointer',
+        boxShadow: selected ? `0 0 0 2px ${V}` : current ? '0 0 0 2px #232220' : '0 1px 3px rgba(28,27,25,.18), 0 0 0 1px rgba(28,27,25,.08)' }}>
+      {inner}
+      {pins && pins(rects)}
+    </div>
+  );
+});
+
+function cubicAt(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+}
+
+function StoryboardView({ channel }) {
+  const { state, act, ui } = useS();
+  const p = state.project, tokens = p.tokens, v = state.view;
+  const T = THUMB[channel];
+  const boardRef = useRef(null);
+  const [drag, setDrag] = useState(null);     // {fromId, x1, y1, x2, y2}
+  const [pending, setPending] = useState(null); // {fromId, toId, x, y}
+  const [draft, setDraft] = useState(null);
+  const sel = v.selection;
+  const flows = p.flows.filter(f => f.channel === channel);
+  const lanes = [];
+  const pos = {};
+  const MARGIN = 96; // room left of the lanes for curves that enter the first column
+  const HEAD = LANE.head + 22;
+  let y = 16, maxX = 400;
+  flows.forEach(f => {
+    const nodes = laneOrder(f, p.nodes, p.edges);
+    lanes.push({ flow: f, nodes, y });
+    nodes.forEach((n, i) => { pos[n.id] = { x: MARGIN + LANE.left + i * (T.w + LANE.gap), y: y + HEAD, lane: lanes.length - 1 }; });
+    maxX = Math.max(maxX, MARGIN + LANE.left + nodes.length * (T.w + LANE.gap) + 160);
+    y += HEAD + T.h + LANE.laneGap;
+  });
+  const height = y + 20;
+  const edges = p.edges.filter(e => pos[e.fromId] && pos[e.toId]);
+  const groups = {};
+  edges.forEach(e => { const k = e.fromId + '>' + e.toId; (groups[k] = groups[k] || []).push(e.id); });
+  const geom = e => {
+    const a = pos[e.fromId], b = pos[e.toId];
+    const g = groups[e.fromId + '>' + e.toId];
+    const off = (g.indexOf(e.id) - (g.length - 1) / 2) * 14;
+    const x1 = a.x + T.w + 6, y1 = a.y + T.h / 2 + off, x2 = b.x - 6, y2 = b.y + T.h / 2 + off;
+    let c;
+    if (e.kind === 'back' || x2 < x1 + 24) {
+      // back edges and leftward edges bow through the channel below the source lane
+      // (or between the two lanes when they differ), so they read as returns.
+      const lo = Math.max(a.y, b.y), hi = Math.min(a.y, b.y);
+      const chan = a.lane === b.lane || e.kind === 'back' ? lo + T.h + LANE.laneGap * 0.55 + off : (hi + T.h + lo - HEAD) / 2 + 8 + off;
+      const reach = Math.min(110, Math.max(56, Math.abs(x2 - x1) / 3));
+      c = [x1 + reach, chan, x2 - reach, chan];
+    } else {
+      const dx = Math.max(40, (x2 - x1) / 2);
+      c = [x1 + dx, y1, x2 - dx, y2];
+    }
+    const mx = cubicAt(x1, c[0], c[2], x2, 0.5), my = cubicAt(y1, c[1], c[3], y2, 0.5);
+    return { d: `M${x1},${y1} C${c[0]},${c[1]} ${c[2]},${c[3]} ${x2},${y2}`, mx, my };
+  };
+  const toBoard = (cx, cy) => { const r = boardRef.current.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+
+  const startConnect = (e, fromId) => {
+    e.stopPropagation(); e.preventDefault();
+    const a = pos[fromId];
+    const start = { fromId, x1: a.x + T.w, y1: a.y + T.h / 2 };
+    setDrag({ ...start, x2: start.x1, y2: start.y1 });
+    const move = ev => { const q = toBoard(ev.clientX, ev.clientY); setDrag(d => d && { ...d, x2: q.x, y2: q.y }); };
+    const up = ev => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      setDrag(null);
+      const hit = document.elementsFromPoint(ev.clientX, ev.clientY).map(el => el.closest && el.closest('[data-thumb-id]')).find(Boolean);
+      const toId = hit && hit.getAttribute('data-thumb-id');
+      if (toId && toId !== fromId && pos[toId]) { const q = toBoard(ev.clientX, ev.clientY); setPending({ fromId, toId, x: q.x, y: q.y }); }
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+
+  const onThumbDown = (e, n) => {
+    if (ui.annotate) return;
+    e.stopPropagation();
+    if (e.detail === 1) act('set_selection', { selection: { kind: 'node', nodeId: n.id } });
+  };
+  const open = n => { act('set_selection', { selection: { kind: 'node', nodeId: n.id } }).then(() => act('set_view', { tab: CHANNEL_TAB[channel], view: 'page' })); };
+
+  const onAnnotate = e => {
+    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
+    e.stopPropagation(); e.preventDefault();
+    const th = e.target.closest('[data-thumb-id]');
+    if (!th) return;
+    const r = th.getBoundingClientRect();
+    const id = th.getAttribute('data-thumb-id');
+    const q = toBoard(e.clientX, e.clientY);
+    setDraft({ left: q.x, top: q.y, target: { type: 'board', nodeId: id }, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+  };
+
+  // pins on a thumbnail: board pins (fractions of the thumbnail) and node pins on their blocks
+  const thumbPins = n => rects => {
+    const items = p.pins.filter(x => (x.target.type === 'board' || x.target.type === 'node') && x.target.nodeId === n.id && pinVisible(x, state, ui));
+    if (!items.length) return null;
+    const k = channel === 'web' ? T.w / 1280 : T.h / PHONE_H;
+    const screenLeft = channel === 'web' ? 0 : (T.w - PHONE_W * k) / 2;
+    return items.map(x => {
+      let left, top;
+      if (x.target.type === 'board') { left = x.x * T.w; top = x.y * T.h; }
+      else if (x.target.blockId && rects[x.target.blockId]) { const r = rects[x.target.blockId]; left = r.x + x.x * r.w; top = r.y + x.y * r.h; }
+      else if (channel === 'web') { left = x.x * T.w; top = x.y * T.h; }
+      else { left = screenLeft + x.x * PHONE_W * k; top = x.y * T.h; }
+      return <span key={x.id} className={'ac-pin' + (x.resolved ? ' resolved' : '')} data-pin-id={x.id} title={firstLine(x.body)}
+        style={{ left: clamp(left, 11, T.w - 11), top: clamp(top, 11, T.h - 11), width: 18, height: 18, margin: '-9px 0 0 -9px', lineHeight: '18px', fontSize: 10, zIndex: 6 }}
+        onPointerDown={e => { e.stopPropagation(); act('set_selection', { selection: { kind: 'pin', pinId: x.id } }); }}>{x.resolved ? '✓' : x.n}</span>;
+    });
+  };
+
+  // board pin (selected) popovers render via an overlay marker at the same spot
+  const selPin = sel && sel.kind === 'pin' ? p.pins.find(x => x.id === sel.pinId) : null;
+  const selPinItems = selPin && selPin.target.type === 'board' && pos[selPin.target.nodeId] ? [{
+    pin: selPin, left: pos[selPin.target.nodeId].x + selPin.x * T.w, top: pos[selPin.target.nodeId].y + selPin.y * T.h,
+    coords: (cx, cy) => { const q = toBoard(cx, cy); const a = pos[selPin.target.nodeId]; return { x: clamp((q.x - a.x) / T.w, 0, 1), y: clamp((q.y - a.y) / T.h, 0, 1) }; },
+  }] : [];
+
+  return (
+    <div className="absolute inset-0 overflow-auto ac-scroll" onPointerDown={() => { if (!ui.annotate && sel && sel.kind !== 'pin') act('set_selection', { selection: null }); }}>
+      <div ref={boardRef} className={'relative ' + (ui.annotate ? 'ac-annotate' : '')} style={{ width: maxX, height, minWidth: '100%' }} onClickCapture={onAnnotate}>
+        {lanes.map(l => (
+          <div key={l.flow.id} style={{ position: 'absolute', left: 0, right: 0, top: l.y - 8, height: HEAD + T.h + 24, borderTop: '1px dashed #CFC6B5' }}>
+            <div style={{ position: 'absolute', left: MARGIN + LANE.left, top: 10, font: '600 12px/16px Inter, sans-serif', color: '#232220' }}>
+              {l.flow.name} <span style={{ fontWeight: 400, color: CH.muted }}>· {l.nodes.length} {channel === 'web' ? 'pages' : 'screens'}</span>
+            </div>
+          </div>
+        ))}
+        <svg style={{ position: 'absolute', left: 0, top: 0, width: maxX, height, overflow: 'visible', zIndex: 3, pointerEvents: 'none' }}>
+          <defs>
+            {[['ink', tokens.colors.ink], ['v', V]].map(([k, c]) => (
+              <marker key={k} id={'sb-arrow-' + k} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>
+            ))}
+          </defs>
+          {edges.map(e => {
+            const g = geom(e);
+            const cross = e.kind === 'cross';
+            const on = sel && sel.kind === 'edge' && sel.edgeId === e.id;
+            const color = cross ? V : tokens.colors.ink;
+            return (
+              <g key={e.id} data-edge-id={e.id}>
+                {on && <path d={g.d} fill="none" stroke={V} strokeOpacity=".25" strokeWidth="7" />}
+                <path d={g.d} fill="none" stroke={color} strokeWidth={cross ? 2 : 1.5} strokeDasharray={e.kind === 'alt' ? '6 4' : e.kind === 'back' ? '2 4' : undefined} markerEnd={`url(#sb-arrow-${cross ? 'v' : 'ink'})`} />
+                {/* SPEC: §9.3 edge hit test — a 12px transparent stroke gives the same 6px tolerance natively */}
+                <path d={g.d} fill="none" stroke="transparent" strokeWidth="12" style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+                  onPointerDown={ev => { ev.stopPropagation(); act('set_selection', { selection: { kind: 'edge', edgeId: e.id } }); }} />
+                <g transform={`translate(${g.mx},${g.my})`} style={{ pointerEvents: 'all', cursor: 'pointer' }} onPointerDown={ev => { ev.stopPropagation(); act('set_selection', { selection: { kind: 'edge', edgeId: e.id } }); }}>
+                  <rect x={-(e.label.length * 3.1 + 7)} y="-8" width={e.label.length * 6.2 + 14} height="16" rx="8" fill={on ? V : '#FBF8F2'} stroke={cross ? V : '#CFC6B5'} />
+                  <text textAnchor="middle" y="3.5" style={{ font: '500 10px Inter, sans-serif' }} fill={on ? '#F4EFE6' : cross ? V : '#232220'}>{e.label}</text>
+                </g>
+              </g>
+            );
+          })}
+          {drag && <path d={`M${drag.x1},${drag.y1} C${drag.x1 + 60},${drag.y1} ${drag.x2 - 60},${drag.y2} ${drag.x2},${drag.y2}`} fill="none" stroke={V} strokeWidth="2" strokeDasharray="5 4" />}
+        </svg>
+        {lanes.map(l => l.nodes.map(n => {
+          const a = pos[n.id];
+          const isStart = l.flow.startId === n.id;
+          return (
+            <div key={n.id} style={{ position: 'absolute', left: a.x, top: a.y, zIndex: 2 }}>
+              <div style={{ position: 'absolute', left: 0, top: -17, font: '500 11px/14px Inter, sans-serif', color: '#232220', whiteSpace: 'nowrap', maxWidth: T.w, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {isStart && <span style={{ color: V }} title="Start">★ </span>}{n.name}
+              </div>
+              <Thumb node={n} tokens={tokens} channel={channel} ui={ui}
+                selected={!!(sel && sel.kind === 'node' && sel.nodeId === n.id)} current={v.currentNodeId[channel] === n.id}
+                onDown={e => onThumbDown(e, n)} onDbl={() => open(n)} pins={thumbPins(n)} />
+              <span title="Input" style={{ position: 'absolute', left: -6, top: T.h / 2 - 6, width: 12, height: 12, borderRadius: 6, background: '#FBF8F2', border: '2px solid #232220', zIndex: 4 }} />
+              <span title="Drag to connect" onPointerDown={e => startConnect(e, n.id)}
+                style={{ position: 'absolute', right: -7, top: T.h / 2 - 7, width: 14, height: 14, borderRadius: 7, background: V, border: '2px solid #FBF8F2', zIndex: 4, cursor: 'crosshair', boxShadow: '0 0 0 1px ' + V }} />
+            </div>
+          );
+        }))}
+        {pending && (
+          <div style={{ position: 'absolute', left: pending.x, top: pending.y, zIndex: 50 }} onPointerDown={e => e.stopPropagation()}>
+            <EdgeLabelInput onDone={label => { const pd = pending; setPending(null); if (label != null) act('upsert_edge', { fromId: pd.fromId, toId: pd.toId, label }); }} />
+          </div>
+        )}
+        <PinsLayer items={selPinItems} draft={draft} onDraftDone={() => setDraft(null)} />
+      </div>
+    </div>
+  );
+}
+
+function EdgeLabelInput({ onDone }) {
+  const [d, setD] = useState('Link');
+  const ref = useRef(null);
+  const done = useRef(false);
+  const finish = val => { if (done.current) return; done.current = true; onDone(val); };
+  useEffect(() => { ref.current.focus(); ref.current.select(); }, []);
+  return (
+    <div className="bg-[#FBF8F2] border border-[#D8432A] rounded shadow-lg p-1.5 flex items-center gap-1.5 font-ui">
+      <input ref={ref} value={d} onChange={e => setD(e.target.value)} className="w-40 h-6 px-1.5 rounded border border-[#DDD5C4] text-[12px] outline-none"
+        onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') finish(d.trim() || 'Link'); if (e.key === 'Escape') finish(null); }}
+        onBlur={() => finish(null)} />
+      <span className="text-[10px] text-[#6B665C]">Enter ↵</span>
+    </div>
+  );
+}
+
+// ---- Preview / Play (§8.7) ----
+function PreviewStage({ navRef }) {
+  const { state, act } = useS();
+  const p = state.project, v = state.view;
+  const mobile = v.tab === 'story';
+  const startId = useMemo(() => {
+    if (!mobile) return v.currentNodeId.web;
+    const cur = findNode(p, v.currentNodeId.mobile);
+    const f = cur && findFlow(p, cur.flowId);
+    return (f && f.startId) || v.currentNodeId.mobile;
+  }, []); // eslint-disable-line
+  const [stack, setStack] = useState([startId]);
+  const curId = stack[stack.length - 1];
+  const node = findNode(p, curId) || findNode(p, startId);
+  const go = useCallback(toId => { if (toId && findNode(p, toId)) setStack(s => [...s, toId]); }, [p]);
+  const back = useCallback(() => setStack(s => (s.length > 1 ? s.slice(0, -1) : s)), []);
+  const exit = () => act('set_preview', { on: false });
+  useEffect(() => {
+    navRef.current = {
+      back,
+      forward: () => { const e = node && p.edges.find(x => x.fromId === node.id && x.kind === 'primary'); if (e) go(e.toId); },
+    };
+    return () => { navRef.current = null; };
+  });
+  if (!node) return <div className="fixed inset-0 z-[100] flex items-center justify-center text-[#F4EFE6]" style={{ background: CH.stage }}>Nothing to preview. <button className="underline ml-2" onClick={exit}>Exit</button></div>;
+  let stage;
+  if (!mobile) {
+    const w = BREAKPOINTS[v.breakpoint];
+    stage = (
+      <div className="absolute inset-0 overflow-auto ac-scroll" key={node.id}>
+        <div className="ac-preview ac-fade mx-auto my-8 shadow-2xl" style={{ width: w, background: p.tokens.colors.paper }}>
+          {node.blocks.map(b => renderBlock(b, { tokens: p.tokens, bp: v.breakpoint, mode: 'preview', nodeId: node.id, onNavigate: go }))}
+        </div>
+      </div>
+    );
+  } else {
+    const flow = findFlow(p, node.flowId);
+    const fnodes = flow ? laneOrder(flow, p.nodes, p.edges) : [node];
+    const tapBack = e => {
+      if (e.target.closest('[data-hotspot],[data-cta]')) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      if (e.clientX - r.left < r.width * 0.25) back();
+    };
+    stage = (
+      <div className="absolute inset-0 overflow-auto ac-scroll flex items-start justify-center py-8">
+        <Bezel flowNodes={fnodes} currentId={node.id} onScreenClick={tapBack}>
+          <div key={node.id} className="ac-fade ac-preview" style={{ position: 'absolute', inset: 0 }}>
+            {renderScreen(node, { tokens: p.tokens, mode: 'preview', onTap: go })}
+          </div>
+        </Bezel>
+      </div>
+    );
+  }
+  return (
+    <div className="fixed inset-0 z-[100]" style={{ background: CH.stage }}>
+      {stage}
+      <div className="fixed left-1/2 -translate-x-1/2 bottom-5 z-[101] flex items-center gap-2 h-9 pl-2 pr-1.5 rounded-full bg-[#F4EFE6] text-[#232220] shadow-xl text-[12px]">
+        <button type="button" title="Back" disabled={stack.length < 2} onClick={back} className="w-7 h-7 rounded-full hover:bg-[#E9E2D4]">←</button>
+        <span><b>{mobile ? 'Play' : 'Preview'}</b> · {node.name} · Esc to exit</span>
+        <button type="button" title="Exit (Esc)" onClick={exit} className="w-7 h-7 rounded-full hover:bg-[#E9E2D4] text-[15px]">×</button>
+      </div>
+    </div>
+  );
+}
+
+// ===== Section 7: Editors =====
+function useLatest(v) { const r = useRef(v); r.current = v; return r; }
+
+function WebEditor() {
+  const { state } = useS();
+  const v = state.view;
+  if (v.view.web === 'board') return <StoryboardView channel="web" />;
+  const node = findNode(state.project, v.currentNodeId.web);
+  if (!node) return <Empty text="No web pages. Create a flow from the Outline." />;
+  return <WebPage node={node} />;
+}
+
+function WebPage({ node }) {
+  const { state, act, ui } = useS();
+  const p = state.project, v = state.view, bp = v.breakpoint;
+  const frameRef = useRef(null), scrollRef = useRef(null);
+  const stRef = useLatest(state);
+  const [drop, setDrop] = useState(null); // {index, y}
+  const [draft, setDraft] = useState(null);
+  const [rects] = useRects(frameRef, 'data-block-id', JSON.stringify([node, bp, p.tokens]));
+  const sel = v.selection;
+
+  const onSelect = useCallback((nodeId, blockId, childId) => {
+    const s = stRef.current.view.selection;
+    if (childId && s && s.kind === 'block' && s.blockId === blockId && s.childId === childId) childId = null;
+    act('set_selection', { selection: childId ? { kind: 'block', nodeId, blockId, childId } : { kind: 'block', nodeId, blockId } });
+  }, [act, stRef]);
+
+  // drag the block chip to reorder (one history step on release)
+  const onChipDown = useCallback((e, blockId) => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const n = findNode(stRef.current.project, node.id);
+    const ids = n.blocks.map(b => b.id);
+    const from = ids.indexOf(blockId);
+    let index = from;
+    const move = ev => {
+      const fr = frame.getBoundingClientRect();
+      const secs = [...frame.querySelectorAll('section[data-block-id]')];
+      let i = secs.length, y = 0;
+      for (let k = 0; k < secs.length; k++) { const r = secs[k].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { i = k; break; } }
+      if (i < secs.length) y = secs[i].getBoundingClientRect().top - fr.top; else if (secs.length) y = secs[secs.length - 1].getBoundingClientRect().bottom - fr.top;
+      index = i;
+      setDrop({ index: i, y });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      setDrop(null);
+      let to = index > from ? index - 1 : index;
+      if (to !== from && to >= 0) {
+        const next = ids.filter(x => x !== blockId);
+        next.splice(to, 0, blockId);
+        act('reorder_blocks', { nodeId: node.id, blockIds: next });
+      }
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }, [act, node.id, stRef]);
+
+  useEffect(() => {
+    if (sel && sel.kind === 'block' && sel.nodeId === node.id && frameRef.current) {
+      const el = frameRef.current.querySelector(`[data-block-id="${sel.blockId}"]`);
+      if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [sel && sel.blockId, node.id]); // eslint-disable-line
+
+  const onAnnotate = e => {
+    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
+    e.stopPropagation(); e.preventDefault();
+    const fr = frameRef.current.getBoundingClientRect();
+    const sec = e.target.closest('[data-block-id]');
+    const box = (sec || frameRef.current).getBoundingClientRect();
+    const target = sec ? { type: 'node', nodeId: node.id, blockId: sec.getAttribute('data-block-id') } : { type: 'node', nodeId: node.id };
+    setDraft({ left: e.clientX - fr.left, top: e.clientY - fr.top, target, x: (e.clientX - box.left) / box.width, y: (e.clientY - box.top) / box.height });
+  };
+
+  const frameW = frameRef.current ? frameRef.current.offsetWidth : BREAKPOINTS[bp];
+  const frameH = frameRef.current ? frameRef.current.offsetHeight : 0;
+  const pinItems = p.pins.filter(x => x.target.type === 'node' && x.target.nodeId === node.id && pinVisible(x, state, ui)).map(x => {
+    const r = x.target.blockId && rects[x.target.blockId];
+    const box = r || { x: 0, y: 0, w: frameW, h: frameH };
+    return {
+      pin: x, left: box.x + x.x * box.w, top: box.y + x.y * box.h,
+      coords: (cx, cy) => {
+        const fr = frameRef.current.getBoundingClientRect();
+        const rr = (x.target.blockId && rects[x.target.blockId]) || { x: 0, y: 0, w: fr.width, h: fr.height };
+        return { x: clamp((cx - fr.left - rr.x) / rr.w, 0, 1), y: clamp((cy - fr.top - rr.y) / rr.h, 0, 1) };
+      },
+    };
+  }).filter(it => it.pin.target.blockId ? rects[it.pin.target.blockId] : true);
+
+  const ctx = { tokens: p.tokens, bp, mode: 'edit', nodeId: node.id, selection: sel, onSelect, showSpecs: v.showSpecs, onChipDown };
+  return (
+    <div ref={scrollRef} className="absolute inset-0 overflow-auto ac-scroll" onClick={() => { if (sel && !ui.annotate) act('set_selection', { selection: null }); }}>
+      <div className="py-8 px-6 min-w-max">
+        <div className="text-[11px] text-[#6B665C] mb-2 mx-auto flex justify-between" style={{ width: BREAKPOINTS[bp] }}>
+          <span>{(findFlow(p, node.flowId) || {}).name} › <b className="text-[#232220]">{node.name}</b></span><span>{BREAKPOINTS[bp]}px</span>
+        </div>
+        <div ref={frameRef} className={'ac-frame ac-edit relative mx-auto shadow-[0_10px_40px_rgba(28,27,25,.18)] ' + (ui.annotate ? 'ac-annotate' : '')}
+          style={{ width: BREAKPOINTS[bp], background: p.tokens.colors.paper, minHeight: 240 }}
+          onClickCapture={onAnnotate} onClick={e => { e.stopPropagation(); if (!ui.annotate) act('set_selection', { selection: { kind: 'node', nodeId: node.id } }); }}>
+          {node.blocks.map(b => renderBlock(b, ctx))}
+          {!node.blocks.length && <div className="h-60 flex items-center justify-center text-[13px] font-ui text-[#6B665C]">Empty page — add blocks from the Palette.</div>}
+          {v.showGrid && <GridOverlay bp={bp} />}
+          {drop && <div style={{ position: 'absolute', left: 0, right: 0, top: drop.y - 1, height: 2, background: V, zIndex: 35 }} />}
+          <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoryEditor() {
+  const { state } = useS();
+  const v = state.view;
+  if (v.view.story === 'board') return <StoryboardView channel="mobile" />;
+  const node = findNode(state.project, v.currentNodeId.mobile);
+  if (!node) return <Empty text="No mobile screens. Create a flow from the Outline." />;
+  return <StoryPage node={node} />;
+}
+
+function StoryPage({ node }) {
+  const { state, act, ui } = useS();
+  const p = state.project, v = state.view, sel = v.selection;
+  const flow = findFlow(p, node.flowId);
+  const fnodes = flow ? laneOrder(flow, p.nodes, p.edges) : [node];
+  const screenRef = useRef(null);
+  const [draft, setDraft] = useState(null);
+  const [dragId, setDragId] = useState(null);
+  const onSelect = useCallback((nodeId, hotspotId) => {
+    act('set_selection', { selection: hotspotId ? { kind: 'hotspot', nodeId, hotspotId } : { kind: 'node', nodeId } });
+  }, [act]);
+  const onHotspotEdit = useCallback((nodeId, hotspotId, g) => act('upsert_hotspot', { nodeId, hotspotId, ...g }), [act]);
+  const onAnnotate = e => {
+    if (!ui.annotate || e.target.closest('.ac-pin, .ac-pop')) return;
+    e.stopPropagation(); e.preventDefault();
+    const r = screenRef.current.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    if (x < 0 || y < 0 || x > 1 || y > 1) return;
+    setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target: { type: 'node', nodeId: node.id }, x, y });
+  };
+  const pinItems = p.pins.filter(x => x.target.type === 'node' && x.target.nodeId === node.id && pinVisible(x, state, ui)).map(x => ({
+    pin: x, left: x.x * PHONE_W, top: x.y * PHONE_H,
+    coords: (cx, cy) => { const r = screenRef.current.getBoundingClientRect(); return { x: clamp((cx - r.left) / r.width, 0, 1), y: clamp((cy - r.top) / r.height, 0, 1) }; },
+  }));
+  const specsSig = JSON.stringify([node, p.tokens.type]);
+  const reorder = (fromId, toId) => {
+    if (!flow || fromId === toId) return;
+    const ids = fnodes.map(n => n.id).filter(id => id !== fromId);
+    ids.splice(ids.indexOf(toId), 0, fromId);
+    act('reorder_nodes', { flowId: flow.id, nodeIds: ids });
+  };
+  return (
+    <div className="absolute inset-0 overflow-auto ac-scroll" onClick={() => { if (sel && !ui.annotate) act('set_selection', { selection: null }); }}>
+      <div className="py-6 flex flex-col items-center gap-5 min-w-max px-6">
+        <div className="text-[11px] text-[#6B665C]">{flow ? flow.name : ''} › <b className="text-[#232220]">{node.name}</b></div>
+        <Bezel flowNodes={fnodes} currentId={node.id}>
+          <div ref={screenRef} className={'ac-edit ' + (ui.annotate ? 'ac-annotate' : '')} style={{ position: 'absolute', inset: 0 }} onClickCapture={onAnnotate}>
+            {renderScreen(node, { tokens: p.tokens, mode: 'edit', selection: sel, onSelect, onHotspotEdit })}
+            {sel && sel.nodeId === node.id && (sel.kind === 'node' || sel.kind === 'hotspot') && <div style={{ position: 'absolute', inset: 0, boxShadow: `inset 0 0 0 2px ${V}`, pointerEvents: 'none', zIndex: 12, borderRadius: 40 }} />}
+            {v.showSpecs && <SpecsOverlay containerRef={screenRef} childId={null} padTop={SPACE[node.pad]} padLeft={SPACE[node.pad]} gap={SPACE[node.gap]} sig={specsSig} />}
+            <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
+          </div>
+        </Bezel>
+        <div className="flex items-start gap-2 pb-6" onClick={e => e.stopPropagation()}>
+          {fnodes.map(n => (
+            <div key={n.id} draggable onDragStart={() => setDragId(n.id)} onDragEnd={() => setDragId(null)}
+              onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragId) reorder(dragId, n.id); setDragId(null); }}
+              onClick={() => act('set_selection', { selection: { kind: 'node', nodeId: n.id } })} title={n.name}
+              className="flex flex-col items-center gap-1 cursor-pointer">
+              <div style={{ width: 60, height: 130, overflow: 'hidden', borderRadius: 6, boxShadow: n.id === node.id ? `0 0 0 2px ${V}` : '0 0 0 1px #CFC6B5', opacity: dragId === n.id ? 0.4 : 1, background: '#000' }}>
+                <div style={{ transform: `scale(${60 / PHONE_W})`, transformOrigin: '0 0', width: PHONE_W, pointerEvents: 'none' }}>{renderScreen(n, { tokens: p.tokens, mode: 'thumb' })}</div>
+              </div>
+              <span className="text-[10px] max-w-[64px] truncate">{flow && flow.startId === n.id ? '★ ' : ''}{n.name}</span>
+            </div>
+          ))}
+          <button type="button" title="Add a screen to this flow" onClick={() => flow && act('upsert_node', { flowId: flow.id })}
+            className="w-[60px] h-[130px] rounded-md border-2 border-dashed border-[#CFC6B5] text-[22px] text-[#6B665C] hover:border-[#232220] hover:text-[#232220]">+</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Draw (§8.5) ----
+function shapeBox(s, tokens) {
+  if (s.type === 'rect' || s.type === 'ellipse') return { x: s.x, y: s.y, w: s.w, h: s.h };
+  if (s.type === 'line' || s.type === 'arrow') return { x: Math.min(s.x1, s.x2), y: Math.min(s.y1, s.y2), w: Math.abs(s.x2 - s.x1), h: Math.abs(s.y2 - s.y1) };
+  if (s.type === 'text') { const t = tokens.type[s.role] || tokens.type.md; return { x: s.x, y: s.y - t.size * 0.82, w: Math.max(8, s.text.length * t.size * 0.52), h: t.lh }; }
+  const xs = s.points.map(q => q[0]), ys = s.points.map(q => q[1]);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+function DrawShape({ s, tokens }) {
+  const stroke = col(tokens, s.stroke);
+  if (s.type === 'rect') return <rect x={s.x} y={s.y} width={s.w} height={s.h} stroke={stroke} fill={col(tokens, s.fill)} strokeWidth={s.sw} />;
+  if (s.type === 'ellipse') return <ellipse cx={s.x + s.w / 2} cy={s.y + s.h / 2} rx={s.w / 2} ry={s.h / 2} stroke={stroke} fill={col(tokens, s.fill)} strokeWidth={s.sw} />;
+  if (s.type === 'line' || s.type === 'arrow') return <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={stroke} strokeWidth={s.sw} strokeLinecap="round" markerEnd={s.type === 'arrow' ? `url(#ah-${s.stroke})` : undefined} />;
+  // SPEC: a text shape's (x, y) is its baseline, matching the SVG export.
+  if (s.type === 'text') { const t = tokens.type[s.role] || tokens.type.md; return <text x={s.x} y={s.y} fill={col(tokens, s.ink)} style={{ fontFamily: SERIF, fontSize: t.size, fontWeight: t.weight }}>{s.text}</text>; }
+  return <polyline points={s.points.map(q => q.join(',')).join(' ')} fill="none" stroke={stroke} strokeWidth={s.sw} strokeLinecap="round" strokeLinejoin="round" />;
+}
+
+function moveShape(s, dx, dy, snapOn) {
+  if (s.type === 'line' || s.type === 'arrow') {
+    const nx = snap(s.x1 + dx, snapOn), ny = snap(s.y1 + dy, snapOn);
+    const ddx = nx - s.x1, ddy = ny - s.y1;
+    return { ...s, x1: nx, y1: ny, x2: s.x2 + ddx, y2: s.y2 + ddy };
+  }
+  if (s.type === 'pen') return { ...s, points: s.points.map(q => [q[0] + dx, q[1] + dy]) }; // pen never snaps
+  return { ...s, x: snap(s.x + dx, snapOn), y: snap(s.y + dy, snapOn) };
+}
+const geomPatch = s => (s.type === 'line' || s.type === 'arrow') ? { x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2 }
+  : s.type === 'pen' ? { points: s.points } : s.type === 'text' ? { x: s.x, y: s.y } : { x: s.x, y: s.y, w: s.w, h: s.h };
+
+function DrawEditor({ spaceHeld }) {
+  const { state, act, ui, drawView: view, setDrawView } = useS();
+  const p = state.project, tokens = p.tokens, sel = state.view.selection;
+  const svgRef = useRef(null);
+  const [creating, setCreating] = useState(null);
+  const [override, setOverride] = useState(null); // shape being moved/resized (local until release)
+  const [textAt, setTextAt] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const viewRef = useLatest(view);
+  const tool = spaceHeld ? 'pan' : ui.drawTool;
+  const selShape = sel && sel.kind === 'shape' ? p.draw.shapes.find(s => s.id === sel.shapeId) : null;
+
+  const toWorld = (cx, cy) => { const r = svgRef.current.getBoundingClientRect(), vw = viewRef.current; return { x: (cx - r.left - vw.x) / vw.zoom, y: (cy - r.top - vw.y) / vw.zoom }; };
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const wheel = e => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      setDrawView(vw => {
+        const z = clamp(vw.zoom * Math.exp(-e.deltaY * 0.0015), 0.25, 4);
+        const wx = (mx - vw.x) / vw.zoom, wy = (my - vw.y) / vw.zoom;
+        return { x: mx - wx * z, y: my - wy * z, zoom: z };
+      }, true);
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => el.removeEventListener('wheel', wheel);
+  }, [setDrawView]);
+
+  const track = (onMove, onUp) => {
+    const move = ev => onMove(ev);
+    const up = ev => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onUp(ev); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+
+  const onDown = e => {
+    if (e.button !== 0 || textAt) return;
+    const w = toWorld(e.clientX, e.clientY);
+    if (ui.annotate) {
+      const r = svgRef.current.getBoundingClientRect();
+      setDraft({ left: e.clientX - r.left, top: e.clientY - r.top, target: { type: 'draw' }, x: Math.round(w.x), y: Math.round(w.y) });
+      return;
+    }
+    if (tool === 'pan') {
+      const sx = e.clientX, sy = e.clientY, o = viewRef.current;
+      track(ev => setDrawView(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy })), () => setDrawView(vw => vw, true));
+      return;
+    }
+    if (tool === 'select') { if (sel) act('set_selection', { selection: null }); return; }
+    const snapOn = !e.altKey;
+    const sx = snap(w.x, snapOn), sy = snap(w.y, snapOn);
+    if (tool === 'text') { setTextAt({ x: sx, y: sy }); return; }
+    if (tool === 'pen') {
+      let pts = [[Math.round(w.x * 10) / 10, Math.round(w.y * 10) / 10]];
+      let lastScreen = [e.clientX, e.clientY];
+      setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
+      track(ev => {
+        if (Math.hypot(ev.clientX - lastScreen[0], ev.clientY - lastScreen[1]) < 2) return;
+        lastScreen = [ev.clientX, ev.clientY];
+        const q = toWorld(ev.clientX, ev.clientY);
+        pts = [...pts, [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10]];
+        setCreating({ type: 'pen', points: pts, stroke: 'ink', sw: 2 });
+      }, () => {
+        const simp = pts.filter((q, i) => i === 0 || i === pts.length - 1 || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) >= 1.5);
+        setCreating(null);
+        if (simp.length >= 2) act('add_shape', { shape: { type: 'pen', points: simp, stroke: 'ink', sw: 2 } });
+      });
+      return;
+    }
+    const make = (ev, alt) => {
+      const q = toWorld(ev.clientX, ev.clientY);
+      const ex = snap(q.x, !alt), ey = snap(q.y, !alt);
+      if (tool === 'line' || tool === 'arrow') return { type: tool, x1: sx, y1: sy, x2: ex, y2: ey, stroke: 'ink', sw: 1.5 };
+      return { type: tool, x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy), stroke: 'ink', fill: 'none', sw: 1.5 };
+    };
+    let last = make(e, e.altKey);
+    setCreating(last);
+    track(ev => { last = make(ev, ev.altKey); setCreating(last); }, () => {
+      setCreating(null);
+      const big = last.type === 'line' || last.type === 'arrow' ? Math.hypot(last.x2 - last.x1, last.y2 - last.y1) > 2 : last.w > 2 && last.h > 2;
+      if (big) act('add_shape', { shape: last });
+    });
+  };
+
+  const onShapeDown = (e, s) => {
+    if (ui.annotate || tool !== 'select' || e.button !== 0) return;
+    e.stopPropagation();
+    if (!sel || sel.shapeId !== s.id) act('set_selection', { selection: { kind: 'shape', shapeId: s.id } });
+    const start = toWorld(e.clientX, e.clientY);
+    let cur = s, moved = false;
+    track(ev => {
+      const q = toWorld(ev.clientX, ev.clientY);
+      const dx = q.x - start.x, dy = q.y - start.y;
+      if (!moved && Math.hypot(dx, dy) * viewRef.current.zoom < 3) return;
+      moved = true;
+      cur = moveShape(s, dx, dy, !ev.altKey);
+      setOverride(cur);
+    }, () => {
+      if (moved) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null));
+      else setOverride(null);
+    });
+  };
+
+  const onHandleDown = (e, s, h) => {
+    e.stopPropagation();
+    let cur = s;
+    track(ev => {
+      const q = toWorld(ev.clientX, ev.clientY);
+      const x = snap(q.x, !ev.altKey), y = snap(q.y, !ev.altKey);
+      if (s.type === 'line' || s.type === 'arrow') cur = h === 'p1' ? { ...s, x1: x, y1: y } : { ...s, x2: x, y2: y };
+      else {
+        let x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+        if (h.includes('w')) x1 = x; if (h.includes('e')) x2 = x; if (h.includes('n')) y1 = y; if (h.includes('s')) y2 = y;
+        cur = { ...s, x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.max(1, Math.abs(x2 - x1)), h: Math.max(1, Math.abs(y2 - y1)) };
+      }
+      setOverride(cur);
+    }, () => { if (cur !== s) act('update_shape', { shapeId: s.id, patch: geomPatch(cur) }).then(() => setOverride(null)); else setOverride(null); });
+  };
+
+  const shapes = p.draw.shapes.map(s => (override && override.id === s.id ? override : s));
+  const shown = selShape ? (override && override.id === selShape.id ? override : selShape) : null;
+  const hs = 8 / view.zoom;
+  const handles = [];
+  if (shown && tool === 'select' && !ui.annotate) {
+    if (shown.type === 'rect' || shown.type === 'ellipse') {
+      const { x, y, w, h } = shown;
+      [['nw', x, y], ['n', x + w / 2, y], ['ne', x + w, y], ['e', x + w, y + h / 2], ['se', x + w, y + h], ['s', x + w / 2, y + h], ['sw', x, y + h], ['w', x, y + h / 2]]
+        .forEach(([k, hx, hy]) => handles.push(<rect key={k} x={hx - hs / 2} y={hy - hs / 2} width={hs} height={hs} fill="#FBF8F2" stroke={V} strokeWidth={1.5 / view.zoom} style={{ cursor: k.length === 2 ? (k === 'nw' || k === 'se' ? 'nwse-resize' : 'nesw-resize') : k === 'n' || k === 's' ? 'ns-resize' : 'ew-resize' }} onPointerDown={e => onHandleDown(e, shown, k)} />));
+    } else if (shown.type === 'line' || shown.type === 'arrow') {
+      [['p1', shown.x1, shown.y1], ['p2', shown.x2, shown.y2]].forEach(([k, hx, hy]) => handles.push(<circle key={k} cx={hx} cy={hy} r={hs / 2 + 1 / view.zoom} fill="#FBF8F2" stroke={V} strokeWidth={1.5 / view.zoom} style={{ cursor: 'move' }} onPointerDown={e => onHandleDown(e, shown, k)} />));
+    }
+  }
+  const box = shown && shapeBox(shown, tokens);
+  const dot = 8 * view.zoom >= 6 ? 8 : 32;
+  const pinItems = p.pins.filter(x => x.target.type === 'draw' && pinVisible(x, state, ui)).map(x => ({
+    pin: x, left: view.x + x.x * view.zoom, top: view.y + x.y * view.zoom,
+    coords: (cx, cy) => { const q = toWorld(cx, cy); return { x: Math.round(q.x), y: Math.round(q.y) }; },
+  }));
+  const cursor = ui.annotate ? 'crosshair' : tool === 'pan' ? 'grab' : tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      <svg ref={svgRef} data-draw-canvas="1" width="100%" height="100%" style={{ display: 'block', background: tokens.colors.paper, cursor, touchAction: 'none' }} onPointerDown={onDown}>
+        <defs>
+          <pattern id="dotgrid" width={dot * view.zoom} height={dot * view.zoom} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
+            <circle cx={0.8} cy={0.8} r={0.8} fill="#CFC6B5" />
+          </pattern>
+          {COLOR_KEYS.map(k => (
+            <marker key={k} id={'ah-' + k} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={tokens.colors[k]} /></marker>
+          ))}
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dotgrid)" />
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
+          {shapes.map(s => (
+            <g key={s.id} data-shape-id={s.id} onPointerDown={e => onShapeDown(e, s)} style={{ cursor: tool === 'select' && !ui.annotate ? 'move' : undefined }}>
+              <DrawShape s={s} tokens={tokens} />
+              {(s.type === 'line' || s.type === 'arrow' || s.type === 'pen') && (
+                s.type === 'pen'
+                  ? <polyline points={s.points.map(q => q.join(',')).join(' ')} fill="none" stroke="transparent" strokeWidth={10 / view.zoom} />
+                  : <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="transparent" strokeWidth={10 / view.zoom} />
+              )}
+              {s.type === 'text' && (() => { const b = shapeBox(s, tokens); return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="transparent" />; })()}
+              {(s.type === 'rect' || s.type === 'ellipse') && s.fill === 'none' && <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="transparent" stroke="none" />}
+            </g>
+          ))}
+          {creating && <g opacity=".85"><DrawShape s={creating} tokens={tokens} /></g>}
+          {box && <rect x={box.x - 4 / view.zoom} y={box.y - 4 / view.zoom} width={box.w + 8 / view.zoom} height={box.h + 8 / view.zoom} fill="none" stroke={V} strokeWidth={1 / view.zoom} strokeDasharray={`${4 / view.zoom} ${3 / view.zoom}`} pointerEvents="none" />}
+          {handles}
+          {textAt && (
+            <foreignObject x={textAt.x} y={textAt.y - tokens.type.md.lh} width={420} height={tokens.type.md.lh + 8}>
+              <TextPlacer onDone={text => { const at = textAt; setTextAt(null); if (text) act('add_shape', { shape: { type: 'text', x: at.x, y: at.y, text, role: 'md', ink: 'ink' } }); }} tokens={tokens} />
+            </foreignObject>
+          )}
+        </g>
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <PinsLayer items={pinItems} draft={draft} onDraftDone={() => setDraft(null)} />
+      </div>
+      <div className="absolute left-3 bottom-3 text-[11px] text-[#6B665C] bg-[#FBF8F2]/90 px-2 py-1 rounded border border-[#DDD5C4] pointer-events-none">
+        {tool[0].toUpperCase() + tool.slice(1)} · {Math.round(view.zoom * 100)}% · snap 8px (Alt frees)
+      </div>
+    </div>
+  );
+}
+
+function TextPlacer({ onDone, tokens }) {
+  const [d, setD] = useState('');
+  const done = useRef(false);
+  const finish = v => { if (done.current) return; done.current = true; onDone(v); };
+  const t = tokens.type.md;
+  return (
+    <input autoFocus value={d} placeholder="Type, then Enter" onChange={e => setD(e.target.value)} onPointerDown={e => e.stopPropagation()}
+      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') finish(d.trim()); if (e.key === 'Escape') finish(''); }}
+      onBlur={() => finish(d.trim())}
+      style={{ width: 400, height: t.lh + 4, font: `${t.weight} ${t.size}px ${SERIF}`, background: 'rgba(251,248,242,.9)', border: `1px dashed ${V}`, outline: 'none', padding: '0 2px', color: tokens.colors.ink }} />
+  );
+}
+
+// ---- DESIGN.md (§8.6) ----
+function DesignDoc() {
+  const { state, act, docRef } = useS();
+  const md = state.project.doc.markdown;
+  const d = useDraft(md, (val, o) => act('set_doc', { markdown: val }, o), 'doc');
+  const ta = useRef(null), pv = useRef(null);
+  useEffect(() => { docRef.current.textarea = ta.current; docRef.current.preview = pv.current; });
+  const onKeyDown = e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const el = e.currentTarget, s = el.selectionStart, en = el.selectionEnd;
+      d.onChange(d.draft.slice(0, s) + '  ' + d.draft.slice(en));
+      requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = s + 2; });
+    }
+  };
+  return (
+    <div className="absolute inset-0 flex">
+      <textarea ref={ta} value={d.draft} spellCheck={false} onChange={e => d.onChange(e.target.value)} onFocus={d.onFocus} onBlur={d.onBlur} onKeyDown={onKeyDown}
+        className="w-1/2 h-full resize-none border-0 border-r border-[#DDD5C4] bg-[#FBF8F2] p-6 outline-none ac-scroll"
+        style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, lineHeight: '20px', color: '#232220' }} />
+      <div ref={pv} className="w-1/2 h-full overflow-auto ac-scroll bg-[#F4EFE6]">
+        <div className="md font-serif px-10 py-8 text-[17px] leading-[27px] text-[#1C1B19]" style={{ maxWidth: 720 }}>{renderMd(d.draft)}</div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Section 8: App =====
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { console.warn('AgentCanvas UI error', error, info && info.componentStack); }
+  reset = async () => {
+    if (!window.confirm('Reset the project to the Hearth seed? Your current project is replaced.')) return;
+    try { await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'reset_project', payload: {} }) }); } catch (e) { /* reload anyway */ }
+    window.location.reload();
+  };
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="h-full flex items-center justify-center bg-[#E7E0D2] font-ui">
+        <div className="max-w-[480px] bg-[#FBF8F2] border border-[#DDD5C4] rounded p-6 shadow-lg">
+          <div className="font-serif text-[22px] mb-2">The studio hit an error</div>
+          <pre className="text-[12px] whitespace-pre-wrap text-[#9A2C19] mb-4">{String(this.state.error && this.state.error.message || this.state.error)}</pre>
+          <div className="flex gap-2">
+            <button type="button" className="h-8 px-3 rounded bg-[#232220] text-[#F4EFE6]" onClick={() => window.location.reload()}>Reload</button>
+            <button type="button" className="h-8 px-3 rounded border border-[#D8432A] text-[#9A2C19]" onClick={this.reset}>Reset project to seed</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+function App() {
+  const studio = useStudio();
+  const { state, conn, act, toast } = studio;
+  const [ui, setUi] = useState({ annotate: false, pinKind: 'issue', drawTool: 'select', inspectorTab: 'content', reviewFilter: { kind: 'all', status: 'open' }, skillsOpen: false });
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const docRef = useRef({});
+  const navRef = useRef(null);
+  const stRef = useLatest(state), uiRef = useLatest(ui);
+
+  // draw view: local while interacting, persisted with set_draw_view (debounced)
+  const [drawView, setDV] = useState({ x: 0, y: 0, zoom: 1 });
+  const dvRef = useRef(drawView), lastSent = useRef(null), dvTimer = useRef(0);
+  const serverView = state ? state.project.draw.view : null;
+  useEffect(() => {
+    if (!serverView) return;
+    if (!lastSent.current || JSON.stringify(serverView) !== JSON.stringify(lastSent.current)) { dvRef.current = serverView; setDV(serverView); lastSent.current = serverView; }
+  }, [serverView]);
+  const setDrawView = useCallback((fn, commit) => {
+    const next = fn(dvRef.current);
+    dvRef.current = next; setDV(next);
+    if (commit) {
+      clearTimeout(dvTimer.current);
+      dvTimer.current = setTimeout(() => { lastSent.current = next; act('set_draw_view', next); }, 250);
+    }
+  }, [act]);
+
+  // leaving the draw tab or a mode resets transient local UI
+  const tab = state ? state.view.tab : 'web';
+  useEffect(() => { setUi(u => (u.annotate ? { ...u, annotate: false } : u)); }, [tab]);
+
+  // one keydown listener on window (§11.1)
+  useEffect(() => {
+    const onKey = e => {
+      const st = stRef.current; if (!st) return;
+      const u = uiRef.current, v = st.view, sel = v.selection;
+      const active = document.activeElement;
+      const typing = isTyping(active);
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        const el = typing ? active : null;
+        if (el) el.blur(); // flush the open text draft so undo reverts the whole burst
+        act(e.shiftKey ? 'redo' : 'undo', { tab: v.tab }).then(() => { if (el && document.contains(el)) el.focus(); });
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (v.preview) { act('set_preview', { on: false }); return; }
+        if (typing) { active.blur(); return; }
+        if (u.skillsOpen) { setUi(x => ({ ...x, skillsOpen: false })); return; }
+        if (u.annotate) setUi(x => ({ ...x, annotate: false }));
+        if (sel) act('set_selection', { selection: null });
+        return;
+      }
+      if (typing) return;
+      if (v.preview) {
+        if (e.key === 'ArrowLeft' && navRef.current) { e.preventDefault(); navRef.current.back(); }
+        if (e.key === 'ArrowRight' && navRef.current) { e.preventDefault(); navRef.current.forward(); }
+        return;
+      }
+      if (v.tab === 'draw') {
+        if (e.key === ' ') { e.preventDefault(); if (!e.repeat) setSpaceHeld(true); return; }
+        if (mod && e.key === '0') { e.preventDefault(); setDrawView(() => ({ x: 0, y: 0, zoom: 1 }), true); return; }
+        const keyTool = { v: 'select', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'pen', h: 'pan' }[e.key];
+        if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, drawTool: keyTool })); return; }
+      }
+      if (mod && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        if (sel && sel.kind === 'block') act('duplicate_block', { nodeId: sel.nodeId, blockId: sel.blockId });
+        if (sel && sel.kind === 'shape') act('duplicate_shape', { shapeId: sel.shapeId });
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
+        e.preventDefault();
+        const p = st.project;
+        if (sel.kind === 'block') {
+          const n = findNode(p, sel.nodeId), b = n && n.blocks.find(x => x.id === sel.blockId);
+          if (!b) return;
+          if (!sel.childId) act('delete_block', { nodeId: sel.nodeId, blockId: sel.blockId });
+          else if (b.secondary && b.secondary.id === sel.childId) act('update_block', { nodeId: n.id, blockId: b.id, patch: { secondary: null } });
+          else if ((b.links || []).some(l => l.id === sel.childId) || (b.items || []).some(i => i.id === sel.childId)) act('delete_child', { nodeId: sel.nodeId, blockId: sel.blockId, childId: sel.childId });
+          else act('delete_block', { nodeId: sel.nodeId, blockId: sel.blockId });
+        } else if (sel.kind === 'hotspot') act('delete_hotspot', { nodeId: sel.nodeId, hotspotId: sel.hotspotId });
+        else if (sel.kind === 'shape') act('delete_shape', { shapeId: sel.shapeId });
+        else if (sel.kind === 'edge') act('delete_edge', { edgeId: sel.edgeId });
+        else if (sel.kind === 'pin') act('delete_pin', { pinId: sel.pinId });
+        else if (sel.kind === 'node') {
+          const n = findNode(p, sel.nodeId);
+          const onBoard = (v.tab === 'web' && v.view.web === 'board') || (v.tab === 'story' && v.view.story === 'board');
+          if (!n || !onBoard) return;
+          const pins = p.pins.filter(x => x.target.nodeId === n.id).length;
+          const has = (n.kind === 'page' ? n.blocks.length : 1) + pins;
+          if (!has || window.confirm(`Delete "${n.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) act('delete_node', { nodeId: n.id });
+        }
+      }
+    };
+    const onUp = e => { if (e.key === ' ') setSpaceHeld(false); };
+    const onBlur = () => setSpaceHeld(false);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onUp);
+    window.addEventListener('blur', onBlur);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); };
+  }, [act, setDrawView, stRef, uiRef]);
+
+  if (!state) {
+    return <div className="h-full flex items-center justify-center font-ui text-[#6B665C]">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
+  }
+  const ctx = { ...studio, ui, setUi, docRef, drawView, setDrawView };
+  const v = state.view;
+  const editor = v.tab === 'web' ? <WebEditor /> : v.tab === 'story' ? <StoryEditor /> : v.tab === 'draw' ? <DrawEditor spaceHeld={spaceHeld} /> : <DesignDoc />;
+  return (
+    <Studio.Provider value={ctx}>
+      <div className="h-full flex flex-col font-ui">
+        <TopBar />
+        <div className="flex-1 min-h-0 flex relative">
+          <LeftPanel />
+          <main className="flex-1 min-w-0 relative bg-[#E7E0D2]">
+            {editor}
+            {toast && <Toast msg={toast.msg} />}
+          </main>
+          <div className="relative flex-none flex">
+            <Inspector />
+            {ui.skillsOpen && <SkillsDrawer />}
+          </div>
+          {conn !== 'live' && <div title="Reconnecting… editing is paused" className="absolute inset-0 z-[80] cursor-not-allowed" style={{ background: 'rgba(231,224,210,.45)' }} />}
+        </div>
+        {v.preview && <PreviewStage navRef={navRef} />}
+      </div>
+    </Studio.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
+</script>
+</body>
+</html>

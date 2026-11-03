@@ -1,0 +1,30 @@
+/* Vendored @font-face rules for AgentCanvas (sources and checksums in VERSIONS). */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/assets/fonts/inter-latin-400-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(/assets/fonts/inter-latin-500-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(/assets/fonts/inter-latin-600-normal.woff2) format('woff2');
+}
+/* Fraunces variable: opsz 9–144, wght 100–900 (400/500/600 used). */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(/assets/fonts/fraunces-latin-opsz-normal.woff2) format('woff2-variations'), url(/assets/fonts/fraunces-latin-opsz-normal.woff2) format('woff2');
+}

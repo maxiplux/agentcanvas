@@ -1,0 +1,11 @@
+# path	name	version	source-url	sha256 (verified by: make vendor)
+react@18.3.1/react.production.min.js	react	18.3.1	https://unpkg.com/react@18.3.1/umd/react.production.min.js	d949f1c3687aedadcedac85261865f29b17cd273997e7f6b2bfc53b2f9d4c4dd
+react@18.3.1/react.development.js	react	18.3.1	https://unpkg.com/react@18.3.1/umd/react.development.js	28348fef6cb0ed8b2ceeb22deaf824428fd13875d84c73d38f77dd216fc24e7f
+react-dom@18.3.1/react-dom.production.min.js	react-dom	18.3.1	https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js	35f4f974f4b2bcd44da73963347f8952e341f83909e4498227d4e26b98f66f0d
+react-dom@18.3.1/react-dom.development.js	react-dom	18.3.1	https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js	f9044a5e9c39db8bb1a204dff924e526ec0a621e695bb69de1035811be8709e4
+babel-standalone@7.24.7/babel.min.js	@babel/standalone	7.24.7	https://unpkg.com/@babel/standalone@7.24.7/babel.min.js	d9e33722fdfba37e4e428aa72cb58da65f18358bfb229e136dfc1285e76b03ff
+tailwindcss-play@3.4/tailwind.js	tailwindcss-play-cdn	3.4.17	https://cdn.tailwindcss.com/3.4.17	176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15
+fonts/inter-latin-400-normal.woff2	@fontsource/inter	5.3.0	https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/inter-latin-400-normal.woff2	8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc
+fonts/inter-latin-500-normal.woff2	@fontsource/inter	5.3.0	https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/inter-latin-500-normal.woff2	f3779f1efccc4bdcdf9c0a02ab95bf6bd092ed09c48c08cedc725889edd1d19f
+fonts/inter-latin-600-normal.woff2	@fontsource/inter	5.3.0	https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/inter-latin-600-normal.woff2	f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a
+fonts/fraunces-latin-opsz-normal.woff2	@fontsource-variable/fraunces	5.3.0	https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.3.0/files/fraunces-latin-opsz-normal.woff2	7234ed860a9cc83045413c4faee63c960a8f2d1917adcf728119307d56e0d783
