@@ -2,6 +2,12 @@
 
 Build: `make test` (go vet + go test, all packages green) and `make release`. Walked on 2026-11-02 with fresh seed projects. Rows 1–33 were re-run in one scripted Chrome session against the production binary, resetting to the seed before each row; rows 38, 41 and 44 against the same server with a second window and the CLI acting from outside the page. The script drives the real UI (clicks, pointer drags, key events, inspector inputs) and reads the result from the DOM and `/api/state`.
 
+## 0a. Release re-verification (v0.1.1, then v0.1.2)
+
+Every §17 row and §18 step was re-run against the released `v0.1.1` binary, installed with the public one-liner `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh`. All passed except §18 step 9: pressing ⌘Z with an empty history sent a request the server refused (409), which Chrome logs as a console error. `v0.1.2` fixes that: the shortcut now shows "Nothing to undo in this tab." locally and sends no request.
+
+The installed binary updated itself to `v0.1.2` with `agent-canvas update`. On `v0.1.2`, §17 rows 13 and 23 (the only code paths the fix touches) and the §18 step 9 console check were re-run and pass: a fresh-tab, UI-only walkthrough logs zero errors, only the two vendor warnings listed in §4. CI and the release workflow passed for `v0.1.2`, including the one-line installers on Ubuntu, macOS and Windows.
+
 ## 0. Final-build re-verification (commit 8cea0d0, binary `v0.1.0-1-g8cea0d0`)
 
 After the security hardening and the `--help` fix, every row below was re-run against a binary built from the clean `main` tree at commit 8cea0d0. CI passed on GitHub for that commit (Linux and macOS tests, six-target build, Linux smoke test).
