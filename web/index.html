@@ -1011,7 +1011,7 @@ function ToolRail() {
         ))}
       </nav>
       {ui.tool === 'pin' && (
-        <div className="ac-float font-ui" style={{ position: 'absolute', right: 66, top: '50%', transform: 'translateY(-50%)', padding: 4, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 30 }}>
+        <div className="ac-float font-ui" style={{ position: 'absolute', right: 66, top: '50%', transform: 'translateY(-50%)', padding: 4, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 33 }}>
           {PIN_KINDS.map(k => (
             <button key={k} type="button" onClick={() => setUi(u => ({ ...u, pinKind: k }))}
               className={'h-7 px-2.5 rounded-md text-[12px] text-left inline-flex items-center gap-2 ' + (ui.pinKind === k ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')}>
@@ -1542,7 +1542,7 @@ function NodeContent({ node }) {
     <div>
       <NodeHeader node={node} />
       <Section title="Page">
-        <Field label="Name"><TextInput value={node.name} coalesce={`text:${node.id}.name`} onSend={(val, o) => val.trim() && act('upsert_node', { id: node.id, name: val }, o)} /></Field>
+        <Field label="Name"><div data-name-field="1"><TextInput value={node.name} coalesce={`text:${node.id}.name`} onSend={(val, o) => val.trim() && act('upsert_node', { id: node.id, name: val }, o)} /></div></Field>
         <NodeMeta node={node} />
         <div className="text-[11px] text-muted">{node.blocks.length} block{node.blocks.length === 1 ? '' : 's'}. Enter the page (double-click) and click a block, or pick one in Layers.</div>
       </Section>
@@ -1724,7 +1724,7 @@ function ScreenContent({ node, hotspotId }) {
       <NodeHeader node={n} />
       {hs && <Section title="Selected hotspot">{hotspotRow(hs)}</Section>}
       <Section title="Screen">
-        <Field label="Name"><TextInput value={n.name} coalesce={`text:${n.id}.name`} onSend={(val, o) => val.trim() && act('update_screen', { nodeId: n.id, patch: { name: val } }, o)} /></Field>
+        <Field label="Name"><div data-name-field="1"><TextInput value={n.name} coalesce={`text:${n.id}.name`} onSend={(val, o) => val.trim() && act('update_screen', { nodeId: n.id, patch: { name: val } }, o)} /></div></Field>
         <NodeMeta node={node} />
         <Field label="Title"><TextInput value={n.title} coalesce={`text:${n.id}.title`} onSend={set('title')} /></Field>
         <Field label="Body"><TextInput multiline rows={3} value={n.body} coalesce={`text:${n.id}.body`} onSend={set('body')} /></Field>
@@ -2370,7 +2370,7 @@ function PreviewStage({ navRef }) {
 function useLatest(v) { const r = useRef(v); r.current = v; return r; }
 
 // ---- Canvas (§8.2): viewport, auto layout, shell ----
-const ART = { GROUP_PAD: 40, GAP_X: 120, GAP_Y: 160, COL_GAP: 400, DIAGRAM_GAP: 200, DEFAULT_PAGE_H: 800, EMPTY_W: 400, EMPTY_H: 200 };
+const ART = { GROUP_PAD: 40, GAP_X: 120, GAP_Y: 260, COL_GAP: 400, DIAGRAM_GAP: 300, DEFAULT_PAGE_H: 800, EMPTY_W: 400, EMPTY_H: 200 }; // gaps leave room for a group label row above each group at fit zoom
 const ZOOM_MIN = 0.1, ZOOM_MAX = 4, LOD_FLAT = 0.12; // SPEC: flat cards below 12 % so fit-all on a 9-node project still shows real pages
 
 function nodeSize(n, bp, heights) {
@@ -2424,10 +2424,11 @@ function layoutCanvas(p, bp, heights) {
 function useViewport(ref, serverView, commit) {
   const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
   const [anim, setAnim] = useState(false);
+  const [adopted, setAdopted] = useState(0); // bumps when a view set elsewhere (an agent, another window) is taken over
   const vRef = useRef(view), lastSent = useRef(null), timer = useRef(0), animT = useRef(0);
   useEffect(() => {
     if (!serverView || !serverView.zoom) return;
-    if (!lastSent.current || JSON.stringify(serverView) !== JSON.stringify(lastSent.current)) { vRef.current = serverView; setView(serverView); lastSent.current = serverView; }
+    if (!lastSent.current || JSON.stringify(serverView) !== JSON.stringify(lastSent.current)) { vRef.current = serverView; setView(serverView); lastSent.current = serverView; setAdopted(n => n + 1); }
   }, [serverView]);
   const set = useCallback((fn, doCommit) => {
     const n = fn(vRef.current);
@@ -2462,7 +2463,7 @@ function useViewport(ref, serverView, commit) {
     if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.006), e.clientX - r.left, e.clientY - r.top);
     else panBy(-e.deltaX, -e.deltaY, true);
   }, [zoomAt, panBy]); // eslint-disable-line
-  return { view, anim, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef, insetsRef };
+  return { view, anim, adopted, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef, insetsRef };
 }
 
 // ---- Artboards (§8.2): one per node, real renderer, levels of detail, drag to place ----
@@ -2488,7 +2489,7 @@ const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected,
     <div data-art-id={node.id} className={'ac-art' + (dimmed ? ' ac-dim' : '')} onPointerDown={onDown} onDoubleClick={onDbl}
       onClickCapture={pinMode ? e => e.stopPropagation() : undefined}
       onClick={entered ? e => { e.stopPropagation(); if (!e.target.closest('[data-block-id], [data-hotspot-id], [data-cta], .ac-pin, .ac-pop')) act('set_selection', { selection: { kind: 'node', nodeId: node.id } }); } : undefined}
-      style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: screen ? 18 : 0, overflow: screen ? 'hidden' : 'visible', cursor: entered ? 'default' : 'pointer',
+      style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: screen ? 18 : 0, overflow: 'visible', cursor: entered ? 'default' : 'pointer',
         outline: selected && !entered ? `${2 * k}px solid ${V}` : undefined, zIndex: entered ? 5 : 2 }}>
       {/* name label: anchored 6 screen px above the artboard, counter-scaled */}
       <div style={{ position: 'absolute', left: 0, top: -6 * k, height: 0, pointerEvents: 'none' }}>
@@ -2498,7 +2499,7 @@ const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected,
           {!screen && <span style={{ color: CH.faint, fontSize: 11 }}>{box.w}</span>}
         </div>
       </div>
-      <div style={{ pointerEvents: entered ? 'auto' : 'none', overflow: screen || entered ? 'visible' : 'hidden', height: screen || entered ? undefined : box.h }}>{body}</div>
+      <div style={{ pointerEvents: entered ? 'auto' : 'none', overflow: entered ? 'visible' : 'hidden', height: screen || entered ? undefined : box.h, borderRadius: screen ? 18 : 0 }}>{body}</div>
       {children}
       <span data-port="in" title="Input" style={{ position: 'absolute', left: -5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: '#fff', border: `${1.5 * k}px solid ${CH.edge}`, zIndex: 4 }} />
       <span data-port="out" title="Drag to connect" onPointerDown={e => onPortDown && onPortDown(e, node, portY)} style={{ position: 'absolute', left: box.w - 5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: V, border: `${1.5 * k}px solid #fff`, boxShadow: `0 0 0 ${1 * k}px ${V}`, zIndex: 4, cursor: 'crosshair' }} />
@@ -2516,6 +2517,8 @@ function useArtboardHeights(worldRef, idsKey) {
       setHeights(prev => {
         let next = prev, changed = false;
         entries.forEach(e => {
+          // an element that was just unmounted reports 0; that is not a measurement
+          if (!e.target.isConnected || e.contentRect.height < 1) return;
           const id = e.target.getAttribute('data-art-body');
           const h = Math.max(240, Math.round(e.contentRect.height));
           if (id && prev[id] !== h) { if (!changed) { next = { ...prev }; changed = true; } next[id] = h; }
@@ -2647,7 +2650,8 @@ function Groups({ layout, zoom, flowId }) {
     const placed = g.nodes.some(x => x.pos);
     return (
       <div key={g.flow.id} data-canvas-bg="1" data-group-id={g.flow.id} className="ac-group" style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `${1 * k}px dashed ${on ? V : '#D2CFC7'}`, borderRadius: 16 * k, background: 'rgba(255,255,255,.28)' }}>
-        <div style={{ position: 'absolute', left: 14 * k, top: -4 * k, height: 0 }}>
+        {/* label on its own line 22 screen px above the border, clear of the artboard names just below it */}
+        <div style={{ position: 'absolute', left: 14 * k, top: -22 * k, height: 0 }}>
           <div className="ac-group-head" style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${k})`, transformOrigin: '0 100%', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: on ? V : CH.muted }}
             onPointerDown={e => e.stopPropagation()} onDoubleClick={e => { e.stopPropagation(); setRenaming(g.flow.id); }}>
             {renaming === g.flow.id
@@ -2945,7 +2949,7 @@ function ContextToolbar({ node, box, view, canvasW }) {
         <Btn title="More" on={menu === 'more'} onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}>⋯</Btn>
         {menu === 'more' && (
           <MenuBox>
-            <Item onClick={() => { setUi(u => ({ ...u, inspectorOpen: true, inspectorTab: 'content' })); requestAnimationFrame(() => { const el = document.querySelector('aside[style*="right"] input'); if (el) { el.focus(); el.select(); } }); }}>Rename…</Item>
+            <Item onClick={() => { setUi(u => ({ ...u, inspectorOpen: true, inspectorTab: 'content' })); act('set_selection', { selection: { kind: 'node', nodeId: node.id } }).then(() => requestAnimationFrame(() => { const el = document.querySelector('[data-name-field] input'); if (el) { el.focus(); el.select(); } })); }}>Rename…</Item>
             {flow && flow.startId !== node.id && <Item onClick={() => act('upsert_flow', { id: flow.id, startId: node.id })}>Set as start of {flow.name}</Item>}
             {v.entered === node.id ? <Item onClick={() => act('set_entered', { nodeId: '' })}>Leave (Esc)</Item> : <Item onClick={() => act('set_entered', { nodeId: node.id })}>Enter (Enter)</Item>}
             <Item danger onClick={delNode}>Delete {page ? 'page' : 'screen'}</Item>
@@ -2962,13 +2966,21 @@ function Canvas({ spaceHeld }) {
   const p = state.project, v = state.view, tokens = p.tokens;
   const bp = v.breakpoint;
   const worldRef = useRef(null);
-  const idsKey = p.nodes.map(n => n.id).join(',');
+  const idsKey = p.nodes.map(n => n.id).join(',') + '|' + (v.entered || ''); // entering swaps the body element, so observe again
   const heights = useArtboardHeights(worldRef, idsKey);
   const layout = useMemo(() => layoutCanvas(p, bp, heights), [p, bp, heights]);
   const { view } = viewport;
   // auto-fit until the person pans or zooms: once on mount, again when measured heights settle
   const autoFit = useRef(!(p.canvas.view && p.canvas.view.zoom));
   const heightsReady = !p.nodes.some(n => n.kind === 'page') || Object.keys(heights).length > 0;
+  // a view set by an agent or another window wins over auto-fit; a server zoom of 0 asks for a fresh fit-all
+  useEffect(() => { if (viewport.adopted) autoFit.current = false; }, [viewport.adopted]);
+  const serverZoom = p.canvas.view ? p.canvas.view.zoom : 0;
+  const firstZoom = useRef(true);
+  useEffect(() => {
+    if (firstZoom.current) { firstZoom.current = false; return; }
+    if (serverZoom === 0) { autoFit.current = true; viewport.fitTo(layout.bounds, 80, true); }
+  }, [serverZoom]); // eslint-disable-line
   useEffect(() => {
     if (!autoFit.current || !heightsReady) return;
     // next frame: Tailwind Play injects classes after the commit, so measure once the root has its real box
@@ -3069,7 +3081,7 @@ function Canvas({ spaceHeld }) {
       <div ref={worldRef} className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
         <Groups layout={layout} zoom={view.zoom} flowId={ui.flowId} />
         <div data-canvas-bg="1" style={{ position: 'absolute', left: layout.diagramBox.x - ART.GROUP_PAD, top: layout.diagramBox.y - ART.GROUP_PAD, width: layout.diagramBox.w + 2 * ART.GROUP_PAD, height: layout.diagramBox.h + 2 * ART.GROUP_PAD, border: `${1 / view.zoom}px dashed #D2CFC7`, borderRadius: 16 / view.zoom, background: 'rgba(255,255,255,.28)' }}>
-          <div style={{ position: 'absolute', left: 14 / view.zoom, top: -4 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
+          <div style={{ position: 'absolute', left: 14 / view.zoom, top: -22 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
         </div>
         <DrawLayer origin={layout.diagram} zoom={view.zoom} tokens={tokens} shapes={p.draw.shapes} sel={sel} tool={tool} draw={draw} />
         <div style={{ position: 'absolute', left: layout.diagram.x, top: layout.diagram.y, width: 0, height: 0, zIndex: 40 }}><PinsLayer items={drawPinItems} scale={1 / view.zoom} /></div>
