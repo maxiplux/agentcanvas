@@ -2331,7 +2331,7 @@ function useLatest(v) { const r = useRef(v); r.current = v; return r; }
 
 // ---- Canvas (§8.2): viewport, auto layout, shell ----
 const ART = { GROUP_PAD: 40, GAP_X: 120, GAP_Y: 160, COL_GAP: 400, DIAGRAM_GAP: 200, DEFAULT_PAGE_H: 800, EMPTY_W: 400, EMPTY_H: 200 };
-const ZOOM_MIN = 0.1, ZOOM_MAX = 4, LOD_FLAT = 0.25;
+const ZOOM_MIN = 0.1, ZOOM_MAX = 4, LOD_FLAT = 0.12; // SPEC: flat cards below 12 % so fit-all on a 9-node project still shows real pages
 
 function nodeSize(n, bp, heights) {
   if (n.kind === 'screen') return { w: PHONE_W, h: PHONE_H };
@@ -2422,27 +2422,132 @@ function useViewport(ref, serverView, commit) {
   return { view, anim, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef };
 }
 
+// ---- Artboards (§8.2): one per node, real renderer, levels of detail, drag to place ----
+const Artboard = memo(function Artboard({ node, box, zoom, bp, tokens, selected, entered, dimmed, isStart, onDown, onDbl, children }) {
+  const k = 1 / zoom;
+  const flat = zoom < LOD_FLAT;
+  const screen = node.kind === 'screen';
+  const portY = Math.min(box.h, 400) / 2;
+  let body;
+  if (flat) body = <div data-art-body={screen ? undefined : node.id} style={{ width: box.w, height: box.h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: CH.muted, fontSize: 24 * k, fontFamily: SERIF }}>{node.name}</div>;
+  else if (screen) body = <div data-art-body={undefined} style={{ width: PHONE_W, height: PHONE_H, position: 'relative', overflow: 'hidden', borderRadius: 18, background: tokens.colors.paper }}>{renderScreen(node, { tokens, mode: entered ? 'edit' : 'thumb' })}</div>;
+  else body = (
+    <div data-art-body={node.id} style={{ width: box.w, background: tokens.colors.paper, minHeight: 240 }}>
+      {node.blocks.map(b => renderBlock(b, { tokens, bp, mode: entered ? 'edit' : 'thumb', nodeId: node.id }))}
+      {!node.blocks.length && <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `13px Inter, sans-serif`, color: CH.muted }}>Empty page — add blocks, or ask your agent to design it.</div>}
+    </div>
+  );
+  return (
+    <div data-art-id={node.id} className={'ac-art' + (dimmed ? ' ac-dim' : '')} onPointerDown={onDown} onDoubleClick={onDbl}
+      style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: screen ? 18 : 0, overflow: screen ? 'hidden' : 'visible', cursor: entered ? 'default' : 'pointer',
+        outline: selected ? `${2 * k}px solid ${V}` : undefined, zIndex: entered ? 3 : 2 }}>
+      {/* name label: anchored 6 screen px above the artboard, counter-scaled */}
+      <div style={{ position: 'absolute', left: 0, top: -6 * k, height: 0, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${k})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', font: '500 12px/16px Inter, sans-serif', color: selected ? V : CH.ink, display: 'flex', gap: 6, alignItems: 'baseline' }}>
+          {isStart && <span style={{ color: V, fontSize: 11 }} title="Start of flow">★</span>}
+          <span>{node.name}</span>
+          {!screen && <span style={{ color: CH.faint, fontSize: 11 }}>{box.w}</span>}
+        </div>
+      </div>
+      <div style={{ pointerEvents: entered ? 'auto' : 'none', overflow: screen ? 'visible' : 'hidden', height: screen ? undefined : box.h }}>{body}</div>
+      {children}
+      <span data-port="in" title="Input" style={{ position: 'absolute', left: -5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: '#fff', border: `${1.5 * k}px solid ${CH.edge}`, zIndex: 4 }} />
+      <span data-port="out" title="Drag to connect" style={{ position: 'absolute', left: box.w - 5 * k, top: portY - 5 * k, width: 10 * k, height: 10 * k, borderRadius: '50%', background: V, border: `${1.5 * k}px solid #fff`, boxShadow: `0 0 0 ${1 * k}px ${V}`, zIndex: 4, cursor: 'crosshair' }} />
+    </div>
+  );
+});
+
+// Measures the natural height of every page body (ResizeObserver contentRect is in unscaled px).
+function useArtboardHeights(worldRef, idsKey) {
+  const [heights, setHeights] = useState({});
+  useLayoutEffect(() => {
+    const world = worldRef.current;
+    if (!world || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      setHeights(prev => {
+        let next = prev, changed = false;
+        entries.forEach(e => {
+          const id = e.target.getAttribute('data-art-body');
+          const h = Math.max(240, Math.round(e.contentRect.height));
+          if (id && prev[id] !== h) { if (!changed) { next = { ...prev }; changed = true; } next[id] = h; }
+        });
+        return changed ? next : prev;
+      });
+    });
+    world.querySelectorAll('[data-art-body]').forEach(el => ro.observe(el));
+    return () => ro.disconnect();
+  }, [worldRef, idsKey]);
+  return heights;
+}
+
+function Artboards({ layout, zoom, bp, tokens, nodes, flows, sel, entered, tool, annotateDown, pinsFor }) {
+  const { act, viewport } = useS();
+  const [drag, setDrag] = useState(null); // {id, x, y}
+  const startByFlow = useMemo(() => Object.fromEntries(flows.map(f => [f.id, f.startId])), [flows]);
+  const onDown = (e, n) => {
+    if (e.button !== 0 || e.target.closest('[data-port]')) return;
+    if (tool === 'pin') { annotateDown(e, n); return; }
+    if (tool !== 'select' || entered === n.id) return;
+    e.stopPropagation();
+    const box = layout.pos[n.id];
+    const w0 = viewport.toWorld(e.clientX, e.clientY);
+    let moved = false, cur = null;
+    const move = ev => {
+      const w = viewport.toWorld(ev.clientX, ev.clientY);
+      const dx = w.x - w0.x, dy = w.y - w0.y;
+      if (!moved && Math.hypot(dx, dy) * viewport.ref.current.zoom < 4) return;
+      moved = true;
+      cur = { id: n.id, x: snap(box.x + dx, !ev.altKey), y: snap(box.y + dy, !ev.altKey) };
+      setDrag(cur);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      if (moved && cur) act('move_node', { nodeId: n.id, x: Math.round(cur.x), y: Math.round(cur.y) }).then(() => setDrag(null));
+      else if (!(sel && sel.kind === 'node' && sel.nodeId === n.id)) act('set_selection', { selection: { kind: 'node', nodeId: n.id } });
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  return nodes.map(n => {
+    let box = layout.pos[n.id];
+    if (!box) return null;
+    if (drag && drag.id === n.id) box = { ...box, x: drag.x, y: drag.y };
+    return (
+      <Artboard key={n.id} node={n} box={box} zoom={zoom} bp={bp} tokens={tokens} isStart={startByFlow[n.flowId] === n.id}
+        selected={!!(sel && sel.nodeId === n.id && (sel.kind === 'node' || sel.kind === 'block' || sel.kind === 'hotspot'))}
+        entered={entered === n.id} dimmed={!!entered && entered !== n.id}
+        onDown={e => onDown(e, n)} onDbl={e => { e.stopPropagation(); if (entered !== n.id) act('set_entered', { nodeId: n.id }); }}>
+        {pinsFor ? pinsFor(n, box) : null}
+      </Artboard>
+    );
+  });
+}
+
 // The infinite canvas: dot grid, world transform, groups and artboards.
 function Canvas({ spaceHeld }) {
   const { state, act, ui, setUi, viewport, canvasRef } = useS();
   const p = state.project, v = state.view, tokens = p.tokens;
   const bp = v.breakpoint;
-  const [heights, setHeights] = useState({});
+  const worldRef = useRef(null);
+  const idsKey = p.nodes.map(n => n.id).join(',');
+  const heights = useArtboardHeights(worldRef, idsKey);
   const layout = useMemo(() => layoutCanvas(p, bp, heights), [p, bp, heights]);
   const { view } = viewport;
-  const fitted = useRef(false);
+  // auto-fit until the person pans or zooms: once on mount, again when measured heights settle
+  const autoFit = useRef(!(p.canvas.view && p.canvas.view.zoom));
+  const heightsReady = !p.nodes.some(n => n.kind === 'page') || Object.keys(heights).length > 0;
   useEffect(() => {
-    if (fitted.current) return;
-    fitted.current = true;
+    if (!autoFit.current || !heightsReady) return;
     // next frame: Tailwind Play injects classes after the commit, so measure once the root has its real box
-    if (!p.canvas.view || !p.canvas.view.zoom) requestAnimationFrame(() => viewport.fitTo(layout.bounds, 80, false));
-  }, [layout.bounds]); // eslint-disable-line
+    requestAnimationFrame(() => { if (autoFit.current) viewport.fitTo(layout.bounds, 80, false); });
+  }, [layout.bounds, heightsReady]); // eslint-disable-line
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    el.addEventListener('wheel', viewport.onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', viewport.onWheel);
+    const wheel = e => { autoFit.current = false; viewport.onWheel(e); };
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => el.removeEventListener('wheel', wheel);
   }, [viewport.onWheel]); // eslint-disable-line
+  const sel = v.selection, entered = v.entered;
   const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
   const onDown = e => {
     if (e.button !== 0) return;
@@ -2451,7 +2556,7 @@ function Canvas({ spaceHeld }) {
       e.preventDefault();
       const sx = e.clientX, sy = e.clientY, o = viewport.ref.current;
       let moved = false;
-      const move = ev => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return; moved = true; viewport.set(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy }), false); };
+      const move = ev => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return; moved = true; autoFit.current = false; viewport.set(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy }), false); };
       const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); if (moved) viewport.set(x => x, true); else if (bg && v.selection && tool === 'select') act('set_selection', { selection: null }); };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
     }
@@ -2460,17 +2565,13 @@ function Canvas({ spaceHeld }) {
   const gridOpacity = clamp((view.zoom - 0.2) / 0.15, 0, 1);
   const cursor = tool === 'hand' ? 'grab' : 'default';
   return (
-    <div ref={canvasRef} data-canvas="1" style={{ position: 'absolute', inset: 0, overflow: 'hidden', userSelect: 'none', background: CH.backdrop, cursor, touchAction: 'none' }} onPointerDown={onDown}>
+    <div ref={canvasRef} data-canvas="1" style={{ position: 'absolute', inset: 0, overflow: 'hidden', userSelect: 'none', background: CH.backdrop, cursor, touchAction: 'none' }} onPointerDownCapture={() => { autoFit.current = false; }} onPointerDown={onDown}>
       <div data-canvas-bg="1" style={{ position: 'absolute', inset: 0, opacity: gridOpacity, backgroundImage: 'radial-gradient(var(--ac-dot) 1px, transparent 1.2px)', backgroundSize: `${step}px ${step}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
-      <div className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
+      <div ref={worldRef} className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
         {layout.groups.map(g => (
           <div key={g.flow.id} data-canvas-bg="1" className="absolute" style={{ left: g.x, top: g.y, width: g.w, height: g.h, border: '1px dashed #D2CFC7', borderRadius: 16, background: 'rgba(255,255,255,.28)' }} />
         ))}
-        {p.nodes.map(n => { const b = layout.pos[n.id]; if (!b) return null; return (
-          <div key={n.id} className="ac-art" style={{ left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: n.kind === 'screen' ? 18 : 0 }}>
-            <div className="absolute left-0 font-ui" style={{ top: -22 / view.zoom, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', fontSize: 12, color: CH.muted, whiteSpace: 'nowrap' }}>{n.name}</div>
-          </div>
-        ); })}
+        <Artboards layout={layout} zoom={view.zoom} bp={bp} tokens={tokens} nodes={p.nodes} flows={p.flows} sel={sel} entered={entered} tool={tool} annotateDown={() => {}} pinsFor={null} />
       </div>
     </div>
   );
