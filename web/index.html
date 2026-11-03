@@ -275,6 +275,7 @@ function useStudio() {
   const [conn, setConn] = useState('connecting');
   const [toast, setToast] = useState(null);
   const [agent, setAgent] = useState(null);
+  const [activity, setActivity] = useState([]); // newest first, capped at 200
   const [epoch, setEpoch] = useState(0);
   const stRef = useRef(null), resync = useRef(true), syncRev = useRef(0);
   const toastT = useRef(0), agentT = useRef(0);
@@ -295,6 +296,7 @@ function useStudio() {
     stRef.current = merged;
     setState(merged);
     if (syncRev.current && next.rev >= syncRev.current) { syncRev.current = 0; setEpoch(e => e + 1); }
+    if (summary) setActivity(a => [{ rev: next.rev, source: source || 'ui', summary, at: Date.now() }, ...a].slice(0, 200));
     if (source === 'mcp' && summary) {
       setAgent(summary);
       clearTimeout(agentT.current);
@@ -370,7 +372,7 @@ function useStudio() {
     pump();
   }), [pump]);
 
-  return { state, conn, toast, agent, epoch, act, showToast };
+  return { state, conn, toast, agent, activity, epoch, act, showToast };
 }
 
 // A text field that keeps a local draft while focused (§12.2): sends one action per
@@ -939,51 +941,250 @@ function SkillsDrawer() {
 }
 
 // ---- Left panel ----
+// ---- Left project panel (§8.1): Layers, Activity, Review, prompt composer ----
+const ago = ts => { const s = Math.max(0, (Date.now() - ts) / 1000); if (s < 5) return 'just now'; if (s < 60) return `${Math.round(s)}s ago`; if (s < 3600) return `${Math.round(s / 60)} min ago`; if (s < 86400) return `${Math.round(s / 3600)} h ago`; return `${Math.round(s / 86400)} d ago`; };
+
 function LeftPanel() {
-  const { state } = useS();
-  const tab = state.view.tab;
+  const { state, ui, setUi, activity } = useS();
+  const open = ui.leftOpen;
+  const unseen = Math.max(0, activity.length - (ui.activitySeen || 0));
+  const tabs = [['layers', 'Layers', null], ['activity', 'Activity', unseen], ['review', 'Review', state.openIssues]];
+  const pick = t => setUi(u => ({ ...u, leftTab: t, leftOpen: true, activitySeen: t === 'activity' ? activity.length : u.activitySeen }));
+  useEffect(() => { if (open && ui.leftTab === 'activity') setUi(u => (u.activitySeen === activity.length ? u : { ...u, activitySeen: activity.length })); }, [activity.length, open, ui.leftTab]); // eslint-disable-line
+  if (!open) {
+    return (
+      <aside className="ac-float" style={{ position: 'absolute', left: 14, top: 14, width: 40, padding: 4, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 30 }}>
+        {tabs.map(([t, l, n]) => (
+          <button key={t} type="button" className="ac-ibtn ac-tip-host" onClick={() => pick(t)}>
+            {t === 'layers' ? <svg className="ac-icon" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
+              : t === 'activity' ? <svg className="ac-icon" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg>
+              : <svg className="ac-icon" viewBox="0 0 24 24"><path d="M12 21s-7-5-7-11a7 7 0 0114 0c0 6-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>}
+            {n ? <span style={{ position: 'absolute', top: 2, right: 2, minWidth: 14, height: 14, borderRadius: 7, background: V, color: '#fff', font: '600 9px/14px Inter, sans-serif', padding: '0 3px' }}>{n}</span> : null}
+            <span className="ac-tip" style={{ left: 40, top: '50%', transform: 'translateY(-50%)' }}>{l}<kbd>{MOD}\</kbd></span>
+          </button>
+        ))}
+      </aside>
+    );
+  }
   return (
-    <aside className="w-[260px] flex-none bg-[#FBF8F2] border-r border-[#DDD5C4] flex flex-col min-h-0 select-none">
-      {(tab === 'web' || tab === 'story') && <><Palette /><div className="flex-1 min-h-0 overflow-auto ac-scroll"><Outline channel={TAB_CHANNEL[tab]} /></div></>}
-      {tab === 'doc' && <DocRail />}
+    <aside className="ac-float font-ui" style={{ position: 'absolute', left: 14, top: 14, bottom: 14, width: 272, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 30 }}>
+      <div className="flex items-end gap-0.5 px-2 pt-2 border-b border-hair flex-none">
+        {tabs.map(([t, l, n]) => (
+          <button key={t} type="button" onClick={() => pick(t)}
+            className={'relative px-2.5 h-8 text-[12px] font-medium rounded-t-lg ' + (ui.leftTab === t ? 'text-ink' : 'text-muted hover:text-ink')}>
+            {l}{n ? <span className="ml-1.5 text-[11px] font-semibold text-accent">{n}</span> : null}
+            {ui.leftTab === t && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded" />}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <button type="button" className="ac-ibtn ac-tip-host mb-0.5" style={{ width: 26, height: 26 }} onClick={() => setUi(u => ({ ...u, leftOpen: false }))}>
+          <svg className="ac-icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg><span className="ac-tip" style={{ left: 30, top: '50%', transform: 'translateY(-50%)' }}>Collapse<kbd>{MOD}\</kbd></span>
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto ac-scroll">
+        {ui.leftTab === 'layers' ? <Layers /> : ui.leftTab === 'activity' ? <Activity /> : <ReviewPanel />}
+      </div>
+      <PromptComposer />
     </aside>
   );
 }
 
-function Palette() {
-  const { state, act } = useS();
-  const [open, setOpen] = useState(true);
-  const tab = state.view.tab, p = state.project, v = state.view;
-  const insertBlock = type => {
-    const nodeId = v.currentNodeId.web;
-    if (!nodeId) return;
-    const s = v.selection;
-    const after = s && s.kind === 'block' && s.nodeId === nodeId ? s.blockId : undefined;
-    act('insert_block', { nodeId, type, afterBlockId: after });
+function LayerRow({ depth, on, dim, onClick, onDoubleClick, children, draggable, onDragStart, onDragOver, onDrop, onDragEnd, dataAttr }) {
+  return (
+    <div {...(dataAttr || {})} draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd}
+      className={'group flex items-center gap-1.5 h-[30px] pr-2 rounded-lg cursor-pointer text-[12px] ' + (on ? 'bg-accentSoft text-[#8E2A18]' : dim ? 'text-muted hover:bg-[#F6F5F2]' : 'text-ink hover:bg-[#F6F5F2]')}
+      style={{ paddingLeft: 8 + depth * 14 }} onClick={onClick} onDoubleClick={onDoubleClick}>
+      {children}
+    </div>
+  );
+}
+const HoverBtn = ({ title, onClick, children, danger }) => (
+  <button type="button" title={title} onClick={e => { e.stopPropagation(); onClick(); }} className={'opacity-0 group-hover:opacity-100 px-1 text-[12px] text-muted ' + (danger ? 'hover:text-accent' : 'hover:text-ink')}>{children}</button>
+);
+
+function Layers() {
+  const { state, act, ui, setUi, canvasApi } = useS();
+  const p = state.project, v = state.view, sel = v.selection;
+  const [renaming, setRenaming] = useState(null);
+  const [expanded, setExpanded] = useState({});
+  const [dragId, setDragId] = useState(null);
+  const failing = useFailing();
+  if (v.tab === 'doc') return <DocRail />;
+  const go = (n, selection) => act('set_selection', { selection }).then(() => { if (canvasApi.current.fitNode) canvasApi.current.fitNode(n.id); });
+  const delNode = n => {
+    const pins = p.pins.filter(x => x.target.nodeId === n.id).length;
+    const has = (n.kind === 'page' ? n.blocks.length : 1) + pins;
+    if (has && !window.confirm(`Delete ${n.kind === 'page' ? 'page' : 'screen'} "${n.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) return;
+    act('delete_node', { nodeId: n.id });
   };
-  const addScreen = archetype => {
-    const cur = findNode(p, v.currentNodeId.mobile);
-    const flowId = cur ? cur.flowId : (p.flows.find(f => f.channel === 'mobile') || {}).id;
-    if (!flowId) return;
-    act('upsert_node', { flowId, archetype });
+  const reorder = (flow, nodes, fromId, toId) => {
+    if (fromId === toId) return;
+    const ids = nodes.map(n => n.id).filter(id => id !== fromId);
+    ids.splice(ids.indexOf(toId), 0, fromId);
+    act('reorder_nodes', { flowId: flow.id, nodeIds: ids });
+  };
+  const channelBlock = (channel, title, unit) => {
+    const flows = p.flows.filter(f => f.channel === channel);
+    const count = p.nodes.filter(n => nodeChannel(n) === channel).length;
+    return (
+      <div className="mb-2">
+        <div className="flex items-center justify-between px-2 h-7">
+          <span className="ac-label">{title}</span>
+          <span className="text-[11px] text-faint">{count} {unit}{count === 1 ? '' : 's'}</span>
+          <button type="button" title="Create a flow" className="text-[11px] text-muted hover:text-ink px-1" onClick={async () => { const r = await act('upsert_flow', { channel }); if (r.ok && r.createdId) setRenaming(r.createdId); }}>+ Flow</button>
+        </div>
+        {flows.map(f => {
+          const nodes = laneOrder(f, p.nodes, p.edges);
+          const fOn = ui.flowId === f.id;
+          return (
+            <div key={f.id}>
+              <LayerRow depth={0} dim on={fOn} onClick={() => setUi(u => ({ ...u, flowId: f.id }))} onDoubleClick={() => setRenaming(f.id)}>
+                {renaming === f.id
+                  ? <InlineRename value={f.name} onDone={name => { setRenaming(null); act('upsert_flow', { id: f.id, name }); }} onCancel={() => setRenaming(null)} />
+                  : <span className="flex-1 truncate font-medium text-ink" title="Double-click to rename">{f.name}</span>}
+                <span className="text-[11px] text-faint">{nodes.length}</span>
+                <HoverBtn title={`Add a ${unit}`} onClick={() => act('upsert_node', { flowId: f.id })}>+</HoverBtn>
+                {flows.length > 1 && <HoverBtn danger title="Delete flow" onClick={() => { if (window.confirm(`Delete flow "${f.name}" and its ${nodes.length} ${unit}(s)?`)) act('delete_flow', { flowId: f.id }); }}>×</HoverBtn>}
+              </LayerRow>
+              {nodes.map(n => {
+                const isSel = sel && sel.kind === 'node' && sel.nodeId === n.id;
+                const open = expanded[n.id] ?? (v.entered === n.id);
+                const kids = n.kind === 'page' ? n.blocks : n.hotspots;
+                return (
+                  <div key={n.id}>
+                    <LayerRow depth={1} on={isSel} dataAttr={{ 'data-layer-node': n.id }}
+                      draggable onDragStart={() => setDragId(n.id)} onDragEnd={() => setDragId(null)} onDragOver={e => e.preventDefault()}
+                      onDrop={e => { e.preventDefault(); if (dragId && p.nodes.find(x => x.id === dragId).flowId === f.id) reorder(f, nodes, dragId, n.id); setDragId(null); }}
+                      onClick={() => go(n, { kind: 'node', nodeId: n.id })} onDoubleClick={e => { e.stopPropagation(); act('set_entered', { nodeId: n.id }); if (canvasApi.current.fitNode) canvasApi.current.fitNode(n.id); }}>
+                      <button type="button" className="w-3 text-[10px] text-faint" onClick={e => { e.stopPropagation(); setExpanded(x => ({ ...x, [n.id]: !open })); }}>{kids.length ? (open ? '▾' : '▸') : ''}</button>
+                      <span className={'inline-block flex-none border-[1.5px] border-current rounded-[3px] opacity-60 ' + (n.kind === 'screen' ? 'w-[9px] h-[13px]' : 'w-[13px] h-[11px]')} />
+                      <button type="button" title={f.startId === n.id ? 'Start of flow' : 'Set as start'} className={f.startId === n.id ? 'text-accent text-[11px]' : 'opacity-0 group-hover:opacity-100 text-faint hover:text-accent text-[11px]'}
+                        onClick={e => { e.stopPropagation(); if (f.startId !== n.id) act('upsert_flow', { id: f.id, startId: n.id }); }}>{f.startId === n.id ? '★' : '☆'}</button>
+                      {renaming === n.id
+                        ? <InlineRename value={n.name} onDone={name => { setRenaming(null); act('upsert_node', { id: n.id, name }); }} onCancel={() => setRenaming(null)} />
+                        : <span className="flex-1 truncate">{n.name}</span>}
+                      {failing.nodes.has(n.id) && <Warn title={failing.nodes.get(n.id)} />}
+                      <HoverBtn title="Rename" onClick={() => setRenaming(n.id)}>✎</HoverBtn>
+                      <HoverBtn danger title={`Delete ${unit}`} onClick={() => delNode(n)}>×</HoverBtn>
+                    </LayerRow>
+                    {open && n.kind === 'page' && n.blocks.map(b => {
+                      const bSel = sel && sel.kind === 'block' && sel.blockId === b.id && !sel.childId;
+                      const children = b.type === 'features' ? b.items.map(i => ({ id: i.id, label: i.title })) : (b.links || []).map(l => ({ id: l.id, label: l.label, toId: l.toId }));
+                      return (
+                        <div key={b.id}>
+                          <LayerRow depth={2} on={bSel} onClick={() => go(n, { kind: 'block', nodeId: n.id, blockId: b.id })}>
+                            <span className="flex-1 truncate">{BLOCK_LABEL[b.type]}</span>
+                            {failing.blocks.has(b.id) && <Warn title={failing.blocks.get(b.id)} />}
+                          </LayerRow>
+                          {children.map(c => {
+                            const cSel = sel && sel.kind === 'block' && sel.blockId === b.id && sel.childId === c.id;
+                            return (
+                              <LayerRow key={c.id} depth={3} on={cSel} onClick={() => go(n, { kind: 'block', nodeId: n.id, blockId: b.id, childId: c.id })}>
+                                <span className="flex-1 truncate">{c.label || <i className="opacity-60">empty</i>}</span>
+                                {c.toId && <span className="text-[10px] text-faint">↗ {(findNode(p, c.toId) || {}).name || ''}</span>}
+                              </LayerRow>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                    {open && n.kind === 'screen' && n.hotspots.map(h => {
+                      const hSel = sel && sel.kind === 'hotspot' && sel.hotspotId === h.id;
+                      return (
+                        <LayerRow key={h.id} depth={2} on={hSel} onClick={() => go(n, { kind: 'hotspot', nodeId: n.id, hotspotId: h.id })}>
+                          <span className="flex-1 truncate">▭ {h.label}</span>
+                          {h.toId && <span className="text-[10px] text-faint">↗ {(findNode(p, h.toId) || {}).name || ''}</span>}
+                        </LayerRow>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  const shapes = p.draw.shapes;
+  const shapeLabel = s => s.type === 'text' ? `Text “${s.text}”` : s.type[0].toUpperCase() + s.type.slice(1);
+  return (
+    <div className="px-2 py-2 pb-4">
+      {channelBlock('web', 'Web', 'page')}
+      {channelBlock('mobile', 'Mobile', 'screen')}
+      <div className="flex items-center justify-between px-2 h-7"><span className="ac-label">Diagram</span><span className="text-[11px] text-faint">{shapes.length} shape{shapes.length === 1 ? '' : 's'}</span></div>
+      {shapes.map(s => {
+        const on = sel && sel.kind === 'shape' && sel.shapeId === s.id;
+        return (
+          <LayerRow key={s.id} depth={1} on={on} onClick={() => act('set_selection', { selection: { kind: 'shape', shapeId: s.id } }).then(() => canvasApi.current.fitDiagram && canvasApi.current.fitDiagram())}>
+            <span className="w-2.5 h-2.5 rounded-sm border" style={{ borderColor: p.tokens.colors[s.stroke || s.ink] }} />
+            <span className="truncate">{shapeLabel(s)}</span>
+          </LayerRow>
+        );
+      })}
+      {!shapes.length && <div className="px-2 text-[11px] text-faint">Pick a shape tool on the rail and drag on the canvas.</div>}
+    </div>
+  );
+}
+
+function Activity() {
+  const { state, act, activity, canvasApi } = useS();
+  const p = state.project;
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick(x => x + 1), 30000); return () => clearInterval(t); }, []);
+  const jump = e => {
+    const m = /[“"]([^”"]+)[”"]/.exec(e.summary);
+    const n = m && p.nodes.find(x => x.name === m[1]);
+    if (n) act('set_selection', { selection: { kind: 'node', nodeId: n.id } }).then(() => canvasApi.current.fitNode && canvasApi.current.fitNode(n.id));
   };
   return (
-    <div className="flex-none border-b border-[#DDD5C4]">
-      <button type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-3 h-8 text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold hover:bg-[#EFE8DB]">
-        <span>Palette</span><span>{open ? '▾' : '▸'}</span>
-      </button>
-      {open && (
-        <div className="grid grid-cols-2 gap-1 px-2 pb-2">
-          {tab === 'web' && BLOCK_TYPES.map(t => (
-            <button key={t} type="button" title={`Insert ${BLOCK_LABEL[t]} after the selected block`} onClick={() => insertBlock(t)}
-              className="h-8 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px] text-left px-2">+ {BLOCK_LABEL[t]}</button>
-          ))}
-          {tab === 'story' && ARCHETYPES.map(a => (
-            <button key={a} type="button" title={`Append a ${ARCH_LABEL[a]} screen to the current flow`} onClick={() => addScreen(a)}
-              className="h-8 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px] text-left px-2">+ {ARCH_LABEL[a]}</button>
-          ))}
+    <div className="p-1">
+      {activity.map((e, i) => (
+        <button key={e.rev + ':' + i} type="button" onClick={() => jump(e)} className="w-full text-left grid gap-2 p-2 rounded-[10px] hover:bg-[#F6F5F2]" style={{ gridTemplateColumns: '22px 1fr' }}>
+          <span className={'w-[22px] h-[22px] rounded-full grid place-items-center text-[9px] font-semibold ' + (e.source === 'mcp' ? 'bg-ink text-white' : 'bg-hair text-ink')}>{e.source === 'mcp' ? 'AG' : 'You'}</span>
+          <span className="min-w-0">
+            <span className="block text-[12px] leading-4 text-ink"><b className="font-medium">{e.source === 'mcp' ? 'Agent' : 'You'}</b> · {e.summary}</span>
+            <span className="block text-[11px] text-faint mt-0.5">{ago(e.at)}</span>
+          </span>
+        </button>
+      ))}
+      {!activity.length && <div className="px-3 py-6 text-[12px] text-muted leading-5">Nothing yet. Every change by you or a connected agent shows up here.</div>}
+    </div>
+  );
+}
+
+function PromptComposer() {
+  const { state, showToast } = useS();
+  const [text, setText] = useState('');
+  const build = () => {
+    const v = state.view, p = state.project;
+    const s = v.selection;
+    let selLabel = 'none';
+    if (s) {
+      if (s.nodeId) { const n = findNode(p, s.nodeId); selLabel = n ? `${n.kind} "${n.name}" (${n.id})` + (s.blockId ? `, block ${s.blockId}` : '') + (s.hotspotId ? `, hotspot ${s.hotspotId}` : '') : s.kind; }
+      else if (s.edgeId) selLabel = `edge ${s.edgeId}`;
+      else if (s.shapeId) selLabel = `shape ${s.shapeId}`;
+      else if (s.pinId) selLabel = `pin ${s.pinId}`;
+    }
+    return `Project "${state.name}" in AgentCanvas (MCP: ${location.origin}/mcp). Selected: ${selLabel}. Open issues: ${state.openIssues}. Request: ${text.trim()}`;
+  };
+  const copy = async () => {
+    if (!text.trim()) return;
+    try { await navigator.clipboard.writeText(build()); showToast('Copied. Paste it into Claude Code or Codex.'); }
+    catch (e) { showToast('Could not copy. Select the text and copy it yourself.'); }
+  };
+  return (
+    <div className="flex-none border-t border-hair p-2.5">
+      <div className="rounded-[10px] border border-hair bg-[#FBFAF8] px-2.5 py-2 focus-within:border-ink">
+        <textarea data-prompt="1" value={text} rows={2} placeholder="Ask your agent to change the canvas…" onChange={e => setText(e.target.value)}
+          onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); copy(); } if (e.key === 'Escape') e.currentTarget.blur(); }}
+          className="w-full resize-none bg-transparent text-[12px] leading-4 outline-none placeholder:text-faint" />
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-[10px] text-faint">{MOD}K · Enter copies</span>
+          <button type="button" onClick={copy} disabled={!text.trim()} className="h-6 px-2.5 rounded-md bg-ink text-white text-[11px] font-medium disabled:opacity-40">Copy prompt</button>
         </div>
-      )}
+      </div>
+      <div className="text-[10px] text-faint mt-1.5 leading-[14px]">Copies a prompt with project context for Claude Code or Codex. Nothing is sent anywhere.</div>
     </div>
   );
 }
@@ -1011,109 +1212,6 @@ function useFailing() {
     state.checks.tap.filter(c => !c.pass).forEach(c => nodes.set(c.nodeId, (nodes.get(c.nodeId) ? nodes.get(c.nodeId) + '; ' : '') + c.label));
     return { blocks, nodes };
   }, [state.checks]);
-}
-
-function Outline({ channel }) {
-  const { state, act } = useS();
-  const p = state.project, v = state.view;
-  const [renaming, setRenaming] = useState(null);
-  const [expanded, setExpanded] = useState({});
-  const failing = useFailing();
-  const flows = p.flows.filter(f => f.channel === channel);
-  const cur = v.currentNodeId[channel];
-  const sel = v.selection;
-  const unit = channel === 'web' ? 'page' : 'screen';
-  const rowCls = on => 'group flex items-center gap-1 h-7 pr-2 cursor-pointer text-[12px] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'hover:bg-[#EFE8DB]');
-
-  const addFlow = async () => {
-    const res = await act('upsert_flow', { channel });
-    if (res.ok && res.createdId) setRenaming(res.createdId);
-  };
-  const delNode = n => {
-    const pins = p.pins.filter(x => x.target.nodeId === n.id).length;
-    const has = (n.kind === 'page' ? n.blocks.length : 1) + pins;
-    if (has && !window.confirm(`Delete ${unit} "${n.name}"? Its edges${pins ? ` and ${pins} pin(s)` : ''} go with it.`)) return;
-    act('delete_node', { nodeId: n.id });
-  };
-  return (
-    <div className="pb-6">
-      <div className="flex items-center justify-between px-3 h-8">
-        <span className="text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Outline</span>
-        <button type="button" onClick={addFlow} className="text-[12px] px-1.5 h-6 rounded hover:bg-[#EFE8DB]" title="Create a flow">+ Flow</button>
-      </div>
-      {flows.map(f => {
-        const nodes = laneOrder(f, p.nodes, p.edges);
-        return (
-          <div key={f.id} className="mb-1">
-            <div className={rowCls(false) + ' pl-2'} onDoubleClick={() => setRenaming(f.id)}>
-              <span className="text-[10px] text-[#6B665C] w-3">▾</span>
-              {renaming === f.id
-                ? <InlineRename value={f.name} onDone={name => { setRenaming(null); act('upsert_flow', { id: f.id, name }); }} onCancel={() => setRenaming(null)} />
-                : <span className="flex-1 truncate font-semibold" title="Double-click to rename">{f.name}</span>}
-              <span className="text-[11px] text-[#6B665C]">{nodes.length}</span>
-              <button type="button" title={`Add a ${unit}`} className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]"
-                onClick={e => { e.stopPropagation(); act('upsert_node', { flowId: f.id }); }}>+</button>
-              <button type="button" title={flows.length <= 1 ? 'A channel must keep at least one flow' : 'Delete flow'} disabled={flows.length <= 1}
-                className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]"
-                onClick={e => { e.stopPropagation(); if (window.confirm(`Delete flow "${f.name}" and its ${nodes.length} ${unit}(s)?`)) act('delete_flow', { flowId: f.id }); }}>×</button>
-            </div>
-            {nodes.map(n => {
-              const isCur = n.id === cur;
-              const isSel = sel && sel.kind === 'node' && sel.nodeId === n.id;
-              const open = expanded[n.id] ?? isCur;
-              const kids = n.kind === 'page' ? n.blocks : n.hotspots;
-              return (
-                <div key={n.id}>
-                  <div className={rowCls(isSel) + ' pl-4 ' + (isCur && !isSel ? 'bg-[#EFE8DB] font-semibold' : '')}
-                    onClick={() => act('set_selection', { selection: { kind: 'node', nodeId: n.id } })} onDoubleClick={e => { e.stopPropagation(); setRenaming(n.id); }}>
-                    <button type="button" className="w-3 text-[10px] text-[#6B665C]" onClick={e => { e.stopPropagation(); setExpanded(x => ({ ...x, [n.id]: !open })); }}>{kids.length ? (open ? '▾' : '▸') : ''}</button>
-                    <button type="button" title={f.startId === n.id ? 'Start of flow' : 'Set as start'}
-                      className={f.startId === n.id ? 'text-[#D8432A]' : 'opacity-0 group-hover:opacity-100 text-[#6B665C] hover:text-[#D8432A]'}
-                      onClick={e => { e.stopPropagation(); if (f.startId !== n.id) act('upsert_flow', { id: f.id, startId: n.id }); }}>{f.startId === n.id ? '★' : '☆'}</button>
-                    {renaming === n.id
-                      ? <InlineRename value={n.name} onDone={name => { setRenaming(null); act('upsert_node', { id: n.id, name }); }} onCancel={() => setRenaming(null)} />
-                      : <span className="flex-1 truncate" title="Double-click to rename">{n.name}</span>}
-                    {failing.nodes.has(n.id) && <Warn title={failing.nodes.get(n.id)} />}
-                    <button type="button" title={`Delete ${unit}`} className="opacity-0 group-hover:opacity-100 px-1 hover:text-[#D8432A]" onClick={e => { e.stopPropagation(); delNode(n); }}>×</button>
-                  </div>
-                  {open && n.kind === 'page' && n.blocks.map(b => {
-                    const bSel = sel && sel.kind === 'block' && sel.blockId === b.id && !sel.childId;
-                    const children = b.type === 'features' ? b.items.map(i => ({ id: i.id, label: i.title })) : (b.links || []).map(l => ({ id: l.id, label: l.label, toId: l.toId }));
-                    return (
-                      <div key={b.id}>
-                        <div className={rowCls(bSel) + ' pl-10'} onClick={() => act('set_selection', { selection: { kind: 'block', nodeId: n.id, blockId: b.id } })}>
-                          <span className="flex-1 truncate">{BLOCK_LABEL[b.type]}</span>
-                          {failing.blocks.has(b.id) && <Warn title={failing.blocks.get(b.id)} />}
-                        </div>
-                        {children.map(c => {
-                          const cSel = sel && sel.kind === 'block' && sel.blockId === b.id && sel.childId === c.id;
-                          return (
-                            <div key={c.id} className={rowCls(cSel) + ' pl-14'} onClick={() => act('set_selection', { selection: { kind: 'block', nodeId: n.id, blockId: b.id, childId: c.id } })}>
-                              <span className="flex-1 truncate">{c.label || <i className="opacity-60">empty</i>}</span>
-                              {c.toId && <span className="text-[10px] opacity-60">↗ {(findNode(p, c.toId) || {}).name || ''}</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                  {open && n.kind === 'screen' && n.hotspots.map(h => {
-                    const hSel = sel && sel.kind === 'hotspot' && sel.hotspotId === h.id;
-                    return (
-                      <div key={h.id} className={rowCls(hSel) + ' pl-10'} onClick={() => act('set_selection', { selection: { kind: 'hotspot', nodeId: n.id, hotspotId: h.id } })}>
-                        <span className="flex-1 truncate">▭ {h.label}</span>
-                        {h.toId && <span className="text-[10px] opacity-60">↗ {(findNode(p, h.toId) || {}).name || ''}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 function DocRail() {
@@ -1686,7 +1784,7 @@ function pinWhere(p, pin) {
 }
 
 function ReviewPanel() {
-  const { state, act, ui, setUi } = useS();
+  const { state, act, ui, setUi, canvasApi } = useS();
   const p = state.project;
   const f = ui.reviewFilter;
   const setF = patch => setUi(u => ({ ...u, reviewFilter: { ...u.reviewFilter, ...patch } }));
@@ -1696,7 +1794,8 @@ function ReviewPanel() {
   const jumpCheck = c => {
     if (c.blockId) act('set_selection', { selection: { kind: 'block', nodeId: c.nodeId, blockId: c.blockId } });
     else if (c.ref && c.ref !== 'cta') act('set_selection', { selection: { kind: 'hotspot', nodeId: c.nodeId, hotspotId: c.ref } });
-    else act('set_selection', { selection: { kind: 'node', nodeId: c.nodeId } }).then(() => act('set_tab', { tab: 'story', view: 'page' }));
+    else act('set_selection', { selection: { kind: 'node', nodeId: c.nodeId } });
+    if (canvasApi.current.fitNode) canvasApi.current.fitNode(c.nodeId);
     setUi(u => ({ ...u, inspectorTab: 'design' }));
   };
   return (
@@ -1710,8 +1809,8 @@ function ReviewPanel() {
           const on = sel && sel.kind === 'pin' && sel.pinId === x.id;
           return (
             <button key={x.id} type="button" data-review-pin={x.id}
-              onClick={() => act('set_selection', { selection: { kind: 'pin', pinId: x.id } })}
-              className={'w-full text-left flex gap-2 py-1.5 px-1 rounded ' + (on ? 'bg-[#EFE8DB]' : 'hover:bg-[#EFE8DB]')}>
+              onClick={() => act('set_selection', { selection: { kind: 'pin', pinId: x.id } }).then(() => { if (x.target.nodeId && canvasApi.current.fitNode) canvasApi.current.fitNode(x.target.nodeId); else if (canvasApi.current.fitDiagram) canvasApi.current.fitDiagram(); })}
+              className={'w-full text-left flex gap-2 py-1.5 px-1 rounded-lg ' + (on ? 'bg-accentSoft' : 'hover:bg-[#F6F5F2]')}>
               <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F4EFE6' }}>{x.resolved ? '✓' : x.n}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[12px] truncate"><b className="mr-1">{PIN_GLYPH[x.kind]}</b>{firstLine(x.body)}</span>
@@ -1720,7 +1819,7 @@ function ReviewPanel() {
             </button>
           );
         })}
-        {!pins.length && <div className="text-[11px] text-[#6B665C]">No pins match. Turn on Annotate in the top bar and click the canvas to add one.</div>}
+        {!pins.length && <div className="text-[11px] text-muted">No pins match. Pick the Pin tool (C) and click the canvas to add one.</div>}
       </Section>
       <Section title={`Checks · ${failC.length + failT.length}`}>
         {failC.map((c, i) => (
@@ -2561,7 +2660,11 @@ function Canvas({ spaceHeld }) {
   }, [viewport.onWheel]); // eslint-disable-line
   const sel = v.selection, entered = v.entered;
   const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
-  useEffect(() => { canvasApi.current.fitAll = () => { autoFit.current = false; viewport.fitTo(layout.bounds, 80, true); }; }, [layout.bounds, viewport, canvasApi]);
+  useEffect(() => {
+    canvasApi.current.fitAll = () => { autoFit.current = false; viewport.fitTo(layout.bounds, 80, true); };
+    canvasApi.current.fitNode = id => { const b = layout.pos[id]; if (b) { autoFit.current = false; viewport.fitTo(b, 120, true); } };
+    canvasApi.current.fitDiagram = () => { autoFit.current = false; viewport.fitTo(layout.diagramBox, 120, true); };
+  }, [layout, viewport, canvasApi]);
   const draw = useDrawTools({ tool, origin: layout.diagram, tokens, shapes: p.draw.shapes, sel });
   const [draft, setDraft] = useState(null); // pin being placed: {sx, sy, target, x, y} (screen px + target coords)
   // the Pin tool on an artboard: board pin (not entered) or node pin on a block / the frame (entered)
@@ -2967,6 +3070,8 @@ function App() {
         const keyTool = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'pen', c: 'pin' }[e.key];
         if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, tool: keyTool })); return; }
       }
+      if (mod && e.key === '\\') { e.preventDefault(); setUi(x => ({ ...x, leftOpen: !x.leftOpen })); return; }
+      if (mod && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); setUi(x => ({ ...x, leftOpen: true })); requestAnimationFrame(() => { const el = document.querySelector('[data-prompt]'); if (el) el.focus(); }); return; }
       if (mod && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
         if (sel && sel.kind === 'block') act('duplicate_block', { nodeId: sel.nodeId, blockId: sel.blockId });
@@ -3016,9 +3121,9 @@ function App() {
       <div className="h-full flex flex-col font-ui">
         <TopBar />
         <div className="flex-1 min-h-0 flex relative">
-          <LeftPanel />
-          <main className="flex-1 min-w-0 relative bg-[#E7E0D2]">
-            {editor}
+          <main className="flex-1 min-w-0 relative" style={{ background: CH.backdrop }}>
+            {v.tab === 'doc' ? <div style={{ position: 'absolute', inset: 0, left: ui.leftOpen ? 300 : 68 }}>{editor}</div> : editor}
+            <LeftPanel />
             {toast && <Toast msg={toast.msg} />}
           </main>
           <div className="relative flex-none flex">
