@@ -63,16 +63,16 @@ tailwind.config = {
   .ac-group-act:hover { color: var(--ac-ink); border-color: var(--ac-ink); }
   .ac-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ac-muted); font-weight: 600; }
   .ac-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-  .ac-scroll::-webkit-scrollbar-thumb { background: #CFC6B5; border-radius: 4px; }
+  .ac-scroll::-webkit-scrollbar-thumb { background: var(--ac-hair); border-radius: 4px; }
   .ac-scroll::-webkit-scrollbar-track { background: transparent; }
   /* linked elements in edit mode show a pointer and a tiny ↗ badge */
   .ac-edit .ac-link { position: relative; cursor: pointer; }
-  .ac-edit .ac-link:hover::after { content: '↗'; position: absolute; top: -9px; right: -11px; width: 15px; height: 15px; border-radius: 3px; background: #D8432A; color: #F4EFE6; font: 600 10px/15px Inter, sans-serif; text-align: center; pointer-events: none; z-index: 5; }
+  .ac-edit .ac-link:hover::after { content: '↗'; position: absolute; top: -9px; right: -11px; width: 15px; height: 15px; border-radius: 3px; background: #D8432A; color: #F4F2EC; font: 600 10px/15px Inter, sans-serif; text-align: center; pointer-events: none; z-index: 5; }
   .ac-preview .ac-link { cursor: pointer; }
   .ac-annotate, .ac-annotate * { cursor: crosshair !important; }
-  .ac-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #D8432A; color: #F4EFE6; box-shadow: 0 0 0 1.5px #F4EFE6, 0 2px 6px rgba(0,0,0,.35); font: 600 11px/22px Inter, sans-serif; text-align: center; z-index: 40; cursor: grab; user-select: none; touch-action: none; }
-  .ac-pin.resolved { background: #6B665C; }
-  .ac-pin.selected { box-shadow: 0 0 0 1.5px #F4EFE6, 0 0 0 3.5px #D8432A, 0 2px 6px rgba(0,0,0,.35); }
+  .ac-pin { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #D8432A; color: #F4F2EC; box-shadow: 0 0 0 1.5px #F4F2EC, 0 2px 6px rgba(0,0,0,.35); font: 600 11px/22px Inter, sans-serif; text-align: center; z-index: 40; cursor: grab; user-select: none; touch-action: none; }
+  .ac-pin.resolved { background: #7A766D; }
+  .ac-pin.selected { box-shadow: 0 0 0 1.5px #F4F2EC, 0 0 0 3.5px #D8432A, 0 2px 6px rgba(0,0,0,.35); }
   .ac-pin .ac-pin-kind { display: none; }
   .ac-pin:hover .ac-pin-n { display: none; }
   .ac-pin:hover .ac-pin-kind { display: inline; }
@@ -400,7 +400,7 @@ function useDraft(value, send, coalesce) {
 // ===== Section 3: Primitives =====
 function Seg({ options, value, onChange, disabled, small }) {
   return (
-    <div className="inline-flex rounded overflow-hidden border border-[#DDD5C4] bg-white">
+    <div className="inline-flex rounded-lg overflow-hidden border border-hair bg-white">
       {options.map(o => {
         const v = typeof o === 'object' ? o.value : o;
         const label = typeof o === 'object' ? o.label : String(o);
@@ -408,7 +408,7 @@ function Seg({ options, value, onChange, disabled, small }) {
         return (
           <button key={String(v)} type="button" disabled={disabled} title={typeof o === 'object' ? o.title : undefined}
             onClick={() => onChange(v)}
-            className={(small ? 'px-1.5 h-6 text-[11px] ' : 'px-2 h-6 text-[11px] ') + 'border-r last:border-r-0 border-[#DDD5C4] ' + (on ? 'bg-[#232220] text-[#F4EFE6]' : 'text-[#232220] hover:bg-[#F1EBDF]')}>
+            className={(small ? 'px-2 h-[26px] text-[11px] ' : 'px-2.5 h-7 text-[12px] ') + 'border-r last:border-r-0 border-hair ' + (on ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')}>
             {label}
           </button>
         );
@@ -425,8 +425,8 @@ function TokenSwatches({ value, onChange, allowNone, disabled }) {
     <div className="flex gap-1.5 items-center">
       {keys.map(k => (
         <button key={k} type="button" disabled={disabled} title={k} onClick={() => onChange(k)}
-          className="w-5 h-5 rounded-[3px] border border-[#CFC6B5] relative"
-          style={{ background: k === 'none' ? 'linear-gradient(135deg, #fff 45%, #D8432A 47%, #D8432A 53%, #fff 55%)' : tokens.colors[k], boxShadow: value === k ? `0 0 0 2px #FBF8F2, 0 0 0 3.5px ${V}` : 'none' }} />
+          className="w-5 h-5 rounded-[3px] border border-hair relative"
+          style={{ background: k === 'none' ? 'linear-gradient(135deg, #fff 45%, #D8432A 47%, #D8432A 53%, #fff 55%)' : tokens.colors[k], boxShadow: value === k ? `0 0 0 2px #FFFFFF, 0 0 0 3.5px ${V}` : 'none' }} />
       ))}
     </div>
   );
@@ -439,14 +439,14 @@ function SpaceScale({ value, onChange, disabled }) {
 function Field({ label, children, hint, row }) {
   return (
     <label className={'block mb-2.5 ' + (row ? 'flex items-center justify-between gap-2' : '')}>
-      <span className="block text-[11px] text-[#6B665C] mb-1 select-none">{label}</span>
+      <span className="block text-[11px] text-muted mb-1 select-none">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-[#6B665C] mt-1">{hint}</span>}
+      {hint && <span className="block text-[11px] text-muted mt-1">{hint}</span>}
     </label>
   );
 }
 
-const inputCls = 'w-full rounded border border-[#DDD5C4] bg-white px-2 py-1 text-[12px] outline-none focus:border-[#D8432A] disabled:opacity-50';
+const inputCls = 'w-full rounded-lg border border-hair bg-white px-2.5 py-1.5 min-h-[30px] text-[12px] outline-none focus:border-ink disabled:opacity-50';
 
 // TextInput: draft-aware (§12.2). onSend(value, {coalesce, commit})
 function TextInput({ value, onSend, coalesce, multiline, rows, placeholder, disabled, onEnter, autoFocus, className }) {
@@ -479,22 +479,22 @@ function NumberInput({ value, onCommit, min, max, step, disabled, width }) {
 function IconButton({ title, onClick, children, active, disabled, dark, className }) {
   return (
     <button type="button" title={title} disabled={disabled} onClick={onClick}
-      className={'h-7 px-2 rounded text-[12px] inline-flex items-center gap-1 whitespace-nowrap ' +
-        (dark ? (active ? 'bg-[#F4EFE6] text-[#232220]' : 'text-[#F4EFE6] hover:bg-white/10') : (active ? 'bg-[#232220] text-[#F4EFE6]' : 'text-[#232220] hover:bg-[#EFE8DB]')) + ' ' + (className || '')}>
+      className={'h-7 px-2 rounded-md text-[12px] inline-flex items-center gap-1 whitespace-nowrap ' +
+        (dark ? (active ? 'bg-[#F4F2EC] text-ink' : 'text-white hover:bg-white/10') : (active ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')) + ' ' + (className || '')}>
       {children}
     </button>
   );
 }
 
 function Pill({ children, tone }) {
-  const tones = { pass: 'bg-[#E3EEDF] text-[#2F5A2A]', fail: 'bg-[#F7DDD7] text-[#9A2C19]', dark: 'bg-[#232220] text-[#F4EFE6]', neutral: 'bg-[#EFE8DB] text-[#232220]' };
-  return <span className={'inline-flex items-center rounded px-1.5 h-[18px] text-[10px] font-semibold ' + (tones[tone] || tones.neutral)}>{children}</span>;
+  const tones = { pass: 'bg-[#E3EEDF] text-[#2F5A2A]', fail: 'bg-[#FBE8E3] text-warn', dark: 'bg-ink text-white', neutral: 'bg-[#F3F2EF] text-ink' };
+  return <span className={'inline-flex items-center rounded-md px-1.5 h-[18px] text-[10px] font-semibold ' + (tones[tone] || tones.neutral)}>{children}</span>;
 }
 
 function Section({ title, children, right }) {
   return (
-    <div className="px-3 py-3 border-b border-[#DDD5C4]">
-      {title && <div className="flex items-center justify-between mb-2"><div className="text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">{title}</div>{right}</div>}
+    <div className="px-3 py-3 border-b border-hair">
+      {title && <div className="flex items-center justify-between mb-2"><div className="text-[10px] uppercase tracking-[.1em] text-muted font-semibold">{title}</div>{right}</div>}
       {children}
     </div>
   );
@@ -511,7 +511,7 @@ function Popover({ x, y, onClose, children, width }) {
   return (
     <div ref={ref} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
-      className="absolute z-[60] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-lg p-2.5 text-[12px] font-ui text-[#232220]"
+      className="absolute z-[60] bg-panel border border-hair rounded-panel shadow-float p-2.5 text-[12px] font-ui text-ink"
       style={{ left: x, top: y, width: width || 240 }}>
       {children}
     </div>
@@ -519,7 +519,7 @@ function Popover({ x, y, onClose, children, width }) {
 }
 
 function Toast({ msg }) {
-  return <div className="absolute left-1/2 -translate-x-1/2 bottom-5 z-[70] max-w-[560px] bg-[#232220] text-[#F4EFE6] text-[12px] px-3 py-2 rounded shadow-lg">{msg}</div>;
+  return <div className="absolute left-1/2 -translate-x-1/2 bottom-16 z-[70] max-w-[560px] bg-ink text-white text-[12px] px-3.5 py-2 rounded-lg shadow-float">{msg}</div>;
 }
 
 // Target dropdown grouped by flow: "Marketing › Home", plus "No link".
@@ -538,7 +538,7 @@ function TargetSelect({ channel, value, onChange, disabled }) {
   );
 }
 
-function Warn({ title }) { return <span title={title} className="text-[#D8432A] text-[11px] font-semibold">⚠</span>; }
+function Warn({ title }) { return <span title={title} className="text-accent text-[11px] font-semibold">⚠</span>; }
 
 // ===== Section 4: Renderers (pure, reused by editor, storyboard thumbnails, and preview) =====
 const dashed = { outline: `1.5px dashed ${V}`, outlineOffset: 3 };
@@ -863,13 +863,13 @@ function DarkSeg({ options, value, onChange }) {
 
 function IssueBadge() {
   const { state, conn, setUi } = useS();
-  if (conn !== 'live') return <span className="text-[12px] text-[#F4EFE6]/80 px-2">Reconnecting…</span>;
+  if (conn !== 'live') return <span className="text-[12px] text-white/80 px-2">Reconnecting…</span>;
   const n = state.openIssues;
   return (
     <button type="button" title="Open issues — show in Review"
       onClick={() => setUi(u => ({ ...u, leftOpen: true, leftTab: 'review', reviewFilter: { kind: 'issue', status: 'open' }, skillsOpen: false }))}
       className="h-[30px] px-2 rounded-lg inline-flex items-center gap-1.5 text-[12px] text-[#F4F2EC] hover:bg-white/10">
-      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F4EFE6' }}>{n}</span>
+      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold" style={{ background: n ? V : '#4A4743', color: '#F4F2EC' }}>{n}</span>
       <span>open {n === 1 ? 'issue' : 'issues'}</span>
     </button>
   );
@@ -909,7 +909,7 @@ function ExportMenu() {
   );
 }
 
-function SkillsDrawer() {
+function SkillsSheet() {
   const { state, setUi } = useS();
   const [open, setOpen] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -920,25 +920,25 @@ function SkillsDrawer() {
     return () => { live = false; };
   }, [open, state.skills]);
   return (
-    <aside className="absolute right-0 top-0 bottom-0 w-[300px] bg-[#FBF8F2] border-l border-[#DDD5C4] z-[45] flex flex-col shadow-xl">
-      <div className="h-10 flex-none flex items-center justify-between px-3 border-b border-[#DDD5C4]">
+    <aside className="ac-float ac-slide-in font-ui" style={{ position: 'absolute', right: 14, top: 14, bottom: 14, width: 360, zIndex: 45, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="h-10 flex-none flex items-center justify-between px-3 border-b border-hair">
         {open ? <button type="button" className="text-[12px] hover:underline" onClick={() => setOpen(null)}>← Skills</button> : <span className="text-[12px] font-semibold">Skills · {state.skills.length}</span>}
-        <button type="button" title="Close (Esc)" className="text-[14px] px-1" onClick={() => setUi(u => ({ ...u, skillsOpen: false }))}>×</button>
+        <button type="button" title="Close (Esc)" className="ac-ibtn" style={{ width: 26, height: 26 }} onClick={() => setUi(u => ({ ...u, skillsOpen: false }))}>×</button>
       </div>
       <div className="flex-1 overflow-auto ac-scroll">
         {!open && state.skills.map(s => (
-          <button key={s.name} type="button" onClick={() => setOpen(s.name)} className="w-full text-left px-3 py-2.5 border-b border-[#DDD5C4] hover:bg-[#EFE8DB]">
-            <div className="flex items-center gap-1.5"><span className="font-semibold text-[12px]">{s.name}</span><span className="text-[11px] text-[#6B665C]">v{s.version}</span>{s.builtin && <Pill tone="dark">built-in</Pill>}</div>
-            <div className="text-[11px] text-[#6B665C] mt-0.5">{s.description}</div>
+          <button key={s.name} type="button" onClick={() => setOpen(s.name)} className="w-full text-left px-3 py-2.5 border-b border-hair hover:bg-[#F3F2EF]">
+            <div className="flex items-center gap-1.5"><span className="font-semibold text-[12px]">{s.name}</span><span className="text-[11px] text-muted">v{s.version}</span>{s.builtin && <Pill tone="dark">built-in</Pill>}</div>
+            <div className="text-[11px] text-muted mt-0.5">{s.description}</div>
           </button>
         ))}
         {open && (
           <div className="px-3 py-3 md md-ui text-[12px] leading-[18px]">
-            {detail ? renderMd(stripFrontmatter(detail.body || '')) : <span className="text-[#6B665C]">Loading…</span>}
+            {detail ? renderMd(stripFrontmatter(detail.body || '')) : <span className="text-muted">Loading…</span>}
           </div>
         )}
       </div>
-      <div className="flex-none px-3 py-2 border-t border-[#DDD5C4] text-[11px] text-[#6B665C]">Manage skills with: <code>agent-canvas skills --help</code></div>
+      <div className="flex-none px-3 py-2 border-t border-hair text-[11px] text-muted">Manage skills with: <code>agent-canvas skills --help</code></div>
     </aside>
   );
 }
@@ -1048,7 +1048,7 @@ function ZoomPill() {
         <div className="ac-float text-[12px] text-ink" style={{ position: 'absolute', right: 0, bottom: 44, width: 360, padding: 12 }}>
           <div className="ac-label mb-2">Keyboard</div>
           <table className="w-full"><tbody>
-            {keys.map(([k, what]) => <tr key={k}><td className="py-0.5 pr-3 whitespace-nowrap"><kbd className="font-ui text-[11px] text-muted border border-hair rounded px-1 py-px">{k}</kbd></td><td className="py-0.5 text-muted">{what}</td></tr>)}
+            {keys.map(([k, what]) => <tr key={k}><td className="py-0.5 pr-3 whitespace-nowrap"><kbd className="font-ui text-[11px] text-muted border border-hair rounded-md px-1 py-px">{k}</kbd></td><td className="py-0.5 text-muted">{what}</td></tr>)}
           </tbody></table>
         </div>
       )}
@@ -1063,8 +1063,8 @@ function HintStrip() {
   const entered = findNode(state.project, state.view.entered);
   return (
     <div className="font-ui" style={{ position: 'absolute', left: '50%', bottom: 14, transform: 'translateX(-50%)', zIndex: 30, fontSize: 12, color: CH.muted, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(6px)', border: `1px solid ${CH.hair}`, padding: '6px 12px', borderRadius: 999, display: 'flex', gap: 14, alignItems: 'center', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-      {entered ? <span>Editing <b className="font-medium text-ink">{entered.name}</b> · <kbd className="text-[11px] text-faint border border-hair rounded px-1">Esc</kbd> leaves it</span>
-        : <><span>Drag to pan · scroll to zoom</span><kbd className="text-[11px] text-faint border border-hair rounded px-1">Space</kbd><span>Double-click a page to edit it in place</span></>}
+      {entered ? <span>Editing <b className="font-medium text-ink">{entered.name}</b> · <kbd className="text-[11px] text-faint border border-hair rounded-md px-1">Esc</kbd> leaves it</span>
+        : <><span>Drag to pan · scroll to zoom</span><kbd className="text-[11px] text-faint border border-hair rounded-md px-1">Space</kbd><span>Double-click a page to edit it in place</span></>}
     </div>
   );
 }
@@ -1126,7 +1126,7 @@ function LeftPanel() {
           <button key={t} type="button" onClick={() => pick(t)}
             className={'relative px-2.5 h-8 text-[12px] font-medium rounded-t-lg ' + (ui.leftTab === t ? 'text-ink' : 'text-muted hover:text-ink')}>
             {l}{n ? <span className="ml-1.5 text-[11px] font-semibold text-accent">{n}</span> : null}
-            {ui.leftTab === t && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded" />}
+            {ui.leftTab === t && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded-md" />}
           </button>
         ))}
         <div className="flex-1" />
@@ -1350,7 +1350,7 @@ function InlineRename({ value, onDone, onCancel }) {
     <input ref={ref} value={d} onChange={e => setD(e.target.value)} onClick={e => e.stopPropagation()}
       onBlur={() => (d.trim() && d !== value ? onDone(d.trim()) : onCancel())}
       onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setD(value); onCancel(); } }}
-      className="flex-1 min-w-0 rounded border border-[#D8432A] bg-white px-1 h-6 text-[12px] outline-none" />
+      className="flex-1 min-w-0 rounded-md border border-accent bg-white px-1 h-6 text-[12px] outline-none" />
   );
 }
 
@@ -1385,10 +1385,10 @@ function DocRail() {
   };
   return (
     <div className="flex-1 min-h-0 flex flex-col">
-      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-[#6B665C] font-semibold">Headings</div>
+      <div className="px-3 h-8 flex items-center text-[10px] uppercase tracking-[.1em] text-muted font-semibold">Headings</div>
       <div className="flex-1 overflow-auto ac-scroll pb-4">
         {heads.map(h => (
-          <button key={h.line} type="button" onClick={() => jump(h)} className="w-full text-left h-7 hover:bg-[#EFE8DB] text-[12px] truncate"
+          <button key={h.line} type="button" onClick={() => jump(h)} className="w-full text-left h-7 hover:bg-[#F3F2EF] text-[12px] truncate"
             style={{ paddingLeft: 12 + (h.level - 1) * 12, fontWeight: h.level === 1 ? 600 : 400 }}>{h.text}</button>
         ))}
       </div>
@@ -1441,7 +1441,7 @@ function Inspector() {
           {tabs.map(([k, l]) => (
             <button key={k} type="button" onClick={() => setUi(u => ({ ...u, inspectorTab: k }))}
               className={'relative px-2.5 h-8 text-[12px] font-medium ' + (tab === k ? 'text-ink' : 'text-muted hover:text-ink')}>
-              {l}{tab === k && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded" />}
+              {l}{tab === k && <span className="absolute left-2 right-2 -bottom-px h-0.5 bg-ink rounded-md" />}
             </button>
           ))}
           <div className="flex-1" />
@@ -1520,15 +1520,15 @@ function FlowContent({ flow }) {
   );
 }
 
-function Empty({ text }) { return <div className="px-3 py-6 text-[12px] text-[#6B665C] leading-5">{text}</div>; }
+function Empty({ text }) { return <div className="px-3 py-6 text-[12px] text-muted leading-5">{text}</div>; }
 
 // Shown when a channel has no page or screen yet (a blank project's App flow starts empty).
 function NodeHeader({ node, children }) {
   const { state } = useS();
   const f = findFlow(state.project, node.flowId);
   return (
-    <div className="px-3 pt-3 pb-2 border-b border-[#DDD5C4]">
-      <div className="text-[11px] text-[#6B665C]">{f ? f.name : ''} › {node.kind === 'page' ? 'Page' : 'Screen'}{f && f.startId === node.id ? ' · ★ start' : ''}</div>
+    <div className="px-3 pt-3 pb-2 border-b border-hair">
+      <div className="text-[11px] text-muted">{f ? f.name : ''} › {node.kind === 'page' ? 'Page' : 'Screen'}{f && f.startId === node.id ? ' · ★ start' : ''}</div>
       <div className="font-semibold text-[14px] mt-0.5 flex items-center justify-between gap-2"><span className="truncate">{node.name}</span>{children}</div>
     </div>
   );
@@ -1561,10 +1561,10 @@ function EdgeList({ title, edges, dir }) {
         const other = findNode(state.project, dir === 'to' ? e.toId : e.fromId);
         return (
           <button key={e.id} type="button" onClick={() => act('set_selection', { selection: { kind: 'edge', edgeId: e.id } })}
-            className="w-full flex items-center gap-1.5 text-left text-[12px] py-1 hover:text-[#D8432A]">
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: e.kind === 'cross' ? V : '#232220' }} />
+            className="w-full flex items-center gap-1.5 text-left text-[12px] py-1 hover:text-accent">
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: e.kind === 'cross' ? V : '#1C1B19' }} />
             <span className="truncate flex-1">“{e.label}” {dir === 'to' ? '→' : '←'} {other ? other.name : '?'}</span>
-            <span className="text-[10px] text-[#6B665C]">{e.kind}</span>
+            <span className="text-[10px] text-muted">{e.kind}</span>
           </button>
         );
       })}
@@ -1599,12 +1599,12 @@ function LinkRow({ node, block, link, removable, labelField }) {
     ? { nodeId: node.id, blockId: block.id, patch: { [labelField]: { label: val } } }
     : { nodeId: node.id, blockId: block.id, childId: link.id, patch: { label: val } }, o);
   return (
-    <div className="mb-2 p-2 rounded border border-[#DDD5C4] bg-white/60">
+    <div className="mb-2 p-2 rounded-md border border-hair bg-white/60">
       <div className="flex gap-1.5 items-center mb-1.5">
         <TextInput value={link.label} coalesce={`text:${link.id}.label`} onSend={sendLabel} />
-        {removable && <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => removable()}>×</button>}
+        {removable && <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-accent" onClick={() => removable()}>×</button>}
       </div>
-      <div className="flex items-center gap-1.5"><span className="text-[11px] text-[#6B665C] w-10">Target</span>
+      <div className="flex items-center gap-1.5"><span className="text-[11px] text-muted w-10">Target</span>
         <TargetSelect channel="web" value={link.toId} onChange={to => act('set_link_target', { nodeId: node.id, owner, toId: to })} />
       </div>
     </div>
@@ -1642,21 +1642,21 @@ function BlockContent({ node, block, childId }) {
       <>
         {tf('Brand', 'brand')}
         {b.type === 'footer' && tf('Note', 'note')}
-        <div className="text-[11px] text-[#6B665C] mb-1">Links</div>
+        <div className="text-[11px] text-muted mb-1">Links</div>
         {b.links.map(l => <LinkRow key={l.id} node={node} block={b} link={l} removable={() => delChild(l.id)} />)}
-        <button type="button" className="text-[12px] hover:text-[#D8432A]" onClick={addChild}>+ add link</button>
+        <button type="button" className="text-[12px] hover:text-accent" onClick={addChild}>+ add link</button>
       </>
     );
   } else if (b.type === 'hero') {
     fields = (
       <>
         {tf('Eyebrow', 'eyebrow')}{tf('Headline', 'headline')}{tf('Body', 'body', true)}
-        <div className="text-[11px] text-[#6B665C] mb-1">Button</div>
+        <div className="text-[11px] text-muted mb-1">Button</div>
         <LinkRow node={node} block={b} link={b.cta} labelField="cta" />
-        <div className="text-[11px] text-[#6B665C] mb-1 flex items-center justify-between">Secondary link
+        <div className="text-[11px] text-muted mb-1 flex items-center justify-between">Secondary link
           {b.secondary
-            ? <button type="button" className="hover:text-[#D8432A]" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: null } })}>remove</button>
-            : <button type="button" className="hover:text-[#D8432A]" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: { label: 'Learn more' } } })}>+ add</button>}
+            ? <button type="button" className="hover:text-accent" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: null } })}>remove</button>
+            : <button type="button" className="hover:text-accent" onClick={() => act('update_block', { nodeId: node.id, blockId: b.id, patch: { secondary: { label: 'Learn more' } } })}>+ add</button>}
         </div>
         {b.secondary && <LinkRow node={node} block={b} link={b.secondary} labelField="secondary" />}
       </>
@@ -1665,17 +1665,17 @@ function BlockContent({ node, block, childId }) {
     fields = (
       <>
         {tf('Heading', 'heading')}
-        <div className="text-[11px] text-[#6B665C] mb-1">Cards</div>
+        <div className="text-[11px] text-muted mb-1">Cards</div>
         {b.items.map(it => (
-          <div key={it.id} className="mb-2 p-2 rounded border border-[#DDD5C4] bg-white/60">
+          <div key={it.id} className="mb-2 p-2 rounded-md border border-hair bg-white/60">
             <div className="flex gap-1.5 mb-1.5">
               <TextInput value={it.title} coalesce={`text:${it.id}.title`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: it.id, patch: { title: val } }, o)} />
-              <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => delChild(it.id)}>×</button>
+              <button type="button" title="Remove" className="px-1.5 text-[14px] hover:text-accent" onClick={() => delChild(it.id)}>×</button>
             </div>
             <TextInput multiline rows={2} value={it.body} coalesce={`text:${it.id}.body`} onSend={(val, o) => act('update_block', { nodeId: node.id, blockId: b.id, childId: it.id, patch: { body: val } }, o)} />
           </div>
         ))}
-        <button type="button" className="text-[12px] hover:text-[#D8432A]" onClick={addChild}>+ add card</button>
+        <button type="button" className="text-[12px] hover:text-accent" onClick={addChild}>+ add card</button>
       </>
     );
   } else if (b.type === 'quote') {
@@ -1684,7 +1684,7 @@ function BlockContent({ node, block, childId }) {
     fields = (
       <>
         {tf('Headline', 'headline')}{tf('Body', 'body', true)}
-        <div className="text-[11px] text-[#6B665C] mb-1">Button</div>
+        <div className="text-[11px] text-muted mb-1">Button</div>
         <LinkRow node={node} block={b} link={b.button} labelField="button" />
       </>
     );
@@ -1692,7 +1692,7 @@ function BlockContent({ node, block, childId }) {
   return (
     <div>
       <NodeHeader node={node} />
-      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-hair flex items-center justify-between">
         <span className="font-semibold text-[12px]">{BLOCK_LABEL[b.type]}</span>
         <BlockActions node={node} block={b} />
       </div>
@@ -1707,14 +1707,14 @@ function ScreenContent({ node, hotspotId }) {
   const n = node;
   const set = field => (val, o) => act('update_screen', { nodeId: n.id, patch: { [field]: val } }, o);
   const hs = hotspotId ? n.hotspots.find(h => h.id === hotspotId) : null;
-  const geo = (h, k) => <label className="flex items-center gap-1 text-[11px] text-[#6B665C]">{k}<NumberInput value={h[k]} width={52} min={0} max={k === 'y' || k === 'h' ? 844 : 390} onCommit={val => act('upsert_hotspot', { nodeId: n.id, hotspotId: h.id, [k]: val })} /></label>;
+  const geo = (h, k) => <label className="flex items-center gap-1 text-[11px] text-muted">{k}<NumberInput value={h[k]} width={52} min={0} max={k === 'y' || k === 'h' ? 844 : 390} onCommit={val => act('upsert_hotspot', { nodeId: n.id, hotspotId: h.id, [k]: val })} /></label>;
   const hotspotRow = h => (
-    <div key={h.id} className={'mb-2 p-2 rounded border bg-white/60 ' + (h.id === hotspotId ? 'border-[#D8432A]' : 'border-[#DDD5C4]')}>
+    <div key={h.id} className={'mb-2 p-2 rounded-md border bg-white/60 ' + (h.id === hotspotId ? 'border-accent' : 'border-hair')}>
       <div className="flex gap-1.5 mb-1.5">
         <TextInput value={h.label} coalesce={`text:${h.id}.label`} onSend={(val, o) => act('upsert_hotspot', { nodeId: n.id, hotspotId: h.id, label: val }, o)} />
-        <button type="button" title="Delete hotspot" className="px-1.5 text-[14px] hover:text-[#D8432A]" onClick={() => act('delete_hotspot', { nodeId: n.id, hotspotId: h.id })}>×</button>
+        <button type="button" title="Delete hotspot" className="px-1.5 text-[14px] hover:text-accent" onClick={() => act('delete_hotspot', { nodeId: n.id, hotspotId: h.id })}>×</button>
       </div>
-      <div className="flex items-center gap-1.5 mb-1.5"><span className="text-[11px] text-[#6B665C] w-10">Target</span>
+      <div className="flex items-center gap-1.5 mb-1.5"><span className="text-[11px] text-muted w-10">Target</span>
         <TargetSelect channel="mobile" value={h.toId} onChange={to => act('set_link_target', { nodeId: n.id, owner: { hotspotId: h.id }, toId: to })} /></div>
       <div className="grid grid-cols-2 gap-1">{geo(h, 'x')}{geo(h, 'y')}{geo(h, 'w')}{geo(h, 'h')}</div>
     </div>
@@ -1730,19 +1730,19 @@ function ScreenContent({ node, hotspotId }) {
         <Field label="Body"><TextInput multiline rows={3} value={n.body} coalesce={`text:${n.id}.body`} onSend={set('body')} /></Field>
       </Section>
       <Section title="CTA" right={n.cta
-        ? <button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: null } })}>remove</button>
-        : <button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: { label: 'Continue' } } })}>+ add</button>}>
+        ? <button type="button" className="text-[11px] hover:text-accent" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: null } })}>remove</button>
+        : <button type="button" className="text-[11px] hover:text-accent" onClick={() => act('update_screen', { nodeId: n.id, patch: { cta: { label: 'Continue' } } })}>+ add</button>}>
         {n.cta ? (
           <>
             <Field label="Label"><TextInput value={n.cta.label} coalesce={`text:${n.id}.cta`} onSend={(val, o) => act('update_screen', { nodeId: n.id, patch: { cta: { label: val } } }, o)} /></Field>
             <Field label="Target"><TargetSelect channel="mobile" value={n.cta.toId} onChange={to => act('set_link_target', { nodeId: n.id, owner: { cta: true }, toId: to })} /></Field>
             <Field label="Size"><Seg value={n.cta.size} onChange={s => act('update_screen', { nodeId: n.id, patch: { cta: { size: s } } })} options={[{ value: 'sm', label: 'sm 36' }, { value: 'md', label: 'md 44' }, { value: 'lg', label: 'lg 52' }]} /></Field>
           </>
-        ) : <div className="text-[11px] text-[#6B665C]">No CTA on this screen.</div>}
+        ) : <div className="text-[11px] text-muted">No CTA on this screen.</div>}
       </Section>
-      <Section title={`Hotspots · ${n.hotspots.length}`} right={<button type="button" className="text-[11px] hover:text-[#D8432A]" onClick={() => act('upsert_hotspot', { nodeId: n.id })}>+ Hotspot</button>}>
+      <Section title={`Hotspots · ${n.hotspots.length}`} right={<button type="button" className="text-[11px] hover:text-accent" onClick={() => act('upsert_hotspot', { nodeId: n.id })}>+ Hotspot</button>}>
         {n.hotspots.filter(h => h.id !== hotspotId).map(hotspotRow)}
-        {!n.hotspots.length && <div className="text-[11px] text-[#6B665C]">Hotspots are tappable rectangles that link to another screen.</div>}
+        {!n.hotspots.length && <div className="text-[11px] text-muted">Hotspots are tappable rectangles that link to another screen.</div>}
       </Section>
     </div>
   );
@@ -1751,11 +1751,11 @@ function ScreenContent({ node, hotspotId }) {
 function ShapeContent({ shape }) {
   const { act } = useS();
   const s = shape;
-  const num = k => <label className="flex items-center gap-1 text-[11px] text-[#6B665C]">{k}<NumberInput value={Math.round(s[k] * 100) / 100} width={60} onCommit={val => act('update_shape', { shapeId: s.id, patch: { [k]: val } })} /></label>;
+  const num = k => <label className="flex items-center gap-1 text-[11px] text-muted">{k}<NumberInput value={Math.round(s[k] * 100) / 100} width={60} onCommit={val => act('update_shape', { shapeId: s.id, patch: { [k]: val } })} /></label>;
   const keys = s.type === 'rect' || s.type === 'ellipse' ? ['x', 'y', 'w', 'h'] : s.type === 'line' || s.type === 'arrow' ? ['x1', 'y1', 'x2', 'y2'] : s.type === 'text' ? ['x', 'y'] : [];
   return (
     <div>
-      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-hair flex items-center justify-between">
         <span className="font-semibold text-[12px] capitalize">{s.type}</span>
         <div className="flex gap-0.5">
           <IconButton title={`Duplicate (${MOD}D)`} onClick={() => act('duplicate_shape', { shapeId: s.id })}>Duplicate</IconButton>
@@ -1764,7 +1764,7 @@ function ShapeContent({ shape }) {
       </div>
       {s.type === 'text' && <Section title="Text"><TextInput value={s.text} coalesce={`text:${s.id}.text`} onSend={(val, o) => act('update_shape', { shapeId: s.id, patch: { text: val } }, o)} /></Section>}
       {keys.length > 0 && <Section title="Geometry"><div className="grid grid-cols-2 gap-1">{keys.map(num)}</div></Section>}
-      {s.type === 'pen' && <Section title="Stroke"><div className="text-[11px] text-[#6B665C]">{s.points.length} points</div></Section>}
+      {s.type === 'pen' && <Section title="Stroke"><div className="text-[11px] text-muted">{s.points.length} points</div></Section>}
     </div>
   );
 }
@@ -1777,12 +1777,12 @@ function DocContent() {
       <Section title="DESIGN.md">
         <div className="text-[12px] mb-3">{wordCount(md)} words · {mdHeadings(md).length} headings</div>
         <div className="flex flex-col gap-1.5">
-          <button type="button" className="h-7 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px]" onClick={() => downloadExport('design-md')}>Export DESIGN.md</button>
-          <button type="button" className="h-7 rounded border border-[#DDD5C4] bg-white hover:border-[#232220] text-[12px]" onClick={async () => {
+          <button type="button" className="h-7 rounded-md border border-hair bg-white hover:border-ink text-[12px]" onClick={() => downloadExport('design-md')}>Export DESIGN.md</button>
+          <button type="button" className="h-7 rounded-md border border-hair bg-white hover:border-ink text-[12px]" onClick={async () => {
             const r = await fetch('/api/export/design-md/write', { method: 'POST' }); const j = await r.json(); showToast(j.ok ? `Saved ${j.rel || j.path}` : j.error);
           }}>Save DESIGN.md to project</button>
         </div>
-        <div className="text-[11px] text-[#6B665C] mt-3 leading-4">The export appends generated Flows and Open issues sections.</div>
+        <div className="text-[11px] text-muted mt-3 leading-4">The export appends generated Flows and Open issues sections.</div>
       </Section>
     </div>
   );
@@ -1795,7 +1795,7 @@ function ContrastReadout({ items }) {
     <Section title="Contrast">
       {items.map((c, i) => (
         <div key={i} className="flex items-center justify-between text-[12px] py-0.5">
-          <span>{c.part === 'body' ? 'Body text' : c.part === 'button' ? 'Button' : 'CTA'} <span className="text-[#6B665C]">({c.role})</span></span>
+          <span>{c.part === 'body' ? 'Body text' : c.part === 'button' ? 'Button' : 'CTA'} <span className="text-muted">({c.role})</span></span>
           <span className="flex items-center gap-1.5"><span className="tabular-nums">{c.ratio.toFixed(1)}:1</span>{!c.pass && <Warn title="Below WCAG AA" />}<Pill tone={c.pass ? 'pass' : 'fail'}>{c.pass ? 'Passes AA' : 'Fails AA'}</Pill></span>
         </div>
       ))}
@@ -1810,7 +1810,7 @@ function BlockDesign({ node, block }) {
   const checks = state.checks.contrast.filter(c => c.blockId === b.id);
   return (
     <div>
-      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px]">{node.name} › {BLOCK_LABEL[b.type]}</div>
+      <div className="px-3 py-2 border-b border-hair font-semibold text-[12px]">{node.name} › {BLOCK_LABEL[b.type]}</div>
       <Section title="Type">
         <Field label="Type role"><Seg small value={b.typeRole} onChange={x => set('typeRole', x)} options={ORDER} /></Field>
         {b.type === 'hero' && <Field label="Body role"><Seg small value={b.bodyRole} onChange={x => set('bodyRole', x)} options={ORDER} /></Field>}
@@ -1840,7 +1840,7 @@ function ScreenDesign({ node }) {
   const tap = state.checks.tap.filter(c => c.nodeId === n.id);
   return (
     <div>
-      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px]">{n.name}</div>
+      <div className="px-3 py-2 border-b border-hair font-semibold text-[12px]">{n.name}</div>
       <Section title="Layout">
         <Field label="Archetype"><Seg small value={n.archetype} onChange={x => set('archetype', x)} options={ARCHETYPES.map(a => ({ value: a, label: ARCH_LABEL[a] }))} /></Field>
         <Field label="Layout"><Seg value={n.layout} onChange={x => set('layout', x)} options={LAYOUTS} /></Field>
@@ -1868,7 +1868,7 @@ function ScreenDesign({ node }) {
             <span className="flex items-center gap-1">{!t.pass && <Warn title="Under 44px" />}<Pill tone={t.pass ? 'pass' : 'fail'}>{t.pass ? 'OK' : 'Too small'}</Pill></span>
           </div>
         ))}
-        {!tap.length && <div className="text-[11px] text-[#6B665C]">No CTA or hotspots.</div>}
+        {!tap.length && <div className="text-[11px] text-muted">No CTA or hotspots.</div>}
       </Section>
     </div>
   );
@@ -1880,7 +1880,7 @@ function ShapeDesign({ shape }) {
   const set = (k, val) => act('update_shape', { shapeId: s.id, patch: { [k]: val } });
   return (
     <div>
-      <div className="px-3 py-2 border-b border-[#DDD5C4] font-semibold text-[12px] capitalize">{s.type}</div>
+      <div className="px-3 py-2 border-b border-hair font-semibold text-[12px] capitalize">{s.type}</div>
       <Section title="Style">
         {s.type === 'text' ? (
           <>
@@ -1905,7 +1905,7 @@ function ColorToken({ k, value }) {
   return (
     <div className="flex items-center gap-2 mb-1.5">
       <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(d.draft) ? d.draft : value} onChange={e => d.onChange(e.target.value.toUpperCase())} onFocus={d.onFocus} onBlur={d.onBlur}
-        className="w-7 h-6 p-0 border border-[#DDD5C4] rounded bg-white cursor-pointer" title={k} />
+        className="w-7 h-6 p-0 border border-hair rounded-md bg-white cursor-pointer" title={k} />
       <span className="w-14 text-[12px]">{k}</span>
       <input type="text" value={d.draft} onChange={e => d.onChange(e.target.value)} onFocus={d.onFocus} onBlur={d.onBlur}
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} className={inputCls + ' font-mono uppercase'} style={{ width: 90 }} />
@@ -1918,19 +1918,19 @@ function ProjectTokens() {
   const t = state.project.tokens;
   return (
     <Section title="Project tokens">
-      <div className="text-[11px] text-[#6B665C] mb-2">Edits here are global and undo from the current tab.</div>
+      <div className="text-[11px] text-muted mb-2">Edits here are global and undo from the current tab.</div>
       {COLOR_KEYS.map(k => <ColorToken key={k} k={k} value={t.colors[k]} />)}
-      <div className="mt-3 grid grid-cols-[48px_1fr_1fr] gap-1 items-center text-[11px] text-[#6B665C]">
+      <div className="mt-3 grid grid-cols-[48px_1fr_1fr] gap-1 items-center text-[11px] text-muted">
         <span>role</span><span>size</span><span>line-height</span>
         {ORDER.map(r => (
           <Fragment key={r}>
-            <span className="text-[#232220]">{r}</span>
+            <span className="text-ink">{r}</span>
             <NumberInput value={t.type[r].size} min={6} max={200} width={70} onCommit={val => act('update_tokens', { type: { [r]: { size: val } } })} />
             <NumberInput value={t.type[r].lh} min={6} max={300} width={70} onCommit={val => act('update_tokens', { type: { [r]: { lh: val } } })} />
           </Fragment>
         ))}
       </div>
-      <div className="mt-3 text-[11px] text-[#6B665C]">Space (fixed): {t.space.join(' · ')}</div>
+      <div className="mt-3 text-[11px] text-muted">Space (fixed): {t.space.join(' · ')}</div>
     </Section>
   );
 }
@@ -1944,18 +1944,18 @@ function EdgePanel({ edge }) {
   const toFlow = to && findFlow(p, to.flowId);
   return (
     <div>
-      <div className="px-3 py-2 border-b border-[#DDD5C4] flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-hair flex items-center justify-between">
         <span className="font-semibold text-[12px]">Edge</span>
         <IconButton title="Delete edge (Del)" onClick={() => act('delete_edge', { edgeId: edge.id })}>Delete edge</IconButton>
       </div>
       <Section title="Connection">
-        <div className="text-[12px] mb-2">{from ? from.name : '?'} → {to ? to.name : '?'}{cross && toFlow ? <span className="text-[#6B665C]"> ({toFlow.name})</span> : null}</div>
+        <div className="text-[12px] mb-2">{from ? from.name : '?'} → {to ? to.name : '?'}{cross && toFlow ? <span className="text-muted"> ({toFlow.name})</span> : null}</div>
         <Field label="Label"><TextInput value={edge.label} coalesce={`text:${edge.id}.label`} onSend={(val, o) => act('upsert_edge', { id: edge.id, label: val }, o)} /></Field>
-        <div className="text-[11px] text-[#6B665C] mb-1">Kind</div>
+        <div className="text-[11px] text-muted mb-1">Kind</div>
         {cross ? (
           <div>
             <label className="flex items-center gap-2 text-[12px]"><input type="radio" checked readOnly disabled /> <span style={{ color: V }} className="font-semibold">cross</span></label>
-            <div className="text-[11px] text-[#6B665C] mt-1 leading-4">This edge connects two different flows, so its kind is always cross (read-only).</div>
+            <div className="text-[11px] text-muted mt-1 leading-4">This edge connects two different flows, so its kind is always cross (read-only).</div>
           </div>
         ) : ['primary', 'alt', 'back'].map(k => (
           <label key={k} className="flex items-center gap-2 text-[12px] py-0.5">
@@ -2005,10 +2005,10 @@ function ReviewPanel() {
             <button key={x.id} type="button" data-review-pin={x.id}
               onClick={() => act('set_selection', { selection: { kind: 'pin', pinId: x.id } }).then(() => { if (x.target.nodeId && canvasApi.current.fitNode) canvasApi.current.fitNode(x.target.nodeId); else if (canvasApi.current.fitDiagram) canvasApi.current.fitDiagram(); })}
               className={'w-full text-left flex gap-2 py-1.5 px-1 rounded-lg ' + (on ? 'bg-accentSoft' : 'hover:bg-[#F6F5F2]')}>
-              <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F4EFE6' }}>{x.resolved ? '✓' : x.n}</span>
+              <span className="flex-none w-[22px] h-[22px] rounded-full text-[11px] font-semibold text-center leading-[22px]" style={{ background: x.resolved ? CH.muted : V, color: '#F4F2EC' }}>{x.resolved ? '✓' : x.n}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[12px] truncate"><b className="mr-1">{PIN_GLYPH[x.kind]}</b>{firstLine(x.body)}</span>
-                <span className="block text-[11px] text-[#6B665C]">#{x.n} · {pinWhere(p, x)}</span>
+                <span className="block text-[11px] text-muted">#{x.n} · {pinWhere(p, x)}</span>
               </span>
             </button>
           );
@@ -2017,16 +2017,16 @@ function ReviewPanel() {
       </Section>
       <Section title={`Checks · ${failC.length + failT.length}`}>
         {failC.map((c, i) => (
-          <button key={'c' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-[#D8432A] flex gap-1.5">
+          <button key={'c' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-accent flex gap-1.5">
             <Warn /> <span>{c.label}: contrast {c.ratio.toFixed(1)}:1 (needs {['lg', 'xl', 'display'].includes(c.role) ? '3.0' : '4.5'})</span>
           </button>
         ))}
         {failT.map((c, i) => (
-          <button key={'t' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-[#D8432A] flex gap-1.5">
+          <button key={'t' + i} type="button" onClick={() => jumpCheck(c)} className="w-full text-left text-[12px] py-1 hover:text-accent flex gap-1.5">
             <Warn /> <span>{c.label}</span>
           </button>
         ))}
-        {!failC.length && !failT.length && <div className="text-[11px] text-[#6B665C]">All contrast and tap-target checks pass at this breakpoint.</div>}
+        {!failC.length && !failT.length && <div className="text-[11px] text-muted">All contrast and tap-target checks pass at this breakpoint.</div>}
       </Section>
     </div>
   );
@@ -2044,7 +2044,7 @@ function pinVisible(pin, state, ui) {
 }
 
 function SpecLabel({ x, y, text }) {
-  return <span style={{ position: 'absolute', left: x, top: y, background: '#FBF8F2', color: V, font: '500 10px/14px Inter, sans-serif', padding: '0 3px', border: `1px solid ${V}`, borderRadius: 2, whiteSpace: 'nowrap' }}>{text}</span>;
+  return <span style={{ position: 'absolute', left: x, top: y, background: '#FFFFFF', color: V, font: '500 10px/14px Inter, sans-serif', padding: '0 3px', border: `1px solid ${V}`, borderRadius: 2, whiteSpace: 'nowrap' }}>{text}</span>;
 }
 
 // items: [{pin, left, top, coords(clientX, clientY) -> {x, y}}] in container px
@@ -2119,10 +2119,10 @@ function PinPopover({ pin, anchorRef }) {
   useEffect(() => setBody(pin.body), [pin.body]);
   if (!pos) return null;
   return ReactDOM.createPortal(
-    <div className="ac-pop fixed z-[90] w-[260px] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-xl p-2.5 text-[12px] text-[#232220] font-ui"
+    <div className="ac-pop fixed z-[90] w-[260px] bg-panel border border-hair rounded-md shadow-float p-2.5 text-[12px] text-ink font-ui"
       style={pos} onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="flex items-center gap-1.5 font-semibold"><span className="w-5 h-5 rounded-full text-center leading-5 text-[11px]" style={{ background: V, color: '#F4EFE6' }}>{PIN_GLYPH[pin.kind]}</span>{PIN_NAME[pin.kind]} #{pin.n}</span>
+        <span className="flex items-center gap-1.5 font-semibold"><span className="w-5 h-5 rounded-full text-center leading-5 text-[11px]" style={{ background: V, color: '#F4F2EC' }}>{PIN_GLYPH[pin.kind]}</span>{PIN_NAME[pin.kind]} #{pin.n}</span>
         <select value={pin.kind} onChange={e => act('update_pin', { pinId: pin.id, kind: e.target.value })} className="text-[11px] bg-transparent">
           {PIN_KINDS.map(k => <option key={k} value={k}>{PIN_GLYPH[k]} {PIN_NAME[k]}</option>)}
         </select>
@@ -2133,10 +2133,10 @@ function PinPopover({ pin, anchorRef }) {
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (body.trim() && body !== pin.body) act('update_pin', { pinId: pin.id, body }); e.currentTarget.blur(); }
           if (e.key === 'Escape') { e.stopPropagation(); setBody(pin.body); e.currentTarget.blur(); }
         }} />
-      <div className="text-[11px] text-[#6B665C] mt-1">{pinWhere(state.project, pin)}</div>
+      <div className="text-[11px] text-muted mt-1">{pinWhere(state.project, pin)}</div>
       <div className="flex gap-1.5 mt-2">
-        <button type="button" className="flex-1 h-7 rounded bg-[#232220] text-[#F4EFE6] text-[12px]" onClick={() => act('update_pin', { pinId: pin.id, resolved: !pin.resolved })}>{pin.resolved ? 'Reopen' : 'Resolve'}</button>
-        <button type="button" className="h-7 px-3 rounded border border-[#DDD5C4] text-[12px] hover:text-[#D8432A]" onClick={() => act('delete_pin', { pinId: pin.id })}>Delete</button>
+        <button type="button" className="flex-1 h-7 rounded-md bg-ink text-white text-[12px]" onClick={() => act('update_pin', { pinId: pin.id, resolved: !pin.resolved })}>{pin.resolved ? 'Reopen' : 'Resolve'}</button>
+        <button type="button" className="h-7 px-3 rounded-md border border-hair text-[12px] hover:text-accent" onClick={() => act('delete_pin', { pinId: pin.id })}>Delete</button>
       </div>
     </div>,
     document.body);
@@ -2157,7 +2157,7 @@ function DraftPin({ draft, onDone }) {
     <>
       <div ref={ref} className="ac-pin" style={{ left: draft.left, top: draft.top, opacity: .85 }}>{PIN_GLYPH[ui.pinKind]}</div>
       {pos && ReactDOM.createPortal(
-        <div className="ac-pop fixed z-[90] w-[260px] bg-[#FBF8F2] border border-[#DDD5C4] rounded shadow-xl p-2.5 text-[12px] font-ui text-[#232220]"
+        <div className="ac-pop fixed z-[90] w-[260px] bg-panel border border-hair rounded-md shadow-float p-2.5 text-[12px] font-ui text-ink"
           style={pos} onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
           <div className="font-semibold mb-1.5">{PIN_GLYPH[ui.pinKind]} New {PIN_NAME[ui.pinKind].toLowerCase()}</div>
           <textarea autoFocus value={body} rows={3} className={inputCls} placeholder="Type a note — Enter saves, Shift+Enter for a new line"
@@ -2292,11 +2292,11 @@ function EdgeLabelInput({ onDone }) {
   const finish = val => { if (done.current) return; done.current = true; onDone(val); };
   useEffect(() => { ref.current.focus(); ref.current.select(); }, []);
   return (
-    <div className="bg-[#FBF8F2] border border-[#D8432A] rounded shadow-lg p-1.5 flex items-center gap-1.5 font-ui">
-      <input ref={ref} value={d} onChange={e => setD(e.target.value)} className="w-40 h-6 px-1.5 rounded border border-[#DDD5C4] text-[12px] outline-none"
+    <div className="bg-panel border border-accent rounded-md shadow-float p-1.5 flex items-center gap-1.5 font-ui">
+      <input ref={ref} value={d} onChange={e => setD(e.target.value)} className="w-40 h-6 px-1.5 rounded-md border border-hair text-[12px] outline-none"
         onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') finish(d.trim() || 'Link'); if (e.key === 'Escape') finish(null); }}
         onBlur={() => finish(null)} />
-      <span className="text-[10px] text-[#6B665C]">Enter ↵</span>
+      <span className="text-[10px] text-muted">Enter ↵</span>
     </div>
   );
 }
@@ -2325,7 +2325,7 @@ function PreviewStage({ navRef }) {
     };
     return () => { navRef.current = null; };
   });
-  if (!node) return <div className="fixed inset-0 z-[100] flex items-center justify-center text-[#F4EFE6]" style={{ background: CH.stage }}>Nothing to preview. <button className="underline ml-2" onClick={exit}>Exit</button></div>;
+  if (!node) return <div className="fixed inset-0 z-[100] flex items-center justify-center text-white" style={{ background: CH.stage }}>Nothing to preview. <button className="underline ml-2" onClick={exit}>Exit</button></div>;
   let stage;
   if (!mobile) {
     const w = BREAKPOINTS[v.breakpoint];
@@ -2357,10 +2357,10 @@ function PreviewStage({ navRef }) {
   return (
     <div className="fixed inset-0 z-[100]" style={{ background: CH.stage }}>
       {stage}
-      <div className="fixed left-1/2 -translate-x-1/2 bottom-5 z-[101] flex items-center gap-2 h-9 pl-2 pr-1.5 rounded-full bg-[#F4EFE6] text-[#232220] shadow-xl text-[12px]">
-        <button type="button" title="Back" disabled={stack.length < 2} onClick={back} className="w-7 h-7 rounded-full hover:bg-[#E9E2D4]">←</button>
+      <div className="ac-float fixed left-1/2 -translate-x-1/2 bottom-5 z-[101] flex items-center gap-2 h-9 pl-2 pr-1.5 !rounded-full text-ink text-[12px]">
+        <button type="button" title="Back" disabled={stack.length < 2} onClick={back} className="w-7 h-7 rounded-full hover:bg-[#F3F2EF]">←</button>
         <span><b>{mobile ? 'Play' : 'Preview'}</b> · {node.name} · Esc to exit</span>
-        <button type="button" title="Exit (Esc)" onClick={exit} className="w-7 h-7 rounded-full hover:bg-[#E9E2D4] text-[15px]">×</button>
+        <button type="button" title="Exit (Esc)" onClick={exit} className="w-7 h-7 rounded-full hover:bg-[#F3F2EF] text-[15px]">×</button>
       </div>
     </div>
   );
@@ -3147,10 +3147,10 @@ function DesignDoc() {
   return (
     <div className="absolute inset-0 flex">
       <textarea ref={ta} value={d.draft} spellCheck={false} onChange={e => d.onChange(e.target.value)} onFocus={d.onFocus} onBlur={d.onBlur} onKeyDown={onKeyDown}
-        className="w-1/2 h-full resize-none border-0 border-r border-[#DDD5C4] bg-[#FBF8F2] p-6 outline-none ac-scroll"
-        style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, lineHeight: '20px', color: '#232220' }} />
-      <div ref={pv} className="w-1/2 h-full overflow-auto ac-scroll bg-[#F4EFE6]">
-        <div className="md font-serif px-10 py-8 text-[17px] leading-[27px] text-[#1C1B19]" style={{ maxWidth: 720 }}>{renderMd(d.draft)}</div>
+        className="w-1/2 h-full resize-none border-0 border-r border-hair bg-panel p-6 outline-none ac-scroll"
+        style={{ fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: 13, lineHeight: '20px', color: '#1C1B19' }} />
+      <div ref={pv} className="w-1/2 h-full overflow-auto ac-scroll bg-[#F4F2EC]">
+        <div className="md font-serif px-10 py-8 text-[17px] leading-[27px] text-ink" style={{ maxWidth: 720 }}>{renderMd(d.draft)}</div>
       </div>
     </div>
   );
@@ -3176,13 +3176,13 @@ class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="h-full flex items-center justify-center bg-[#E7E0D2] font-ui">
-        <div className="max-w-[480px] bg-[#FBF8F2] border border-[#DDD5C4] rounded p-6 shadow-lg">
+      <div className="h-full flex items-center justify-center bg-[#F3F2EF] font-ui">
+        <div className="max-w-[480px] bg-panel border border-hair rounded-md p-6 shadow-float">
           <div className="font-serif text-[22px] mb-2">The studio hit an error</div>
-          <pre className="text-[12px] whitespace-pre-wrap text-[#9A2C19] mb-4">{String(this.state.error && this.state.error.message || this.state.error)}</pre>
+          <pre className="text-[12px] whitespace-pre-wrap text-warn mb-4">{String(this.state.error && this.state.error.message || this.state.error)}</pre>
           <div className="flex gap-2">
-            <button type="button" className="h-8 px-3 rounded bg-[#232220] text-[#F4EFE6]" onClick={() => window.location.reload()}>Reload</button>
-            <button type="button" className="h-8 px-3 rounded border border-[#D8432A] text-[#9A2C19]" onClick={this.reset}>Start over (blank)</button>
+            <button type="button" className="h-8 px-3 rounded-md bg-ink text-white" onClick={() => window.location.reload()}>Reload</button>
+            <button type="button" className="h-8 px-3 rounded-md border border-accent text-warn" onClick={this.reset}>Start over (blank)</button>
           </div>
         </div>
       </div>
@@ -3300,7 +3300,7 @@ function App() {
   }, [act, stRef, uiRef, studio.showToast]);
 
   if (!state) {
-    return <div className="h-full flex items-center justify-center font-ui text-[#6B665C]">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
+    return <div className="h-full flex items-center justify-center font-ui text-muted">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
   }
   const ctx = { ...studio, ui, setUi, docRef, viewport, canvasRef, canvasApi };
   const v = state.view;
@@ -3317,7 +3317,7 @@ function App() {
             <LeftPanel />
             {v.tab !== 'doc' && <><ToolRail /><ZoomPill /><HintStrip /></>}
             <Inspector />
-            {ui.skillsOpen && <SkillsDrawer />}
+            {ui.skillsOpen && <SkillsSheet />}
             {toast && <Toast msg={toast.msg} />}
           </main>
           {conn !== 'live' && <div title="Reconnecting… editing is paused" className="absolute inset-0 z-[80] cursor-not-allowed" style={{ background: 'rgba(231,224,210,.45)' }} />}
