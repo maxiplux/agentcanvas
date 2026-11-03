@@ -303,6 +303,22 @@ type flowIn struct {
 	FlowID string `json:"flowId" jsonschema:"flow id"`
 }
 
+type moveNodeIn struct {
+	NodeID string  `json:"nodeId" jsonschema:"page or screen id"`
+	X      float64 `json:"x" jsonschema:"world x in px (artboard top-left)"`
+	Y      float64 `json:"y" jsonschema:"world y in px (artboard top-left)"`
+}
+
+type canvasViewIn struct {
+	X    float64 `json:"x" jsonschema:"pan x in screen px"`
+	Y    float64 `json:"y" jsonschema:"pan y in screen px"`
+	Zoom float64 `json:"zoom" jsonschema:"0.1 to 4; 0 resets to fit everything on open"`
+}
+
+type setEnteredIn struct {
+	NodeID string `json:"nodeId" jsonschema:"page or screen to edit in place; empty to leave"`
+}
+
 type upsertNodeIn struct {
 	ID        string  `json:"id,omitempty" jsonschema:"existing node id to update; omit to create"`
 	FlowID    string  `json:"flowId,omitempty" jsonschema:"flow to create in, or to move an existing node into (same channel)"`
@@ -519,6 +535,14 @@ func (s *Server) registerTools() {
 		func(_ context.Context, in setSelectionIn) *sdk.CallToolResult {
 			return s.apply("set_selection", in, "")
 		})
+	add(s, "Navigate", "set_canvas_view",
+		"Pan and zoom the shared infinite canvas (zoom 0.1 to 4; 0 resets to fit everything). Not undoable.",
+		nil, false, func(_ context.Context, in canvasViewIn) *sdk.CallToolResult {
+			return s.apply("set_canvas_view", in, "")
+		})
+	add(s, "Navigate", "set_entered",
+		"Enter a page or screen for in-place editing in the browser (the canvas zooms to it and it becomes current), or pass an empty nodeId to leave.",
+		nil, false, func(_ context.Context, in setEnteredIn) *sdk.CallToolResult { return s.apply("set_entered", in, "") })
 	add(s, "Navigate", "set_toggles",
 		"Turn shared overlays on or off: showPins, showGrid (12-column overlay), showSpecs (px labels). Send at least one; fails when none is given.",
 		nil, false, func(_ context.Context, in setTogglesIn) *sdk.CallToolResult { return s.apply("set_toggles", in, "") })
@@ -573,6 +597,12 @@ func (s *Server) registerTools() {
 		nil, false, func(_ context.Context, in reorderNodesIn) *sdk.CallToolResult {
 			return s.apply("reorder_nodes", in, "")
 		})
+	add(s, "Edit", "move_node",
+		"Place a page or screen on the canvas at world coordinates (x, y). Nodes without a position are laid out automatically in their flow group; tidy_flow clears positions.",
+		nil, false, func(_ context.Context, in moveNodeIn) *sdk.CallToolResult { return s.apply("move_node", in, "") })
+	add(s, "Edit", "tidy_flow",
+		"Clear every manual position in a flow so its nodes return to the automatic lane layout. Fails when no node in the flow has a position.",
+		nil, false, func(_ context.Context, in flowIn) *sdk.CallToolResult { return s.apply("tidy_flow", in, "") })
 	add(s, "Edit", "delete_node",
 		"Delete a page or screen with its edges (both directions), its pins, and every link target pointing at it; the flow start moves to the next node. Fails on an unknown id.",
 		nil, false, func(_ context.Context, in nodeIn) *sdk.CallToolResult { return s.apply("delete_node", in, "") })

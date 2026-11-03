@@ -44,6 +44,8 @@ A new project has one web flow (`Website`) with an empty `Home` page, one mobile
 - `set_breakpoint` — `desktop` (1280), `tablet` (768), `phone` (390); checks are computed at this breakpoint.
 - `set_selection` — select a node, block or child, hotspot, edge, shape, or pin (selecting a node makes it current).
 - `set_toggles` — `showPins`, `showGrid`, `showSpecs`.
+- `set_canvas_view` — pan and zoom the shared canvas (`zoom` 0.1 to 4; 0 fits everything).
+- `set_entered` — enter a page or screen for in-place editing (the browser zooms to it); empty `nodeId` leaves.
 - `preview` — enter or leave Preview/Play.
 
 ### History
@@ -56,6 +58,7 @@ A new project has one web flow (`Website`) with an empty `Home` page, one mobile
 - `update_tokens` — token colors (hex) and type sizes; `space` is fixed.
 - `upsert_flow`, `delete_flow` — create (with one empty node), rename, set start; delete with cascade.
 - `upsert_node`, `reorder_nodes`, `delete_node` — pages and screens; delete cascades edges, pins, and link targets.
+- `move_node`, `tidy_flow` — place an artboard at world `x, y` on the canvas, or clear a flow's positions back to the automatic layout.
 - `insert_block`, `update_block`, `upsert_child`, `delete_child`, `reorder_blocks`, `duplicate_block`, `delete_block` — web page blocks (nav, hero, features, quote, cta, footer) and their links or feature items.
 - `update_screen`, `upsert_hotspot`, `delete_hotspot` — mobile screens, their CTA, and hotspots.
 - `set_link_target` — the only way to point a link, CTA, or hotspot at a node; it writes the matching edge.

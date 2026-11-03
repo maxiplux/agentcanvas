@@ -20,9 +20,9 @@ import (
 // catalog is every §13.3 tool.
 var catalog = []string{
 	"get_canvas", "get_node", "get_doc", "skills_list",
-	"set_tab", "set_breakpoint", "set_selection", "set_toggles", "preview",
+	"set_tab", "set_breakpoint", "set_selection", "set_toggles", "preview", "set_canvas_view", "set_entered",
 	"undo", "redo", "reset_project",
-	"update_tokens", "upsert_flow", "delete_flow", "upsert_node", "reorder_nodes", "delete_node",
+	"update_tokens", "upsert_flow", "delete_flow", "upsert_node", "reorder_nodes", "delete_node", "move_node", "tidy_flow",
 	"insert_block", "update_block", "upsert_child", "delete_child", "reorder_blocks", "duplicate_block", "delete_block",
 	"update_screen", "upsert_hotspot", "delete_hotspot", "set_link_target", "upsert_edge", "delete_edge",
 	"add_shape", "update_shape", "duplicate_shape", "delete_shape", "set_doc", "add_pin", "update_pin", "delete_pin",
@@ -381,5 +381,17 @@ func TestAttachRawLines(t *testing.T) {
 	}
 	if len(lines) != 2 || !strings.Contains(lines[0], `"id":1`) || !strings.Contains(lines[1], "Hearth") {
 		t.Fatalf("lines: %v", lines)
+	}
+}
+
+func TestMoveNodeTool(t *testing.T) {
+	f := setup(t)
+	out, isErr := f.call(t, "move_node", map[string]any{"nodeId": "pg_shop", "x": 1500, "y": 40})
+	if isErr || !strings.Contains(out, "Moved") {
+		t.Fatalf("move_node: %s", out)
+	}
+	out, isErr = f.call(t, "set_entered", map[string]any{"nodeId": "pg_shop"})
+	if isErr || !strings.Contains(out, "Entered") {
+		t.Fatalf("set_entered: %s", out)
 	}
 }
