@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentCanvas · infinite canvas mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --canvas:#F3F2EF; --dot:#D9D6CF; --panel:#FFFFFF; --hair:#E3E0D9; --ink:#1C1B19; --muted:#7A766D; --faint:#A8A49B;
+  --bar:#1C1B19; --bar-text:#F4F2EC; --accent:#D8432A; --accent-soft:#FBE8E3; --edge:#8E8A80; --shadow:0 1px 2px rgba(20,18,14,.06),0 8px 24px rgba(20,18,14,.08);
+  --r:12px; --ui:13px;
+}
+*{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:var(--canvas);font:var(--ui)/1.4 Inter,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.serif{font-family:Fraunces,Georgia,serif}
+/* top bar */
+.top{position:fixed;inset:0 0 auto 0;height:44px;background:var(--bar);color:var(--bar-text);display:flex;align-items:center;padding:0 12px;gap:10px;z-index:40}
+.top .wm{font-family:Fraunces,serif;font-weight:600;font-size:15px;letter-spacing:-.01em;padding:0 6px}
+.top .proj{display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:8px;color:#D8D4CA}
+.top .proj b{color:var(--bar-text);font-weight:500}
+.top .proj span{opacity:.5}
+.top .spacer{flex:1}
+.top .pill{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.08);color:#D8D4CA;font-size:12px}
+.top .pill i{width:7px;height:7px;border-radius:50%;background:#5FB37A;box-shadow:0 0 0 3px rgba(95,179,122,.25)}
+.top .btn{height:30px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;color:#F4F2EC;background:rgba(255,255,255,.06)}
+.top .btn.primary{background:var(--accent);color:#fff}
+.top .btn:hover{background:rgba(255,255,255,.12)} .top .btn.primary:hover{background:#C53B24}
+.top .seg{display:flex;background:rgba(255,255,255,.06);border-radius:8px;padding:2px}
+.top .seg button{height:26px;padding:0 10px;border-radius:6px;color:#B9B5AB;font-weight:500}
+.top .seg button.on{background:#F4F2EC;color:var(--ink)}
+.kbd{font:11px/1 Inter;color:var(--faint);border:1px solid var(--hair);border-radius:4px;padding:2px 4px}
+/* floating panels */
+.float{position:fixed;background:var(--panel);border:1px solid var(--hair);border-radius:var(--r);box-shadow:var(--shadow);z-index:30}
+.left{left:14px;top:58px;bottom:14px;width:272px;display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--hair)}
+.tabs button{padding:8px 10px;border-radius:8px 8px 0 0;color:var(--muted);font-weight:500;position:relative}
+.tabs button.on{color:var(--ink)} .tabs button.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--ink);border-radius:2px}
+.tabs .cnt{margin-left:6px;font-size:11px;color:var(--accent);font-weight:600}
+.pane{flex:1;overflow:auto;padding:8px}
+.pane::-webkit-scrollbar{width:8px} .pane::-webkit-scrollbar-thumb{background:#E3E0D9;border-radius:8px}
+.group{margin:4px 0 10px}
+.group h4{margin:0;padding:6px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.group h4 em{font-style:normal;color:var(--faint);letter-spacing:0;text-transform:none;font-size:11px}
+.row{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:8px;color:var(--ink)}
+.row:hover{background:#F6F5F2} .row.sel{background:var(--accent-soft);color:#8E2A18}
+.row .ico{width:14px;height:14px;border:1.5px solid currentColor;border-radius:3px;opacity:.55;flex:none}
+.row .ico.phone{width:10px;border-radius:3px}
+.row .star{color:var(--accent);font-size:11px}
+.row .warn{margin-left:auto;color:var(--accent);font-size:12px}
+.row .kids{margin-left:auto;color:var(--faint);font-size:11px}
+.activity{padding:4px}
+.ev{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:8px;border-radius:10px}
+.ev:hover{background:#F6F5F2}
+.ev .av{width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;display:grid;place-items:center;font-weight:600}
+.ev .av.you{background:#E3E0D9;color:var(--ink)}
+.ev .t{font-size:11px;color:var(--faint);margin-top:2px}
+.ev b{font-weight:500}
+.ev .chip{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:999px;background:#F3F2EF;border:1px solid var(--hair);font-size:11px;color:var(--muted)}
+.prompt{border-top:1px solid var(--hair);padding:10px}
+.prompt .box{border:1px solid var(--hair);border-radius:10px;padding:8px 10px;color:var(--faint);display:flex;align-items:center;gap:8px;background:#FBFAF8}
+.prompt .box span{flex:1}
+.prompt small{display:block;margin-top:6px;color:var(--faint);font-size:11px}
+/* tool rail */
+.rail{right:14px;top:50%;transform:translateY(-50%);width:44px;padding:6px;display:flex;flex-direction:column;gap:2px}
+.rail button{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted);position:relative}
+.rail button:hover{background:#F3F2EF;color:var(--ink)} .rail button.on{background:var(--ink);color:#fff}
+.rail hr{border:0;border-top:1px solid var(--hair);margin:4px 2px}
+.rail button .tip{position:absolute;right:42px;top:50%;transform:translateY(-50%);background:var(--ink);color:#fff;font-size:11px;padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+.rail button:hover .tip{opacity:1}
+.rail .tip i{font-style:normal;opacity:.55;margin-left:6px}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* inspector */
+.insp{right:72px;top:58px;width:292px;max-height:calc(100% - 140px);display:flex;flex-direction:column;overflow:hidden}
+.insp .hd{padding:12px 14px 0}
+.insp .crumb{font-size:11px;color:var(--faint)} .insp .crumb b{color:var(--muted);font-weight:500}
+.insp h3{margin:2px 0 0;font-size:14px;font-weight:600}
+.insp .tabs{padding-top:4px}
+.insp .body{padding:12px 14px;overflow:auto}
+.field{margin-bottom:12px} .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+.field input,.field select{width:100%;height:30px;border:1px solid var(--hair);border-radius:8px;padding:0 10px;font:inherit;background:#fff;color:var(--ink)}
+.seg2{display:flex;border:1px solid var(--hair);border-radius:8px;overflow:hidden}
+.seg2 button{flex:1;height:28px;color:var(--muted);font-size:12px} .seg2 button.on{background:var(--ink);color:#fff}
+.check{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#FBF4F2;color:#8E2A18;font-size:12px;margin-top:6px}
+/* zoom pill & bottom */
+.zoom{right:14px;bottom:14px;height:36px;display:flex;align-items:center;padding:0 4px}
+.zoom button{height:28px;min-width:28px;padding:0 8px;border-radius:7px;color:var(--muted)} .zoom button:hover{background:#F3F2EF;color:var(--ink)}
+.zoom .pct{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500;min-width:48px;text-align:center}
+.zoom .sep{width:1px;height:18px;background:var(--hair);margin:0 4px}
+.hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:30;font-size:12px;color:var(--muted);background:rgba(255,255,255,.85);backdrop-filter:blur(6px);border:1px solid var(--hair);padding:6px 12px;border-radius:999px;display:flex;gap:14px;align-items:center}
+/* canvas */
+.stage{position:fixed;inset:44px 0 0 0;cursor:grab;background:var(--canvas);background-image:radial-gradient(var(--dot) 1px,transparent 1.2px);background-size:24px 24px;overflow:hidden}
+.stage.grabbing{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.sect{position:absolute;border:1px dashed #D2CFC7;border-radius:16px;background:rgba(255,255,255,.28)}
+.sect .lbl{position:absolute;left:14px;top:-11px;background:var(--canvas);padding:2px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sect .lbl em{font-style:normal;color:var(--faint);letter-spacing:0;text-transform:none;font-weight:400;margin-left:6px}
+.art{position:absolute;background:#fff;border:1px solid #E6E3DC;box-shadow:0 1px 2px rgba(20,18,14,.04),0 6px 18px rgba(20,18,14,.06);overflow:hidden}
+.art.sel{outline:2px solid var(--accent);outline-offset:0}
+.art .name{position:absolute;left:0;top:-22px;font-size:12px;color:var(--muted);white-space:nowrap;display:flex;gap:6px;align-items:center}
+.art .name b{color:var(--ink);font-weight:500} .art .name .st{color:var(--accent)} .art .name .bp{color:var(--faint);font-size:11px}
+.art.sel .name b{color:var(--accent)}
+.port{position:absolute;width:10px;height:10px;border-radius:50%;background:#fff;border:1.5px solid var(--edge);top:50%;transform:translate(-50%,-50%)}
+.port.out{left:100%} .port.in{left:0}
+.web{width:320px;height:200px} .web .pg{transform:scale(.25);transform-origin:0 0;width:1280px;height:800px;background:#F8F5EE;font-family:Fraunces,serif;color:#1C1B19}
+.phone{width:140px;height:280px;border-radius:18px;border:1px solid #DDD9D0}
+.phone .sc{transform:scale(.358);transform-origin:0 0;width:390px;height:780px;background:#F8F5EE;font-family:Fraunces,serif;position:relative}
+/* mini page content */
+.nav{display:flex;justify-content:space-between;align-items:center;padding:36px 80px;font-size:26px}
+.nav span{font-size:16px;font-family:Inter;margin-left:28px;opacity:.7}
+.hero{padding:40px 80px 56px}.hero .k{font:12px Inter;letter-spacing:.2em;text-transform:uppercase;opacity:.6}
+.hero h1{font-size:72px;line-height:1.02;margin:12px 0 18px;font-weight:600;letter-spacing:-.02em;max-width:720px}
+.hero p{font-size:20px;opacity:.75;margin:0 0 28px}
+.cta{display:inline-block;background:#D8432A;color:#fff;padding:18px 28px;font-size:20px}
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;padding:0 80px}
+.feat div{border-top:1px solid #D9D5CC;padding-top:18px;font-size:22px}.feat small{display:block;font:16px/1.4 Inter;opacity:.65;margin-top:8px}
+.foot{position:absolute;left:0;right:0;bottom:0;height:90px;background:#1C1B19}
+.sc .bar{height:44px;display:flex;justify-content:space-between;padding:12px 24px;font:600 16px Inter}
+.sc h2{font-size:64px;text-align:center;margin:260px 0 8px;font-weight:600}
+.sc p{text-align:center;font-size:22px;padding:0 40px;opacity:.75;margin:0}
+.sc .btn{position:absolute;left:24px;right:24px;bottom:40px;height:60px;background:#D8432A;color:#fff;display:grid;place-items:center;font-size:24px}
+.sc .skip{position:absolute;right:24px;top:70px;font:16px Inter;opacity:.6}
+.sc.list{padding:70px 24px 0}.sc.list h3{font-size:34px;margin:0 0 20px}.sc.list .it{height:64px;border-bottom:1px solid #D9D5CC;display:flex;align-items:center;font:18px Inter;opacity:.8}
+/* edges */
+svg.edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.edges path{fill:none;stroke:var(--edge);stroke-width:1.5}
+.edges path.cross{stroke:var(--accent)} .edges path.back{stroke-dasharray:3 4}
+.edges .lab{font:11px Inter;fill:var(--ink)}
+.edges .labbg{fill:#fff;stroke:#E6E3DC}
+/* contextual toolbar */
+.ctx{position:absolute;z-index:5;height:34px;display:flex;align-items:center;gap:2px;padding:0 4px;background:var(--panel);border:1px solid var(--hair);border-radius:10px;box-shadow:var(--shadow);transform:translateX(-50%);white-space:nowrap}
+.ctx button{height:26px;padding:0 8px;border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:5px}
+.ctx button:hover{background:#F3F2EF;color:var(--ink)} .ctx button.on{background:var(--ink);color:#fff}
+.ctx .sep{width:1px;height:18px;background:var(--hair);margin:0 3px}
+.pin{position:absolute;width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);color:#fff;display:grid;place-items:center;font:600 10px Inter;box-shadow:0 2px 6px rgba(216,67,42,.4)}
+.pin span{transform:rotate(45deg)}
+.note{position:absolute;white-space:nowrap;font-family:Fraunces,serif;font-size:22px;color:var(--ink)}
+.shape{position:absolute;border:1.5px solid var(--ink);background:#EFECE4}
+.ellipse{position:absolute;border:1.5px solid var(--accent);border-radius:50%}
+.empty{position:fixed;inset:44px 0 0 0;display:none}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wm">AgentCanvas</div>
+  <div class="proj"><span>/</span><b>Hearth</b><span>▾</span></div>
+  <div class="seg"><button class="on">Canvas</button><button>DESIGN.md</button></div>
+  <div class="spacer"></div>
+  <div class="pill"><i></i>Claude Code · editing Shop</div>
+  <button class="btn" title="Undo ⌘Z">↶</button><button class="btn" title="Redo ⇧⌘Z">↷</button>
+  <button class="btn">▶ Preview</button>
+  <button class="btn">Export ▾</button>
+  <button class="btn">Skills · 1</button>
+</header>
+
+<aside class="float left">
+  <div class="tabs"><button class="on" data-t="layers">Layers</button><button data-t="activity">Activity<span class="cnt">3</span></button><button data-t="review">Review<span class="cnt">2</span></button></div>
+  <div class="pane" id="layers">
+    <div class="group"><h4>Web <em>4 pages</em></h4>
+      <div class="row"><i class="ico"></i><span class="star">★</span>Home<span class="kids">6 blocks</span></div>
+      <div class="row sel"><i class="ico"></i>Shop<span class="warn">⚠</span></div>
+      <div class="row" style="padding-left:20px;color:var(--muted)">Checkout</div>
+      <div class="row"><i class="ico"></i><span class="star">★</span>Cart</div>
+      <div class="row"><i class="ico"></i>Confirm</div>
+    </div>
+    <div class="group"><h4>Mobile <em>5 screens</em></h4>
+      <div class="row"><i class="ico phone"></i><span class="star">★</span>Welcome</div>
+      <div class="row"><i class="ico phone"></i>Pick your craft</div>
+      <div class="row"><i class="ico phone"></i>Notifications</div>
+      <div class="row"><i class="ico phone"></i><span class="star">★</span>Home</div>
+      <div class="row"><i class="ico phone"></i>Profile<span class="warn">⚠</span></div>
+    </div>
+    <div class="group"><h4>Diagram <em>5 shapes</em></h4>
+      <div class="row"><i class="ico"></i>Kiln map</div>
+    </div>
+  </div>
+  <div class="pane activity" id="activity" hidden>
+    <div class="ev"><div class="av">CC</div><div><b>Claude Code</b> added block <b>Features</b> to <b>Shop</b><div class="t">just now</div><span class="chip">insert_block</span></div></div>
+    <div class="ev"><div class="av">CC</div><div><b>Claude Code</b> linked <b>Shop → Cart</b> “Browse the collection”<div class="t">2 min ago</div></div></div>
+    <div class="ev"><div class="av you">JM</div><div><b>You</b> pinned an issue on <b>Home</b>: “CTA contrast fails AA”<div class="t">5 min ago</div></div></div>
+    <div class="ev"><div class="av">CC</div><div><b>Claude Code</b> connected<div class="t">12 min ago</div></div></div>
+  </div>
+  <div class="pane" id="review" hidden>
+    <div class="group"><h4>Open issues <em>2</em></h4>
+      <div class="row"><span class="pin" style="position:static;transform:none;border-radius:50%;width:18px;height:18px">1</span>CTA contrast fails AA <span class="kids">Home</span></div>
+      <div class="row"><span class="pin" style="position:static;transform:none;border-radius:50%;width:18px;height:18px">2</span>Sign out: 36px (min 44) <span class="kids">Profile</span></div>
+    </div>
+  </div>
+  <div class="prompt"><div class="box"><span>Ask your agent to change the canvas…</span><span class="kbd" style="flex:none">⌘K</span></div><small>Copies a prompt with project context for Claude Code / Codex.</small></div>
+</aside>
+
+<aside class="float insp">
+  <div class="hd"><div class="crumb">Web › <b>Marketing</b> › Page</div><h3>Shop</h3></div>
+  <div class="tabs"><button class="on">Content</button><button>Design</button><button>Review<span class="cnt">1</span></button></div>
+  <div class="body">
+    <div class="field"><label>Name</label><input value="Shop"></div>
+    <div class="field"><label>Breakpoint</label><div class="seg2"><button class="on">1280</button><button>768</button><button>390</button></div></div>
+    <div class="field"><label>Start page of flow</label><div class="seg2"><button>Yes</button><button class="on">No</button></div></div>
+    <div class="field"><label>Blocks · 5</label>
+      <div class="row"><i class="ico"></i>Nav</div><div class="row"><i class="ico"></i>Hero</div><div class="row sel"><i class="ico"></i>Features</div><div class="row"><i class="ico"></i>CTA band</div><div class="row"><i class="ico"></i>Footer</div>
+    </div>
+    <div class="check">⚠ “Add to cart” contrast 3.9:1 — fails AA</div>
+  </div>
+</aside>
+
+<nav class="float rail">
+  <button class="on"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 8-7 1-3 7z"/></svg><span class="tip">Select<i>V</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M8 13V6a2 2 0 014 0v6m0-4a2 2 0 014 0v4m0-2a2 2 0 014 0v5a6 6 0 01-6 6h-2a6 6 0 01-5-3l-3-5a2 2 0 013-2l2 2"/></svg><span class="tip">Hand<i>H</i></span></button>
+  <hr>
+  <button><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg><span class="tip">Add web page<i>P</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span class="tip">Add mobile screen<i>M</i></span></button>
+  <hr>
+  <button><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg><span class="tip">Rectangle<i>R</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg><span class="tip">Ellipse<i>O</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M4 20L20 4m0 0h-6m6 0v6"/></svg><span class="tip">Arrow<i>A</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M4 20c4-8 8-12 16-16M4 20l4-1"/></svg><span class="tip">Pen<i>P</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M5 6h14M12 6v14"/></svg><span class="tip">Text<i>T</i></span></button>
+  <hr>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-7-5-7-11a7 7 0 0114 0c0 6-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span class="tip">Pin a note<i>C</i></span></button>
+  <button><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="tip">Tidy layout<i>⇧T</i></span></button>
+</nav>
+
+<div class="float zoom">
+  <button title="Fit (⌘0)">⤢</button><div class="sep"></div>
+  <button id="zout">−</button><span class="pct" id="pct">60%</span><button id="zin">+</button>
+  <div class="sep"></div><button title="Help">?</button>
+</div>
+<div class="hint"><span>Drag to pan · scroll to zoom</span><span class="kbd">Space</span><span>Double-click a page to edit it in place</span></div>
+
+<div class="stage" id="stage">
+<div class="world" id="world">
+  <!-- Web · Marketing -->
+  <div class="sect" style="left:0;top:0;width:900px;height:300px"><div class="lbl">Marketing<em>2 pages · web</em></div></div>
+  <div class="art web" style="left:40px;top:60px"><div class="name"><span class="st">★</span><b>Home</b><span class="bp">1280</span></div>
+    <div class="pg"><div class="nav">Hearth<span>Shop · Our story · Cart</span></div><div class="hero"><div class="k">Studio shop</div><h1>Everyday ceramics, fired slowly.</h1><p>Small batches thrown in a converted barn.</p><span class="cta">Browse the collection</span></div><div class="feat"><div>Stoneware that lasts<small>Fired to 1280°C.</small></div><div>Glazes mixed in-house<small>Tested on tiles.</small></div><div>Shipped with care<small>Recycled paper.</small></div></div><div class="foot"></div></div>
+    <div class="port in"></div><div class="port out"></div>
+    <div class="pin" style="left:150px;top:40px"><span>1</span></div>
+  </div>
+  <div class="art web sel" style="left:520px;top:60px"><div class="name"><b>Shop</b><span class="bp">1280</span></div>
+    <div class="pg"><div class="nav">Hearth<span>Shop · Our story · Cart</span></div><div class="hero"><div class="k">Collection</div><h1>Mugs, bowls, and a few surprises.</h1><p>Each piece is numbered and signed.</p><span class="cta">Add to cart</span></div><div class="feat"><div>Mug<small>€28</small></div><div>Bowl<small>€34</small></div><div>Plate<small>€22</small></div></div><div class="foot"></div></div>
+    <div class="port in"></div><div class="port out"></div>
+    
+  </div>
+  <div class="ctx" style="left:680px;top:-6px"><button>1280</button><button class="on">768</button><button>390</button><div class="sep"></div><button>Grid</button><button>Specs</button><div class="sep"></div><button>▶ Preview</button><button>Duplicate</button><button>⋯</button></div>
+  <!-- Web · Checkout -->
+  <div class="sect" style="left:0;top:360px;width:900px;height:300px"><div class="lbl">Checkout<em>2 pages · web</em></div></div>
+  <div class="art web" style="left:40px;top:420px"><div class="name"><span class="st">★</span><b>Cart</b><span class="bp">1280</span></div>
+    <div class="pg"><div class="nav">Hearth<span>Shop · Our story · Cart</span></div><div class="hero"><div class="k">Your cart</div><h1>Pay €28</h1><p>1 item · Stoneware mug</p><span class="cta">Pay €28</span></div><div class="foot"></div></div>
+    <div class="port in"></div><div class="port out"></div>
+  </div>
+  <div class="art web" style="left:520px;top:420px"><div class="name"><b>Confirm</b><span class="bp">1280</span></div>
+    <div class="pg"><div class="nav">Hearth<span>Shop · Our story · Cart</span></div><div class="hero"><div class="k">Order 1042</div><h1>Thank you.</h1><p>We'll email you when it ships.</p></div><div class="foot"></div></div>
+    <div class="port in"></div><div class="port out"></div>
+  </div>
+  <!-- Mobile · Onboarding -->
+  <div class="sect" style="left:1000px;top:0;width:620px;height:380px"><div class="lbl">Onboarding<em>3 screens · mobile</em></div></div>
+  <div class="art phone" style="left:1040px;top:60px"><div class="name"><span class="st">★</span><b>Welcome</b></div><div class="sc"><div class="bar"><span>9:41</span><span>▮▮▮</span></div><div class="skip">Skip</div><h2>Hearth</h2><p>Small-batch ceramics from the studio, in your pocket.</p><div class="btn">Get started</div></div><div class="port in"></div><div class="port out"></div></div>
+  <div class="art phone" style="left:1240px;top:60px"><div class="name"><b>Pick your craft</b></div><div class="sc list"><h3>Pick your craft</h3><div class="it">Mugs</div><div class="it">Bowls</div><div class="it">Plates</div><div class="it">Vases</div><div class="btn">Next</div></div><div class="port in"></div><div class="port out"></div></div>
+  <div class="art phone" style="left:1440px;top:60px"><div class="name"><b>Notifications</b></div><div class="sc list"><h3>Know when the kiln opens</h3><div class="it">We fire twice a month.</div><div class="btn">Allow and finish</div></div><div class="port in"></div><div class="port out"></div></div>
+  <!-- Mobile · Account -->
+  <div class="sect" style="left:1000px;top:420px;width:620px;height:380px"><div class="lbl">Account<em>2 screens · mobile</em></div></div>
+  <div class="art phone" style="left:1040px;top:480px"><div class="name"><span class="st">★</span><b>Home</b></div><div class="sc list"><h3>This season</h3><div class="it">Tea bowls, fired slowly.</div><div class="it">Studio notes</div><div class="btn">Shop the season</div></div><div class="port in"></div><div class="port out"></div></div>
+  <div class="art phone" style="left:1240px;top:480px"><div class="name"><b>Profile</b></div><div class="sc list"><h3>Your profile</h3><div class="it">Orders</div><div class="it">Addresses</div><div class="it">Saved glazes</div><div class="btn" style="height:36px;font-size:18px">Sign out</div></div><div class="port in"></div><div class="port out"></div><div class="pin" style="left:95px;top:240px"><span>2</span></div></div>
+  <!-- Diagram -->
+  <div class="sect" style="left:0;top:720px;width:900px;height:260px"><div class="lbl">Kiln map<em>diagram</em></div></div>
+  <div class="note" style="left:40px;top:760px">Hearth — kiln map</div>
+  <div class="shape" style="left:40px;top:810px;width:220px;height:120px"></div>
+  <div class="ellipse" style="left:340px;top:820px;width:120px;height:100px"></div>
+  <svg class="edges" width="1700" height="1000" style="overflow:visible">
+    <defs><marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#8E8A80"/></marker><marker id="mv" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#D8432A"/></marker></defs>
+    <path d="M360,160 C440,160 440,160 520,160" marker-end="url(#m)"/>
+    <rect class="labbg" x="398" y="148" width="84" height="20" rx="10"/><text class="lab" x="440" y="162" text-anchor="middle">Browse</text>
+    <path class="cross" d="M840,160 C940,160 960,300 940,420 C930,480 900,520 840,520" marker-end="url(#mv)" transform="translate(0,0)"/>
+    <rect class="labbg" x="912" y="330" width="52" height="20" rx="10"/><text class="lab" x="938" y="344" text-anchor="middle">Cart</text>
+    <path d="M360,520 C440,520 440,520 520,520" marker-end="url(#m)"/>
+    <rect class="labbg" x="406" y="508" width="68" height="20" rx="10"/><text class="lab" x="440" y="522" text-anchor="middle">Pay €28</text>
+    <path class="back" d="M520,540 C460,600 360,600 300,340 C290,300 300,280 360,260" marker-end="url(#m)"/>
+    <rect class="labbg" x="330" y="610" width="100" height="20" rx="10"/><text class="lab" x="380" y="624" text-anchor="middle">Keep shopping</text>
+    <path d="M1180,200 C1210,200 1210,200 1240,200" marker-end="url(#m)"/>
+    <path d="M1380,200 C1410,200 1410,200 1440,200" marker-end="url(#m)"/>
+    <path class="cross" d="M1580,200 C1640,200 1640,360 1600,480 C1580,560 1300,620 1180,620" marker-end="url(#mv)"/>
+    <rect class="labbg" x="1540" y="360" width="100" height="20" rx="10"/><text class="lab" x="1590" y="374" text-anchor="middle">Allow and finish</text>
+    <path d="M1180,620 C1210,620 1210,620 1240,620" marker-end="url(#m)"/>
+    <rect class="labbg" x="1182" y="590" width="56" height="20" rx="10"/><text class="lab" x="1210" y="604" text-anchor="middle">Profile</text>
+    <path d="M260,870 C300,870 300,870 340,870" marker-end="url(#m)"/>
+  </svg>
+</div>
+</div>
+
+<script>
+const stage=document.getElementById('stage'),world=document.getElementById('world'),pct=document.getElementById('pct');
+let v={x:310,y:90,k:.56};const apply=()=>{world.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.k})`;pct.textContent=Math.round(v.k*100)+'%'};apply();
+let drag=null;stage.addEventListener('pointerdown',e=>{if(e.target.closest('.ctx,.port'))return;drag={x:e.clientX,y:e.clientY,ox:v.x,oy:v.y};stage.classList.add('grabbing')});
+window.addEventListener('pointermove',e=>{if(!drag)return;v.x=drag.ox+e.clientX-drag.x;v.y=drag.oy+e.clientY-drag.y;apply()});
+window.addEventListener('pointerup',()=>{drag=null;stage.classList.remove('grabbing')});
+stage.addEventListener('wheel',e=>{e.preventDefault();const r=stage.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;if(e.ctrlKey||e.metaKey||Math.abs(e.deltaY)>Math.abs(e.deltaX)&&!e.shiftKey&&e.deltaMode===0&&Number.isInteger(e.deltaY)===false){const k=Math.min(4,Math.max(.1,v.k*Math.exp(-e.deltaY*.0015)));v.x=mx-(mx-v.x)*k/v.k;v.y=my-(my-v.y)*k/v.k;v.k=k}else{v.x-=e.deltaX;v.y-=e.deltaY}apply()},{passive:false});
+const z=f=>{const r=stage.getBoundingClientRect(),mx=r.width/2,my=r.height/2,k=Math.min(4,Math.max(.1,v.k*f));v.x=mx-(mx-v.x)*k/v.k;v.y=my-(my-v.y)*k/v.k;v.k=k;apply()};
+document.getElementById('zin').onclick=()=>z(1.25);document.getElementById('zout').onclick=()=>z(.8);
+document.querySelectorAll('.left .tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.left .tabs button').forEach(x=>x.classList.toggle('on',x===b));['layers','activity','review'].forEach(id=>document.getElementById(id).hidden=id!==b.dataset.t)});
+document.querySelectorAll('.art').forEach(a=>a.addEventListener('pointerdown',e=>{if(e.target.closest('.ctx'))return;document.querySelectorAll('.art').forEach(x=>x.classList.toggle('sel',x===a));e.stopPropagation()}));
+</script>
+</body>
+</html>

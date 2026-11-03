@@ -606,57 +606,81 @@ flowchart TB
   Undo[UndoRedo] --> Shell
 ```
 
-Fixed grid, full viewport, no page scroll (panels scroll internally):
+Full viewport, no page scroll. One infinite canvas fills the window under a 44px bar; every other piece of chrome floats over the canvas and can be collapsed, so the canvas is never boxed in.
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│ TopBar 48px: [Web|Story|Draw|Doc]  · context controls ·  ⟲ ⟳  Export│
-├──────────┬───────────────────────────────────────────┬───────────────┤
-│ Left     │ Canvas (scrolls, warm paper backdrop)     │ Inspector     │
-│ 260px    │                                           │ 300px         │
-│ Palette  │                                           │ Content /     │
-│ ──────   │                                           │ Design /      │
-│ Outline  │                                           │ Review        │
-└──────────┴───────────────────────────────────────────┴───────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ 44px bar  AgentCanvas / <project> ▾  [Canvas | DESIGN.md]   ● Agent · … ↶ ↷ ▶ Preview Export ▾ Skills · N │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ ╭ Project 272px ─╮                                            ╭ Inspector 292 ╮ ╭rail╮ │
+│ │ Layers         │        infinite canvas (dot grid)          │ Content       │ │ V  │ │
+│ │ Activity       │   ┌ Marketing ─────────┐ ┌ Onboarding ──┐  │ Design        │ │ H  │ │
+│ │ Review         │   │ [Home]──▶[Shop]    │ │ [☐][☐][☐]    │  ╰───────────────╯ │ P M│ │
+│ │ ──────────     │   └────────────────────┘ └──────────────┘                     │R O │ │
+│ │ Ask your agent │   ┌ Checkout ──────────┐                                      │L A │ │
+│ ╰────────────────╯   │ [Cart]──▶[Confirm] │   (hint strip)        [⤢ − 60% + ?]  │C ⇧T│ │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**TopBar context controls by tab**
+**Top bar (44px, charcoal).** Wordmark · project name (the project directory) with a menu holding `Load the Hearth sample…` and `Start over (blank)…` · a two-way switch `Canvas | DESIGN.md` (the server `tab` is `doc` for DESIGN.md, else the last canvas tab) · agent presence pill (§8.8) · open-issue badge · undo ⟲ / redo ⟳ · `▶ Preview` (Preview for a page, Play for a screen) · `Export ▾` · `Skills · N`. No per-tab tool strips.
 
-| tab | controls |
+**Left project panel (floating, 272px, `Cmd/Ctrl+\` collapses it to a 40px rail).** Three tabs:
+
+| tab | content |
 |---|---|
-| web | `Page \| Storyboard` toggle · breakpoint segmented `1280 / 768 / 390` · `Grid` toggle · `Specs` toggle · `Preview` · `Annotate` · `Show pins` · open-issue badge |
-| story | `Page \| Storyboard` toggle · `Specs` toggle · `Play` · `Annotate` · `Show pins` · open-issue badge |
-| draw | tool buttons `Select Pan Rect Ellipse Line Arrow Text Pen` · zoom `− 100% +` · `Annotate` · `Show pins` · open-issue badge |
-| doc | word count · `Export DESIGN.md` · open-issue badge |
+| Layers | the outline for every channel: `Web · N pages` → flows → pages → blocks → children; `Mobile · N screens` → flows → screens → hotspots; `Diagram · N shapes`. Same affordances as before: inline rename, ★ start, ⚠ for failing checks, hover × delete, `+ Flow`, `+ page/screen`, drag to reorder nodes within a flow. Click selects and scrolls the canvas to the item; double-click enters it (§8.3). |
+| Activity | every state update with a summary, newest first (capped at 200): who (`Agent` for `source: 'mcp'`, `You` otherwise), what, when. Clicking an entry selects the item it names when it still exists. |
+| Review | the review list and checks (§10), project-wide. The open-issue badge opens this tab filtered to Issues / Open. |
 
-Undo/redo buttons and the Export menu are always present. Buttons show a tooltip with the shortcut.
+Footer: **Ask your agent** composer (`Cmd/Ctrl+K`): typing a request and pressing `Copy prompt` copies `Project "<name>" in AgentCanvas (MCP: <origin>/mcp). Selected: <label>. Open issues: <n>. Request: <text>` to the clipboard and toasts `Copied. Paste it into Claude Code or Codex.` The studio calls no model and sends nothing anywhere.
 
-**Open-issue badge**: count of pins where `kind === 'issue' && !resolved` across the whole project. Clicking it opens the Review tab of the inspector filtered to Issues/Open.
+**Right tool rail (floating, 44px wide, vertically centered).** `Select V` · `Hand H` · `Add web page P` · `Add mobile screen M` · `Rect R` · `Ellipse O` · `Line L` · `Arrow A` · `Pen` · `Text T` · `Pin C` · `Tidy layout ⇧T`. Every button shows a tooltip with its shortcut after 300 ms. Drawing tools act on the diagram group of the canvas (§8.5); `Pin` replaces `Annotate` (§10).
 
-**Visual direction (Guidance):** print-atelier. Charcoal tools, warm paper canvas, vermillion only for selection, pins, cross-flow edges, and primary actions. Compact grotesque for tool UI (13px Inter), serif for designed content. No gradients, no purple, no glassmorphism, no rounded-everything (4px radius on controls, 0 on canvases).
+**Inspector (floating, 292px, contextual, `Cmd/Ctrl+.` hides it).** Appears only when something is selected, a node is entered, or a flow is being inspected. Tabs `Content | Design`. Panels are chosen by what is selected, never by tab: block → block content/design; page → page content (name, breakpoint `1280 / 768 / 390`, start-of-flow); screen or hotspot → screen content/design; shape → shape content/design; edge → the Edge panel; flow → name, start node, delete. **Project tokens** sit under Design for pages, screens and blocks, and in a `Project` popover from the top bar when nothing is selected.
 
-### 8.2 Flow graph and Storyboard view
+**Zoom pill (floating, bottom right).** `Fit ⌘0` · `−` · `NN%` (click resets to 100%) · `+` · `?` (keyboard map popover).
 
-**Left panel in web/story tabs**
+**Hint strip (bottom center).** One line of context (`Drag to pan · scroll to zoom · double-click a page to edit it`; `Esc leaves <name>` when entered); hidden after five sessions.
 
-- Palette (top, collapsible): web shows the six block types; story shows the five archetypes. Click inserts after the selected block (web) or appends a new screen to the current flow (story).
-- Outline (bottom, fills the rest): tree `Flow ▸ Node ▸ Block ▸ Child`. Each flow row has `+ page/screen`, `rename` (double-click), `delete` (hover ×). Each node row has `set as start` (hover ★), `rename`, `delete`. Clicking any row selects it and scrolls the canvas to it. The current node is highlighted; the start node shows a filled ★.
-- `+ Flow` button at the top of the outline creates `{ name: 'Untitled flow', channel, startId: null }` and one empty node inside it, and enters rename mode.
+**Empty project.** When there are no nodes and no shapes, a centered card offers `Add a web page`, `Add a mobile screen`, `Load the Hearth sample`, `Set up an agent` (copies the README agent prompt).
 
-**Storyboard view** (`view[tab] === 'board'`)
+**Open-issue badge**: count of pins where `kind === 'issue' && !resolved` across the whole project. Clicking it opens the Review tab of the left panel filtered to Issues/Open.
 
-- Auto layout, deterministic, no manual node positions: one **lane per flow**, stacked vertically in `flows` order. Lane header shows name, node count, and a ★ marker next to the start thumbnail.
-- Within a lane, nodes are ordered by BFS from `startId` following edges with `kind !== 'back'`; unreached nodes follow in `nodes` order. Thumbnails are laid left to right.
-- Thumbnail sizes: web `220×140` (page rendered at 1280 and scaled via CSS `transform: scale()`); mobile `110×220`. Horizontal gap 64 px, lane gap 56 px, lane left padding 32 px.
-- Each thumbnail has an **output port** (circle, right-middle) and an **input port** (left-middle). Drag from an output port to any thumbnail in the same channel (any lane) to create an edge. On drop, show an inline label input prefilled `"Link"`; Enter commits, Esc cancels. Kind is auto-set (`cross` if lanes differ, else `primary`).
-- Edges are SVG cubic Béziers from output port to input port, drawn in a single overlay `<svg>` above the thumbnails. Style: `primary` solid 1.5px ink; `alt` dashed `6 4`; `back` dotted `2 4` drawn below the lane (curve bows downward); `cross` solid 2px `#D8432A`. Arrowhead at the target. Label in a small pill at the curve midpoint; when several edges share the same from/to pair, offset each by 14 px vertically so labels do not overlap.
-- Click an edge (hit test within 6 px of the curve, or click the label) to select it. Inspector shows **Edge** panel: label text, kind radio (disabled with explanation when cross), from/to names, `Delete edge`.
-- Click a thumbnail to select the node; double-click opens it in Page view. `Delete` on a selected node in storyboard deletes it (with confirm if it has blocks/pins).
-- Storyboard supports pins (target `board`), `Annotate`, and `Show pins`.
+**Visual system (normative for the chrome).** Neutral light tools, warm content: the tokens below style every piece of chrome; designed content keeps using `project.tokens`.
+
+| token | value | use |
+|---|---|---|
+| `canvas` | `#F3F2EF` | the infinite surface (24 px dot grid in `dot`, fading below 35 % zoom) |
+| `dot` | `#D9D6CF` | grid dots |
+| `panel` | `#FFFFFF` | floating panels, artboards |
+| `hair` | `#E3E0D9` | borders |
+| `ink` | `#1C1B19` | text, active controls, top bar |
+| `muted` | `#7A766D` | secondary text and icons |
+| `faint` | `#A8A49B` | tertiary text, placeholders |
+| `accent` | `#D8432A` | selection ring, pins, cross-flow edges, one primary action |
+| `accentSoft` | `#FBE8E3` | selected rows |
+| `edge` | `#8E8A80` | connectors |
+| `ok` / `warn` | `#2E7D4F` / `#B23A1E` | check pills |
+
+Radii: 12 px panels, 8 px controls and rows, 6 px chips, 999 pills; artboards 0 px (web) and 18 px (phone). Elevation `0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.08)` on floating panels. Inter 13 px for tools (11 px uppercase `.08em` section labels), Fraunces only for the wordmark and designed content. Controls 30 px inputs, 32 px icon buttons, 28 px segmented buttons, focus ring 2 px `accent` at 2 px offset. Motion: 120 ms hover, 180 ms panel open/close, 220 ms ease-out zoom-to-artboard, all off under `prefers-reduced-motion`. No gradients, no purple, no glassmorphism.
+
+### 8.2 Canvas and flow groups
+
+**The canvas** is one infinite surface holding every web page, mobile screen, diagram shape, connector and pin. Pan by dragging empty canvas, by `Space`+drag anywhere, or by two-finger scroll; zoom with pinch, `Cmd/Ctrl`+wheel, `Cmd/Ctrl +/−`, between `0.1` and `4`, always around the cursor. `Cmd/Ctrl+0` fits everything with 80 px padding; `Cmd/Ctrl+1` fits the selection. The viewport is persisted in `project.canvas.view {x, y, zoom}` (`zoom: 0` means "fit all on open") through `set_canvas_view`, never undoable, so reopening the studio returns to the same place and an agent can focus the canvas. The world transform is one `translate(x, y) scale(zoom)` on the world layer; every world-space label, port, pin and handle counter-scales so it keeps its screen size.
+
+**Artboards.** Each node is an artboard at its real size in world units: a web page at its breakpoint width (`1280 / 768 / 390`) and natural height, rendered by the same block renderer as editing; a mobile screen at `390×844` inside a 1 px `hair` frame with an 18 px radius (the dark bezel appears only in Play). White fill, hairline border, soft shadow. The name label sits above the artboard (★ for the flow start, the breakpoint for pages) and stays 12 px at any zoom. Below 25 % zoom an artboard renders as a flat card with its name only. Click selects the node (2 px `accent` outline); double-click, `Enter` or `Cmd/Ctrl+1` enters it (§8.3).
+
+**Flow groups.** One rounded dashed group per flow, computed (never stored) as the bounding box of its nodes plus 40 px, labeled `Name · N pages · web`. Clicking the label inspects the flow; double-click renames; hover shows `+ page/screen` and `Tidy`. Web groups stack from `(0, 0)` with 160 px between them; mobile groups stack in a column 400 px to the right of the widest web group; the diagram group (§8.5) sits 200 px below the last web group.
+
+**Placement.** Inside a group, nodes without a position are auto-placed left to right in BFS order from `startId` following edges with `kind !== 'back'` (unreached nodes follow in `nodes` order; §9.5), 120 px apart, after the right-most placed node. Dragging an artboard sets `node.pos {x, y}` (world units, 8 px snap unless `Alt`) through `move_node`; `tidy_flow` clears every position in a flow so it returns to the lane. Auto-placed and placed nodes coexist.
+
+**Ports and edges.** Each artboard has an input port (left) and an output port (right) at `y + min(height, 400) / 2`. Drag from an output port to any artboard of the same channel to create an edge; on drop an inline label input prefilled `"Link"` appears (`Enter` commits, `Esc` cancels); kind is auto-set (`cross` when the flows differ, else `primary`). Edges are SVG cubic Béziers in one world-space overlay with non-scaling strokes, leaving the output port to the right and entering the input port from the left; back and leftward edges bow below the lower artboard. Style: `primary` solid 1.5 px `edge`; `alt` dashed `6 4`; `back` dotted `2 4`; `cross` solid 2 px `accent`. Arrowhead at the target. The label is a white pill at the curve midpoint (counter-scaled); edges sharing a from/to pair are offset 28 world px each so labels never overlap. Hovering an edge raises it. Click an edge (hit test within 6 screen px, or the label) to select it; the Inspector shows the **Edge** panel: label, kind radio (disabled with explanation when cross), from/to names, `Delete edge`. `Delete` on a selected node deletes it (with confirm if it has blocks/pins).
+
+**Pins** on the canvas target `board` (fractions of the artboard) when the artboard is not entered, `node` when it is, and `draw` in the diagram group (§10).
 
 ### 8.3 Web page designer
 
-**Canvas**: a frame of the current breakpoint width, centered, with a drop shadow, on the paper backdrop. The page scrolls inside the canvas area. Width changes animate 150 ms.
+**Canvas**: the page is an artboard on the canvas (§8.2). Entering it (double-click, `Enter`, `Cmd/Ctrl+1`, or an agent's `set_entered`) animates the viewport to fit it (220 ms), dims every other artboard to 60 %, and turns on in-place editing: block and child selection, chip drag to reorder, pins on blocks, Specs and Grid inside the artboard. `Esc` leaves and restores the previous viewport. A **contextual toolbar** floats above the entered or selected page: breakpoint `1280 / 768 / 390`, `Grid`, `Specs`, `▶ Preview`, `+ Add block ▾` (inserts after the selected block), `Duplicate` (selected block), `⋯` (rename, set as start, delete). Width changes animate 150 ms.
 
 **Blocks render rules**
 
@@ -691,9 +715,9 @@ Undo/redo buttons and the Export menu are always present. Buttons show a tooltip
 
 ### 8.4 Mobile story designer
 
-**Canvas**: a phone bezel `390×844` content area, 24 px dark bezel, 40 px radius, centered. Inside: status bar (time "9:41", signal/battery glyphs drawn with CSS), **story progress bars** at the top (one segment per screen in the current flow in BFS order, current one filled), screen content, home indicator.
+**Canvas**: the screen is a `390×844` artboard with an 18 px radius on the canvas (§8.2), entered like a page (§8.3). Its contextual toolbar holds `Specs`, `▶ Play`, `+ Add screen ▾` (archetype menu, inserted after it), `+ Hotspot`, `⋯`. The phone bezel (24 px dark bezel, 40 px radius, status bar with "9:41" and CSS signal/battery glyphs, **story progress bars** at the top with one segment per screen of the current flow in BFS order, home indicator) appears only in Play (§8.7).
 
-**Filmstrip** below the phone: thumbnails (`60×130`) of the **current flow only**, in BFS order, with a `+` tile at the end that adds a screen. Click selects; drag reorders *node order* only (does not change edges).
+Screens of a flow are siblings in their group on the canvas; node order is changed by dragging rows in Layers or by `reorder_nodes` (edges unchanged).
 
 **Archetypes** (initial field values when inserted; the designer can change any field afterwards):
 
@@ -711,9 +735,9 @@ Undo/redo buttons and the Export menu are always present. Buttons show a tooltip
 
 ### 8.5 SVG draw
 
-- A single `<svg>` filling the canvas area; world transform `translate(view.x, view.y) scale(view.zoom)`. Background: paper with a faint 8 px dot grid (drawn with a `<pattern>`) that scales with zoom.
-- Tools: `Select` (click/drag select, move, resize), `Pan` (drag), `Rect`, `Ellipse`, `Line`, `Arrow`, `Text` (click places, inline `<foreignObject>` input until Enter/blur), `Pen` (freehand polyline, points sampled every ≥2 px of movement, simplified by dropping points closer than 1.5 px).
-- Holding `Space` temporarily switches to Pan. Wheel zooms around the cursor between `0.25` and `4`; `Cmd/Ctrl+0` resets. `+`/`−` buttons step zoom by 1.25×.
+- Shapes live in the **diagram group** of the canvas (§8.2): one `<svg>` overlay in world space, translated to the group origin, so shape coordinates stay in diagram space (agents and the SVG export are unaffected by where the group sits). The canvas dot grid shows through.
+- Tools (on the rail): `Select` (click/drag select, move, resize), `Hand` (drag), `Rect`, `Ellipse`, `Line`, `Arrow`, `Text` (click places, inline `<foreignObject>` input until Enter/blur), `Pen` (freehand polyline, points sampled every ≥2 px of movement, simplified by dropping points closer than 1.5 px).
+- Holding `Space` temporarily switches to Hand. Zoom and pan are the canvas's (§8.2); the zoom pill `+`/`−` buttons step by 1.25×.
 - **Snap**: while creating, moving, or resizing, snap x/y to the 8 px grid unless `Alt` is held. Pen never snaps.
 - Selection handles: 8 handles on rect/ellipse (resize), 2 endpoint handles on line/arrow, bounding box only on text and pen (move). `Delete` removes. `Cmd/Ctrl+D` duplicates with a +16/+16 offset.
 - Inspector › Design for a shape: stroke token, fill token or none, stroke width `1 | 1.5 | 2 | 3`, text role for text shapes.
@@ -739,9 +763,9 @@ Undo/redo buttons and the Export menu are always present. Buttons show a tooltip
 
 These are additions to the §8.1 chrome.
 
-- **Skills button** in the TopBar, right of the Export menu, labeled `Skills · N` (N = installed skills including the built-in). It opens a right-side drawer over the Inspector (300 px, same panel styling) listing each skill: name, version, description, and a `built-in` chip for `agentcanvas`. Clicking a skill shows its `SKILL.md` rendered with `renderMd` (§8.6) and a `← Skills` back link. `Esc` closes the drawer.
+- **Skills button** in the TopBar, right of the Export menu, labeled `Skills · N` (N = installed skills including the built-in). It opens a floating sheet from the right edge (360 px, panel styling) listing each skill: name, version, description, and a `built-in` chip for `agentcanvas`. Clicking a skill shows its `SKILL.md` rendered with `renderMd` (§8.6) and a `← Skills` back link. `Esc` closes the drawer.
 - The drawer is **read-only**: no install, remove, or edit controls. A footer line reads `Manage skills with: agent-canvas skills --help`.
-- **Agent activity pill**: when an SSE update has `source: 'mcp'`, a small pill appears left of the undo buttons — `Agent · <summary>` — for 3 s (a newer update replaces it). It is chrome: charcoal with paper text, vermillion dot.
+- **Agent activity pill**: when an SSE update has `source: 'mcp'`, a small pill appears left of the undo buttons — `● <summary>` — for 3 s (a newer update replaces it). The **Activity** tab of the left panel (§8.1) keeps the record: every update with a summary, newest first, capped at 200.
 - **Connection state**: if the SSE stream drops, the TopBar shows `Reconnecting…` in place of the open-issue badge and all editing controls are disabled until the stream is back and the client has re-read `/api/state`.
 - Hidden in Preview/Play like all chrome.
 
@@ -817,12 +841,12 @@ function laneOrder(flow, nodes, edges) {
 
 ## 10. Review pins
 
-- **Placement**: with `annotate` on, the cursor is a crosshair; a kind picker (Issue / Suggestion / Question, default Issue, remembered for the session) sits in the TopBar next to `Annotate`. Click on a page, a block, a screen, a storyboard thumbnail, or the draw canvas to place a pin. A popover opens immediately with a textarea; `Enter` saves, `Shift+Enter` newline, `Esc` cancels (and removes the empty pin). Empty bodies are not saved.
-- **Target resolution**: in Page view clicking inside a block records `{type:'node', nodeId, blockId}` with `x,y` as fractions of that **block's** box (so pins follow reflow). Clicking the frame outside blocks records `{type:'node', nodeId}` with fractions of the frame. On the storyboard, `{type:'board', nodeId}` with fractions of the thumbnail. On draw, `{type:'draw'}` with world coordinates.
+- **Placement**: with the `Pin` tool active, the cursor is a crosshair; a kind picker (Issue / Suggestion / Question, default Issue, remembered for the session) appears beside the rail. Click inside an entered page or screen, on any artboard, or in the diagram group to place a pin. A popover opens immediately with a textarea; `Enter` saves, `Shift+Enter` newline, `Esc` cancels (and removes the empty pin). Empty bodies are not saved.
+- **Target resolution**: in Page view clicking inside a block records `{type:'node', nodeId, blockId}` with `x,y` as fractions of that **block's** box (so pins follow reflow). Clicking the frame outside blocks records `{type:'node', nodeId}` with fractions of the frame. On an artboard that is not entered, `{type:'board', nodeId}` with fractions of the artboard. In the diagram group, `{type:'draw'}` with diagram coordinates.
 - **Rendering**: 22 px circle, vermillion fill, paper number, 1.5 px paper ring, small drop shadow. Resolved pins render in `muted` with a check glyph instead of the number when the filter shows them. Kind is shown by a glyph on hover and in the popover: `!` issue, `✦` suggestion, `?` question.
 - **Interaction**: click selects (popover shows kind, body, Resolve/Reopen, Delete, and the target name). Drag moves (updates fractions/world coords). `Delete` key deletes a selected pin.
 - **Show pins**: when on, pins are visible while designing and do not block clicks on content unless the click is on the pin itself. When off, pins are hidden everywhere except the Review list.
-- **Review tab** (inspector): filters `kind` (All / Issue / Suggestion / Question) and `status` (Open / Resolved / All, default Open); list rows show number, kind glyph, first line of body, target label ("Home › Hero", "Storyboard › Cart", "Draw"). Clicking a row switches tab/view/node as needed, scrolls so the pin is visible, and selects it. Below the list: **Checks** (computed contrast and tap-target failures with jump links).
+- **Review tab** (left panel): filters `kind` (All / Issue / Suggestion / Question) and `status` (Open / Resolved / All, default Open); list rows show number, kind glyph, first line of body, target label ("Home › Hero", "Storyboard › Cart", "Draw"). Clicking a row zooms the canvas so the pin is visible (entering the node for node pins) and selects it. Below the list: **Checks** (computed contrast and tap-target failures with jump links).
 - **Numbering**: `n = ++pinCounter` on create. Deleting never renumbers.
 - **Cascade**: deleting a node or block deletes pins targeting it. Deleting a draw shape does not delete draw pins.
 - Pins are in the project and in `.agentcanvas/project.json`; they are excluded from HTML/SVG exports and included in the DESIGN.md "Open issues" appendix.
@@ -837,14 +861,22 @@ function laneOrder(flow, nodes, edges) {
 |---|---|---|
 | `Esc` | preview/play | exit |
 | `Esc` | popover or inline input open | cancel |
-| `Esc` | otherwise | clear selection; turn `annotate` off |
+| `Esc` | a node is entered | leave it (restore the previous viewport) |
+| `Esc` | otherwise | tool back to Select; clear selection |
 | `Delete` / `Backspace` | selection is block/child/hotspot/shape/edge/pin and focus is not in an input | delete |
 | `Cmd/Ctrl+D` | block/shape selected | duplicate |
 | `Cmd/Ctrl+Z` | any (also inside the doc textarea) | undo current tab's history |
 | `Cmd/Ctrl+Shift+Z` | any | redo |
-| `Space` (hold) | draw | temporary pan |
-| `Alt` (hold) | draw | disable snap |
-| `Cmd/Ctrl+0` | draw | reset zoom |
+| `Space` (hold) | canvas | temporary Hand |
+| `Alt` (hold) | canvas | disable 8 px snap (shapes and artboards) |
+| `V` `H` `P` `M` `R` `O` `L` `A` `T` `C` | canvas, not typing | Select, Hand, Add page, Add screen, Rect, Ellipse, Line, Arrow, Text, Pin |
+| `Cmd/Ctrl+0` | canvas | fit all |
+| `Cmd/Ctrl+1` | canvas | fit the selection; enter it when it is a node |
+| `Enter` | node selected | enter it |
+| `Cmd/Ctrl+\` | any | toggle the left panel |
+| `Cmd/Ctrl+.` | any | toggle the inspector |
+| `Shift+T` | canvas | tidy the selected node's flow |
+| `Cmd/Ctrl+K` | any | focus the prompt composer |
 | `←` / `→` | play | back / follow first `primary` edge |
 
 Shortcuts are ignored while focus is in an `input`, `textarea`, or `contenteditable`, except `Esc` and undo/redo. Use one `keydown` listener on `window`.
@@ -993,7 +1025,11 @@ Every row is a reducer case in `internal/studio`. `MCP tool` is the tool that se
 | `set_selection` | `{ selection }` | — | `set_selection` |
 | `set_toggles` | `{ showPins?, showGrid?, showSpecs? }` | — | `set_toggles` |
 | `set_preview` | `{ on }` | — | `preview` |
-| `set_draw_view` | `{ x, y, zoom }` | none (persisted, not undoable) | — |
+| `set_draw_view` | `{ x, y, zoom }` | none (persisted, not undoable; kept for compatibility, the UI no longer reads it) | — |
+| `set_canvas_view` | `{ x, y, zoom }` (zoom clamped to 0.1–4; 0 = fit all on open) | none (persisted, not undoable) | `set_canvas_view` |
+| `set_entered` | `{ nodeId }` (empty or null leaves; also makes the node current) | — | `set_entered` |
+| `move_node` | `{ nodeId, x, y }` (world units, rounded) | channel | `move_node` |
+| `tidy_flow` | `{ flowId }` (clears every `pos` in the flow; refused when none is set) | channel | `tidy_flow` |
 | `undo` / `redo` | `{ tab }` | that tab | `undo` / `redo` |
 | `reset_project` | `{}` | clears all | `reset_project` |
 | `update_tokens` | `{ colors?: Partial<…>, type?: Partial<…> }` (space is refused) | `tab` field | `update_tokens` |
@@ -1131,8 +1167,8 @@ Single Babel script, in this order, with a `// ===== Section N: name =====` bann
 3. **Primitives** — `Seg` (segmented control), `TokenSwatches`, `SpaceScale`, `Field`, `IconButton`, `Pill`, `Popover`, `Toast`.
 4. **Renderers (pure, reused by editor, storyboard thumbnails, and preview)** — `renderBlock(block, ctx)`, `renderScreen(screen, ctx)` where `ctx = {tokens, bp, mode: 'edit'|'preview'|'thumb', onNavigate, selection, onSelect}`.
 5. **Chrome** — `TopBar`, `LeftPanel` (Palette + Outline), `Inspector` (Content/Design/Review/Edge), `ExportMenu`, `SkillsDrawer`, `AgentPill`.
-6. **Shared views** — `StoryboardView`, `PinLayer`, `PreviewStage`, `SpecsOverlay`, `GridOverlay`.
-7. **Editors** — `WebEditor`, `StoryEditor`, `DrawEditor`, `DesignDoc`.
+6. **Shared views** — `PinLayer`, `PreviewStage`, `SpecsOverlay`, `GridOverlay`.
+7. **Canvas** — `useViewport`, `layoutCanvas`, `Canvas`, `Artboard`, `Connectors`, `Groups`, `DrawLayer`, `ContextToolbar`, `DesignDoc`. Formerly **Editors** — `WebEditor`, `StoryEditor`, `DrawEditor`, `DesignDoc`.
 8. **App** — composes everything, owns `LocalUi`, one `keydown` listener, error boundary.
 
 ### 16.2 Milestones
@@ -1161,11 +1197,11 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 | # | Given / When / Then |
 |---|---|
 | 1 | When the Web tab is opened, then `pg_home` renders all five blocks in order with the token colors; editing the hero headline in Content updates the canvas on each keystroke. |
-| 2 | When the Story tab is opened, then `sc_welcome` renders in the bezel with three progress segments and the filmstrip shows exactly Welcome, Pick your craft, Notifications. |
+| 2 | When `sc_welcome` is entered, then it renders as a 390×844 artboard with its title, body and CTA; Play from it shows the bezel with three progress segments. |
 | 3 | When the Draw tab is opened, then the five seed shapes render; choosing Rect and dragging creates a rect whose corners are multiples of 8. |
 | 4 | When the Doc tab is opened, then the textarea contains the seed markdown and the preview shows four `##` headings; the left rail lists five headings. |
 | 5 | Then the web Outline shows flows Marketing and Checkout; the story Outline shows Onboarding and Account; each flow row lists its nodes. |
-| 6 | When `Storyboard` is toggled in Web, then two lanes appear with 2 thumbnails each and 12 distinct curves (`ed_w1`…`ed_w12`), 9 of them vermillion; toggling back returns to the same page. |
+| 6 | When the canvas fits all, then the Marketing and Checkout groups show 2 artboards each and 12 distinct curves (`ed_w1`…`ed_w12`), 9 of them vermillion; entering Home and pressing Esc returns to the same viewport. |
 | 7 | When dragging from the `pg_shop` output port onto `pg_cart` and typing "Buy now" + Enter, then a new edge appears in vermillion with kind `cross` shown read-only in the inspector, and Preview from Shop can follow it. |
 | 8 | Then `sc_welcome` shows two outbound edges (Get started, Skip) with offset labels; the Edge inspector for each shows a different label. |
 | 9 | When Play starts in Onboarding and "Allow and finish" is tapped on Notifications, then the Home screen of Account appears and the progress bars show two segments. |
@@ -1173,7 +1209,7 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 | 11 | When the `accent` token is changed to `#0055FF` in Design › Project tokens, then every CTA button on web and mobile and the hero CTA update; storyboard cross edges and pins stay vermillion. |
 | 12 | When `bk_home_hero` is selected, then Design shows segmented typeRole (display active), weight, align, pad (8 active), gap (4 active), fill/ink swatches; changing pad to 32 updates padding visibly. |
 | 13 | When the hero headline is edited, then blurred, then `Cmd/Ctrl+Z`, then the previous headline returns; `Cmd/Ctrl+Shift+Z` re-applies it; 51 distinct edits keep only the last 50 undoable. Undo in Story does not touch Web. |
-| 14 | When `Preview` is clicked, then panels and TopBar are gone; clicking nav "Cart" shows the Cart page; `Esc` returns to the editor with Home still current. |
+| 14 | When `Preview` is clicked, then every panel, the rail, the pill and the top bar are gone; clicking nav "Cart" shows the Cart page; `Esc` returns to the canvas with Home still entered. |
 | 15 | When breakpoint `390` is chosen, then nav shows "Menu", Features is one column, hero headline renders at 32/38 (display → xl) and hero padding drops one step; at `768` Features has two columns and headline is 32/38. |
 | 16 | When the Outline row "Home › Nav › Cart" is clicked, then that single link is outlined on the canvas and the inspector shows its label and Target. |
 | 17 | When the second feature card is clicked on the canvas, then only that card is outlined (dashed) and the Content panel edits its title. |
@@ -1183,15 +1219,15 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 | 21 | Then `bk_shop_cta` shows a ⚠ in Outline and the Design panel reads a ratio below 4.5 with "Fails AA"; changing `buttonInk` to `ink` flips it to pass and removes the ⚠. |
 | 22 | Then `sc_profile` shows ⚠ and Tap targets lists "Sign out: 36px (min 44)"; changing size to `md` clears it. |
 | 23 | Each row in §11.1 works as described; typing "d" in a text field does not duplicate anything. |
-| 24 | Pins can be placed on the Home page, on `sc_craft`, on the Cart storyboard thumbnail, and on the draw canvas; each shows the next number. |
+| 24 | Pins can be placed inside the entered Home page, on `sc_craft`, on the Cart artboard (not entered), and in the diagram group; each shows the next number and sits under the cursor at any zoom. |
 | 25 | The kind picker offers exactly Issue, Suggestion, Question, and the glyph on the pin popover matches. |
 | 26 | Click places and opens the popover; Enter saves; Esc on an empty note removes the pin; dragging moves it and the new position survives reload; Resolve greys it and Delete removes it. |
-| 27 | Review filter `Question` + `Open` shows only open questions; clicking a row for a storyboard pin switches to Storyboard view and selects that pin. |
+| 27 | Review filter `Question` + `Open` shows only open questions; clicking a row for an artboard pin zooms the canvas to that pin and selects it. |
 | 28 | With `Show pins` on, selecting and editing blocks still works around pins; the badge reads `2` on the seed and `1` after resolving pin 1. |
 | 29 | Reload keeps all pins. The exported `hearth-home.html` and `hearth-draw.svg` contain no pin markup; the exported `DESIGN.md` lists pins 1 and 2 under Open issues. |
 | 30 | Seed has hero `bodyRole: xs`, `pad: 2`; `bk_shop_cta` fails AA; `sc_profile` CTA is `sm`. |
-| 31 | Seed web storyboard shows `ed_w1…ed_w12` and pins 1 and 2 on their blocks. |
-| 32 | Seed mobile storyboard shows Onboarding (3) and Account (2) with `ed_m4` drawn in vermillion into the Account lane. |
+| 31 | The seed canvas shows `ed_w1…ed_w12` and pins 1 and 2 on their blocks. |
+| 32 | The seed canvas shows Onboarding (3) and Account (2) with `ed_m4` drawn in vermillion into the Account group. |
 | 33 | Seed DESIGN.md contains headings Intent, Users, Principles, Decisions with the §7.5 text. |
 | 34 | With the machine offline (or all non-loopback traffic blocked), `agent-canvas serve` then opening the UI URL loads the full studio with Inter and Fraunces rendered; the browser network panel shows requests only to `127.0.0.1:<port>`. |
 | 35 | With `47321` occupied, the server binds `47322` and prints the UI URL, the MCP URL, and the agent note; with `47321`–`47341` all occupied it exits with code `2`. |
@@ -1210,11 +1246,11 @@ Each item maps to the requirement number in §3. "Given" states assume the untou
 Walk this as a designer and as an agent, not a screenshot check. Record pass/fail per step in the final report.
 
 1. **Doc**: edit principle 3; export `DESIGN.md`; open the file; confirm the edit, the Flows section (both channels), and both open issues.
-2. **Web Storyboard**: drag a new cross-flow edge Shop → Cart labeled "Buy now"; switch to Page view on Shop; Preview; click the element that carries that label (if none, add the label to a nav link via Target); confirm Cart appears.
+2. **Web canvas**: drag a new cross-flow edge Shop → Cart labeled "Buy now"; enter Shop; Preview; click the element that carries that label (if none, add the label to a nav link via Target); confirm Cart appears.
 3. **Web Phone width**: switch to 390; confirm reflow; turn on Specs; select the hero; fix `bodyRole` to `md` and `pad` to 24; fix the Shop CTA contrast via `buttonInk`; undo twice; redo twice.
-4. **Mobile Storyboard**: confirm Onboarding → Home exists; Play from Welcome through to Home; open Profile via the avatar hotspot; flag the small CTA with a pin; fix size to `md`; resolve the pin.
+4. **Mobile canvas**: confirm Onboarding → Home exists; Play from Welcome through to Home; open Profile via the avatar hotspot; flag the small CTA with a pin; fix size to `md`; resolve the pin.
 5. **Draw**: create a rect, ellipse, arrow, text; move with and without Alt; zoom; export SVG and open it.
-6. **Pins**: place Issue / Suggestion / Question on a page, a screen, a storyboard node, and the SVG; resolve one; confirm the badge count and the Review filters.
+6. **Pins**: place Issue / Suggestion / Question on a page, a screen, an artboard, and the diagram; resolve one; confirm the badge count and the Review filters.
 7. **Reload**: project, tokens, graph, doc, pins, current tab, and breakpoint restore.
 8. **Exports**: all four visual exports open standalone, honor edges where applicable, and contain no pins or studio chrome.
 9. **Console**: zero errors and zero React warnings across the whole walkthrough.
@@ -1227,7 +1263,7 @@ Walk this as a designer and as an agent, not a screenshot check. Record pass/fai
 
 ## 19. Out of scope
 
-Not Figma. Do **not** build: hover/pressed state machines, version compare, auto-layout constraints, image uploads, component variants, full CommonMark (tables and code fences in the author doc are not required), manual storyboard node positioning, or theme switching for the studio chrome.
+Not Figma. Do **not** build: hover/pressed state machines, version compare, auto-layout constraints, image uploads, component variants, full CommonMark (tables and code fences in the author doc are not required), or theme switching for the studio chrome.
 
 Also out: multiple projects per process, multiplayer across machines, presence or cursors, auth (bearer tokens or otherwise), non-loopback binding, NATS/Redis or any external broker, templ, Datastar, npm or any bundler, git-URL or registry skill installs, skill code execution, skill-defined tools, agent-specific plugins or handlers, an MCP tool for skill export, and creating or editing skills inside the studio UI.
 
