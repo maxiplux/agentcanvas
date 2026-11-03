@@ -265,7 +265,7 @@ footer a { color: var(--paper); }
 
 <header class="mast">
   <a class="mark" href="#top" aria-label="AgentCanvas, back to top"><i></i>AgentCanvas</a>
-  <span class="chip">v0.1.1</span>
+  <span class="chip">v0.1.3</span>
   <nav aria-label="Sections">
     <a class="keep" href="#install">Install</a>
     <a href="#start">Quick start</a>
@@ -407,11 +407,12 @@ footer a { color: var(--paper); }
 <span class="p">$ </span>agent-canvas update            <span class="c"># download, verify, and replace this binary</span></pre></div>
 
       <h3>For coding agents</h3>
-      <p>Paste this into your agent. It installs (or updates) the CLI, gives the agent the built-in skill, and starts the studio:</p>
+      <p>Paste this into your agent. It installs (or updates) the CLI, sets the project up with the skills and an MCP server, and opens the studio:</p>
       <div class="code"><span class="label">prompt</span><pre>Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh`
 (on Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), then run
-`agent-canvas skills export agentcanvas --agent claude` in this project, start `agent-canvas`
-here, connect to the MCP URL it prints, and call get_canvas first.</pre></div>
+`agent-canvas init` in this project and `agent-canvas open` to start the studio and show
+me the UI. Use the agentcanvas MCP server it configures (after a reload) and call
+get_canvas first.</pre></div>
 
       <table>
         <thead><tr><th>Release file</th><th>For</th></tr></thead>
@@ -468,6 +469,22 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
       <h2 id="h-agents">Connect an agent</h2>
       <p>Any client that speaks the Model Context Protocol can drive the studio. Agent edits appear in open browsers immediately, with a short <code>Agent · …</code> note in the top bar.</p>
 
+      <h3>One command: <code>agent-canvas init</code></h3>
+      <p>Run it in a project and every supported agent is ready. It is safe to re-run; it refreshes the skills and config in place and keeps everything else in those files.</p>
+      <div class="code"><span class="label">terminal</span><pre><span class="p">$ </span>cd my-project
+<span class="p">$ </span>agent-canvas init                      <span class="c"># Claude Code and Codex</span>
+<span class="p">$ </span>agent-canvas init --agent claude       <span class="c"># just one agent</span></pre></div>
+      <table>
+        <thead><tr><th>Writes</th><th>For</th></tr></thead>
+        <tbody>
+          <tr><td><code>.agentcanvas/project.json</code></td><td>The design project, seeded with Hearth if missing. Never overwritten.</td></tr>
+          <tr><td><code>.claude/skills/</code> · <code>.mcp.json</code></td><td>Claude Code: every skill, plus an <code>agentcanvas</code> MCP server</td></tr>
+          <tr><td><code>.agents/skills/</code> · <code>.codex/config.toml</code></td><td>Codex: every skill, plus <code>[mcp_servers.agentcanvas]</code> (read in trusted projects)</td></tr>
+          <tr><td><code>.gitignore</code></td><td>The per-machine <code>.agentcanvas</code> files, in git repositories</td></tr>
+        </tbody>
+      </table>
+      <p>The MCP entry runs <code>agent-canvas attach --start</code>, so the agent can always connect: if the studio isn't running, it starts in the background and keeps running after the agent disconnects. The agent can also show it to you with <code>agent-canvas open</code>, which starts the studio if needed and opens the UI in your browser. <code>agent-canvas open --no-browser</code> only starts it and prints the URLs.</p>
+
       <h3>Streamable HTTP</h3>
       <p>Point the client at the MCP URL that <code>agent-canvas</code> printed. <code>http://127.0.0.1:&lt;port&gt;/mcp.json</code> returns this config with the real port filled in:</p>
       <div class="code"><span class="label">mcp config · http</span><pre>{
@@ -477,10 +494,10 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
 }</pre></div>
 
       <h3>stdio</h3>
-      <p>For clients that start a command instead, use <code>attach</code>. It connects to the studio already running for the current folder; add <code>--project DIR</code> or <code>--url URL</code> to choose another.</p>
+      <p>For clients that start a command instead, use <code>attach</code>. It connects to the studio for the current folder; <code>--start</code> starts it in the background first if it isn't running. Add <code>--project DIR</code> or <code>--url URL</code> to choose another.</p>
       <div class="code"><span class="label">mcp config · stdio</span><pre>{
   "mcpServers": {
-    "agentcanvas": { "command": "agent-canvas", "args": ["attach"] }
+    "agentcanvas": { "command": "agent-canvas", "args": ["attach", "--start"] }
   }
 }</pre></div>
       <p>To start the studio and speak MCP over stdin/stdout from a single process, use <code>agent-canvas serve --stdio</code>. In that mode, log lines go to stderr.</p>
@@ -534,7 +551,9 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
       <div class="num"><big>07</big>reference</div>
       <h2 id="h-ref">CLI reference</h2>
       <div class="code"><span class="label">synopsis</span><pre>agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-agent-canvas attach [--project DIR | --url URL]
+agent-canvas init [DIR] [--agent claude,codex]
+agent-canvas open [DIR] [--no-browser]
+agent-canvas attach [--project DIR [--start] | --url URL]
 agent-canvas skills list [--json]
 agent-canvas skills install PATH [--force]
 agent-canvas skills remove NAME
@@ -551,6 +570,9 @@ agent-canvas --help</pre></div>
           <tr><td><code>--stdio</code></td><td>Also serve MCP on stdin/stdout; startup lines go to stderr.</td></tr>
           <tr><td><code>--dev</code></td><td>For contributors: serve React's development builds and read <code>web/</code> from disk.</td></tr>
           <tr><td><code>--url URL</code></td><td><code>attach</code> only: connect to this MCP URL instead of the current folder's server.</td></tr>
+          <tr><td><code>--start</code></td><td><code>attach</code> only: start the studio in the background first if it isn't running.</td></tr>
+          <tr><td><code>--agent LIST</code></td><td><code>init</code>: which agents to set up, comma-separated: <code>claude</code>, <code>codex</code> (default: both).</td></tr>
+          <tr><td><code>--no-browser</code></td><td><code>open</code>: start the studio and print its URLs without opening a browser.</td></tr>
         </tbody>
       </table>
       <table>
@@ -589,7 +611,7 @@ agent-canvas --help</pre></div>
         <details><summary>“no free port in 47321–47341” (exit 2)</summary><div><p>Something else holds all 21 ports. Pick one yourself: <code>agent-canvas --port 8090</code>.</p></div></details>
         <details><summary>“a server is already running for …” (exit 3)</summary><div><p>Only one process may serve a project. The message prints that server's UI and MCP URLs, so open those, or stop the other process first.</p></div></details>
         <details><summary>The top bar says “Reconnecting…”</summary><div><p>The page lost its connection to the server, so editing pauses. Start <code>agent-canvas</code> again in the same folder. The page reconnects by itself and reloads the latest state.</p></div></details>
-        <details><summary>“No AgentCanvas server for &lt;dir&gt;” from attach</summary><div><p><code>attach</code> only connects to a studio that is already running. Start <code>agent-canvas</code> in that folder, or pass <code>--url http://127.0.0.1:&lt;port&gt;/mcp</code>.</p></div></details>
+        <details><summary>“No AgentCanvas server for &lt;dir&gt;” from attach</summary><div><p>Plain <code>attach</code> only connects to a studio that is already running. Use <code>attach --start</code> (what <code>init</code> configures), run <code>agent-canvas open</code> in that folder, or pass <code>--url http://127.0.0.1:&lt;port&gt;/mcp</code>.</p></div></details>
         <details><summary>My project was replaced by the sample</summary><div><p>If <code>project.json</code> can't be read or contains invalid values, it is renamed to <code>project.json.bad-&lt;timestamp&gt;</code>, a warning is printed, and the sample is loaded. Your file is still there to inspect or fix.</p></div></details>
         <details><summary>“forbidden host” or “forbidden origin” (403)</summary><div><p>The server only answers pages it served itself, at <code>http://127.0.0.1:&lt;port&gt;</code> or <code>http://localhost:&lt;port&gt;</code>. This blocks other websites from reading or changing your project, so open the URL that <code>agent-canvas</code> printed.</p></div></details>
         <details><summary>“cannot write to …” from agent-canvas update</summary><div><p>The binary lives in a folder you can't write to, such as a root-owned <code>/usr/local/bin</code>. Re-run the one-line installer instead, or move <code>agent-canvas</code> to a folder you own.</p></div></details>
@@ -620,7 +642,7 @@ agent-canvas --help</pre></div>
 
 <footer>
   <div class="in">
-    <span>AgentCanvas · <code>agent-canvas</code> v0.1.1</span>
+    <span>AgentCanvas · <code>agent-canvas</code> v0.1.3</span>
     <span>Set in Fraunces · <a href="https://github.com/maxiplux/agentcanvas">github.com/maxiplux/agentcanvas</a></span>
   </div>
 </footer>

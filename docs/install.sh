@@ -98,4 +98,5 @@ case ":$PATH:" in
   *":$dir:"*) ;;
   *) say "add it to your PATH:  export PATH=\"$dir:\$PATH\"" ;;
 esac
-say "start the studio in a project folder with: agent-canvas"
+say "set up a project for your coding agent with: cd your-project && agent-canvas init"
+say "open the studio with: agent-canvas open"

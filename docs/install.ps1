@@ -58,7 +58,8 @@
 
     $installed = & $dest version
     Write-Host "agent-canvas installer: installed $installed to $dest"
-    Write-Host 'agent-canvas installer: start the studio in a project folder with: agent-canvas'
+    Write-Host 'agent-canvas installer: set up a project for your coding agent with: cd your-project; agent-canvas init'
+    Write-Host 'agent-canvas installer: open the studio with: agent-canvas open'
   }
   finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue

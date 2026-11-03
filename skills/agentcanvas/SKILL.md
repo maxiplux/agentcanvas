@@ -16,10 +16,10 @@ AgentCanvas is a local design studio: web pages, mobile story screens, connected
 
 - Not installed yet? Install or update in one line: `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`). `agent-canvas update` updates an existing install.
 
-- Start the studio in the project directory: `agent-canvas serve`. It prints the UI URL and the MCP URL (`http://127.0.0.1:<port>/mcp`).
-- Any streamable-HTTP MCP client connects to the MCP URL. `GET /mcp.json` on the server returns a generic client config.
-- A client that can only spawn a command uses `agent-canvas attach` (stdio proxy to the server already running for the current directory; `--project DIR` or `--url URL` to choose another).
-- `agent-canvas serve --stdio` starts the studio and speaks MCP on stdin/stdout in one process.
+- Set a project up once: `agent-canvas init` in the project directory. It creates `.agentcanvas/`, copies the skills to `.claude/skills/` and `.agents/skills/`, and adds an `agentcanvas` MCP server to `.mcp.json` and `.codex/config.toml` (command `agent-canvas attach --start`). If the AgentCanvas MCP tools are not available to you, run `agent-canvas init`, then ask the user to restart or reload the agent so it picks up the MCP server.
+- **You can start and show the studio yourself.** `agent-canvas open` starts it in the background when it is not running and opens the UI in the user's browser; it prints the UI and MCP URLs and returns, and the studio keeps running. Use `agent-canvas open --no-browser` to only start it and get the URLs. Tell the user the UI URL so they can watch and edit with you.
+- `agent-canvas attach --start` (what `init` configures) proxies MCP over stdio and starts the studio in the background first when none is running. Plain `agent-canvas attach` only connects to a studio that is already running.
+- `agent-canvas serve` runs the studio in the foreground and prints the UI URL and the MCP URL (`http://127.0.0.1:<port>/mcp`). Any streamable-HTTP MCP client connects to the MCP URL; `GET /mcp.json` returns a generic client config. `agent-canvas serve --stdio` starts the studio and speaks MCP on stdin/stdout in one process.
 
 ## Always call `get_canvas` first
 

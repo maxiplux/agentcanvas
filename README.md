@@ -40,7 +40,7 @@ agent-canvas update           # download, verify, and replace this binary
 
 **For coding agents**, paste:
 
-> Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), run `agent-canvas skills export agentcanvas --agent claude` in this project, start `agent-canvas` here, connect to the MCP URL it prints, and call `get_canvas` first.
+> Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), then run `agent-canvas init` in this project. Run `agent-canvas open` to start the studio and show me the UI. Use the `agentcanvas` MCP server it configures (after a reload), and call `get_canvas` first.
 
 The full guide is at **https://maxiplux.github.io/agentcanvas/**.
 
@@ -81,6 +81,31 @@ Open the UI URL; `agent-canvas --open` does that for you. A new project starts f
 - Running `serve` again for a project that already has a server prints that server's URLs and exits with code 3.
 - Press Ctrl+C to stop. Pending saves are flushed before exit.
 
+## Set up a project for coding agents
+
+One command prepares a project for Claude Code and Codex:
+
+```sh
+cd my-project
+agent-canvas init                  # or: agent-canvas init path/to/project --agent claude
+```
+
+| Writes | For |
+|---|---|
+| `.agentcanvas/project.json` | the design project (seeded with Hearth if missing; never overwritten) |
+| `.claude/skills/<skill>/` and `.mcp.json` | Claude Code: every skill, plus an `agentcanvas` MCP server |
+| `.agents/skills/<skill>/` and `.codex/config.toml` | Codex: every skill, plus `[mcp_servers.agentcanvas]` |
+| `.gitignore` | the per-machine `.agentcanvas` files, in git repositories |
+
+The MCP server entry runs `agent-canvas attach --start`. When the agent connects, the studio starts in the background if it isn't already running, and it keeps running after the agent disconnects. Existing MCP servers and settings in those files are kept. Run `init` again whenever you like: it refreshes the skills and the entry in place. `--agent claude` or `--agent codex` limits it to one agent. Codex reads `.codex/config.toml` only in projects you have marked as trusted.
+
+Agents can also start the studio and show it to you:
+
+```sh
+agent-canvas open                  # start it in the background if needed, open the UI in your browser
+agent-canvas open --no-browser     # start it if needed and print the UI and MCP URLs
+```
+
 ## Connect an agent
 
 Any MCP client that supports **streamable HTTP** connects to the MCP URL. `GET /mcp.json` returns a ready-made generic config with the port the server actually bound:
@@ -89,13 +114,13 @@ Any MCP client that supports **streamable HTTP** connects to the MCP URL. `GET /
 { "mcpServers": { "agentcanvas": { "type": "http", "url": "http://127.0.0.1:47321/mcp" } } }
 ```
 
-For clients that can only start a command (**stdio**), point them at `attach`. It proxies stdio to the server already running for the current directory:
+For clients that can only start a command (**stdio**), point them at `attach`. It proxies stdio to the server for the current directory; with `--start` it first starts that server in the background if none is running:
 
 ```json
-{ "mcpServers": { "agentcanvas": { "command": "agent-canvas", "args": ["attach"] } } }
+{ "mcpServers": { "agentcanvas": { "command": "agent-canvas", "args": ["attach", "--start"] } } }
 ```
 
-`attach` takes `--project DIR` or `--url URL` to choose another server. To start the studio and speak MCP on stdin/stdout in one process, use `agent-canvas serve --stdio`.
+`attach` takes `--project DIR` or `--url URL` to choose another server. Without `--start` it exits with code 1 if no server is running. To start the studio and speak MCP on stdin/stdout in one process, use `agent-canvas serve --stdio`.
 
 Once connected, the agent should call `get_canvas` first; it is the agent's view of the screen. `GET /guide` (also the MCP resource `agentcanvas://guide`) lists every tool. Edits made by agents show up in open browsers immediately, with a small `Agent · …` note in the top bar.
 
@@ -118,7 +143,9 @@ A skill folder holds `SKILL.md` (with YAML front matter `name` and `description`
 
 ```text
 agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-agent-canvas attach [--project DIR | --url URL]
+agent-canvas init [DIR] [--agent claude,codex]
+agent-canvas open [DIR] [--no-browser]
+agent-canvas attach [--project DIR [--start] | --url URL]
 agent-canvas skills list [--json]
 agent-canvas skills install PATH [--force]
 agent-canvas skills remove NAME

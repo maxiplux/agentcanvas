@@ -39,7 +39,9 @@ const usage = `agent-canvas — a local design studio that people and MCP agents
 
 Usage:
   agent-canvas [serve] [--project DIR] [--port N] [--open] [--stdio] [--dev]
-  agent-canvas attach [--project DIR | --url URL]
+  agent-canvas init [DIR] [--agent claude,codex]
+  agent-canvas open [DIR] [--no-browser]
+  agent-canvas attach [--project DIR [--start] | --url URL]
   agent-canvas skills list [--json]
   agent-canvas skills install PATH [--force]
   agent-canvas skills remove NAME
@@ -52,7 +54,12 @@ serve    Start the studio for the project in DIR (default: current directory).
          The project lives in DIR/.agentcanvas/. Prints the UI URL and the MCP URL.
          --stdio also speaks MCP on stdin/stdout (logs go to stderr).
          --dev serves React development builds and reads web/ from disk.
+init     Set a project up for coding agents: the .agentcanvas project, every skill in
+         .claude/skills and .agents/skills, and an "agentcanvas" MCP server in
+         .mcp.json and .codex/config.toml. Safe to re-run; it refreshes in place.
+open     Start the studio in the background if needed and open the UI in a browser.
 attach   Proxy MCP between stdin/stdout and the server already running for DIR.
+         --start starts the studio in the background first when none is running.
 skills   Manage SKILL.md packages (stored in the user config dir).
 update   Replace this binary with the latest GitHub release (verified by SHA-256).
          --check only reports whether a newer release exists.
@@ -83,6 +90,10 @@ func Run(env Env, args []string) int {
 	switch cmd {
 	case "serve":
 		return serve(env, args)
+	case "init":
+		return initCmd(env, args)
+	case "open":
+		return openCmd(env, args)
 	case "attach":
 		return attach(env, args)
 	case "skills":

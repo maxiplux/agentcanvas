@@ -53,40 +53,59 @@ func attach(env Env, args []string) int {
 	fs := newFlags(env, "attach")
 	project := fs.String("project", "", "project directory whose running server to use (default: current directory)")
 	rawURL := fs.String("url", "", "MCP URL of a running server (overrides --project)")
+	start := fs.Bool("start", false, "start the studio in the background when none is running for the project")
 	if ok, code := parse(env, fs, args); !ok {
 		return code
 	}
-	endpoint := *rawURL
-	label := endpoint
-	if endpoint == "" {
-		dir, err := absDir(*project)
-		if err != nil {
-			fmt.Fprintln(env.Stderr, "agent-canvas:", err)
-			return ExitErr
-		}
-		label = dir
-		si, err := ReadServerInfo(dir)
-		if err != nil || !alive(si, dir) {
-			fmt.Fprintf(env.Stderr, "No AgentCanvas server for %s. Start one with: agent-canvas serve\n", dir)
-			return ExitErr
-		}
-		endpoint = si.MCPURL
-	} else {
-		u, err := url.Parse(endpoint)
-		if err != nil || u.Host == "" {
-			fmt.Fprintf(env.Stderr, "agent-canvas: invalid --url %q\n", endpoint)
-			return ExitErr
-		}
-		if !healthy(u.Scheme + "://" + u.Host) {
-			fmt.Fprintf(env.Stderr, "No AgentCanvas server for %s. Start one with: agent-canvas serve\n", label)
-			return ExitErr
-		}
+	if *start && *rawURL != "" {
+		fmt.Fprintln(env.Stderr, "agent-canvas: --start works with --project, not --url")
+		return ExitErr
+	}
+	endpoint, ok := attachEndpoint(env, *project, *rawURL, *start)
+	if !ok {
+		return ExitErr
 	}
 	if err := mcp.Attach(env.Ctx, endpoint, env.Stdin, env.Stdout); err != nil {
 		fmt.Fprintln(env.Stderr, "agent-canvas: attach:", err)
 		return ExitErr
 	}
 	return ExitOK
+}
+
+// attachEndpoint resolves the MCP URL to proxy to, reporting problems on stderr.
+func attachEndpoint(env Env, project, rawURL string, start bool) (string, bool) {
+	const noServer = "No AgentCanvas server for %s. Start one with: agent-canvas serve\n"
+	if rawURL != "" {
+		u, err := url.Parse(rawURL)
+		if err != nil || u.Host == "" {
+			fmt.Fprintf(env.Stderr, "agent-canvas: invalid --url %q\n", rawURL)
+			return "", false
+		}
+		if !healthy(u.Scheme + "://" + u.Host) {
+			fmt.Fprintf(env.Stderr, noServer, rawURL)
+			return "", false
+		}
+		return rawURL, true
+	}
+	dir, err := absDir(project)
+	if err != nil {
+		fmt.Fprintln(env.Stderr, "agent-canvas:", err)
+		return "", false
+	}
+	if start {
+		si, err := ensureServer(env, dir)
+		if err != nil {
+			fmt.Fprintln(env.Stderr, "agent-canvas: attach:", err)
+			return "", false
+		}
+		return si.MCPURL, true
+	}
+	si, err := ReadServerInfo(dir)
+	if err != nil || !alive(si, dir) {
+		fmt.Fprintf(env.Stderr, noServer, dir)
+		return "", false
+	}
+	return si.MCPURL, true
 }
 
 // ---- skills ----

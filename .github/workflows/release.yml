@@ -103,6 +103,21 @@ jobs:
           sh docs/install.sh   # re-running updates in place
           "$AGENT_CANVAS_INSTALL_DIR/agent-canvas" version | grep -F "$VERSION"
 
+      - name: init and open in a fresh project (macOS / Linux)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          AC="$RUNNER_TEMP/bin/agent-canvas"
+          mkdir -p "$RUNNER_TEMP/proj" && cd "$RUNNER_TEMP/proj" && git init -q .
+          "$AC" init
+          test -f .agentcanvas/project.json && test -f .claude/skills/agentcanvas/SKILL.md && test -f .agents/skills/agentcanvas/SKILL.md
+          grep -F '"--start"' .mcp.json && grep -F '[mcp_servers.agentcanvas]' .codex/config.toml && grep -F '.agentcanvas/server.json' .gitignore
+          "$AC" open --no-browser | tee open.txt
+          ui=$(sed -n 's/^UI:  //p' open.txt); curl -fsS "${ui}healthz"
+          "$AC" open --no-browser | grep -F "$ui"   # reuses the running studio
+          kill "$(python3 -c 'import json;print(json.load(open(".agentcanvas/server.json"))["pid"])')"
+
       - name: One-line installer (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -117,3 +132,26 @@ jobs:
           if ($c -notmatch 'is up to date') { throw "unexpected update check: $c" }
           Get-Content -Raw docs/install.ps1 | Invoke-Expression   # re-running updates in place
           & $exe version
+
+      - name: init and open in a fresh project (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Join-Path $env:RUNNER_TEMP 'bin') 'agent-canvas.exe'
+          $proj = Join-Path $env:RUNNER_TEMP 'proj'
+          New-Item -ItemType Directory -Force -Path $proj | Out-Null
+          Set-Location $proj
+          git init -q .
+          & $exe init
+          if ($LASTEXITCODE -ne 0) { throw "init failed" }
+          foreach ($f in '.agentcanvas/project.json', '.claude/skills/agentcanvas/SKILL.md', '.agents/skills/agentcanvas/SKILL.md', '.mcp.json', '.codex/config.toml') {
+            if (-not (Test-Path $f)) { throw "missing $f" }
+          }
+          $out = & $exe open --no-browser
+          if ($LASTEXITCODE -ne 0) { throw "open failed: $out" }
+          $ui = (($out | Select-String '^UI:  ').Line -replace '^UI:  ', '')
+          Invoke-WebRequest -UseBasicParsing -Uri ($ui + 'healthz') | Out-Null
+          $again = & $exe open --no-browser
+          if (-not ($again -match [regex]::Escape($ui))) { throw "second open started another studio: $again" }
+          $info = Get-Content .agentcanvas/server.json | ConvertFrom-Json
+          Stop-Process -Id $info.pid -Force
