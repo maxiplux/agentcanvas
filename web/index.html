@@ -2443,11 +2443,14 @@ function useViewport(ref, serverView, commit) {
   const zoomBy = useCallback(f => { const r = rect(); return zoomAt(f, r.width / 2, r.height / 2); }, [zoomAt]); // eslint-disable-line
   const panBy = useCallback((dx, dy, doCommit) => set(v => ({ ...v, x: v.x + dx, y: v.y + dy }), doCommit), [set]);
   const animate = useCallback(() => { setAnim(true); clearTimeout(animT.current); animT.current = setTimeout(() => setAnim(false), 240); }, []);
+  // floating panels cover the edges of the canvas; fitTo centers inside the area they leave free (insetsRef is set by the canvas)
+  const insetsRef = useRef({ left: 0, right: 0, top: 0, bottom: 0 });
   const fitTo = useCallback((box, pad, doAnimate) => {
     if (!box) return;
-    const r = rect();
-    const z = clamp(Math.min((r.width - 2 * pad) / Math.max(1, box.w), (r.height - 2 * pad) / Math.max(1, box.h)), ZOOM_MIN, ZOOM_MAX);
-    const x = (r.width - box.w * z) / 2 - box.x * z, y = (r.height - box.h * z) / 2 - box.y * z;
+    const r = rect(), ins = insetsRef.current;
+    const w = Math.max(200, r.width - ins.left - ins.right), h = Math.max(200, r.height - ins.top - ins.bottom);
+    const z = clamp(Math.min((w - 2 * pad) / Math.max(1, box.w), (h - 2 * pad) / Math.max(1, box.h)), ZOOM_MIN, ZOOM_MAX);
+    const x = ins.left + (w - box.w * z) / 2 - box.x * z, y = ins.top + (h - box.h * z) / 2 - box.y * z;
     if (doAnimate) animate();
     return set(() => ({ x, y, zoom: z }), true);
   }, [set, animate]); // eslint-disable-line
@@ -2459,7 +2462,7 @@ function useViewport(ref, serverView, commit) {
     if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.006), e.clientX - r.left, e.clientY - r.top);
     else panBy(-e.deltaX, -e.deltaY, true);
   }, [zoomAt, panBy]); // eslint-disable-line
-  return { view, anim, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef };
+  return { view, anim, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef, insetsRef };
 }
 
 // ---- Artboards (§8.2): one per node, real renderer, levels of detail, drag to place ----
@@ -2644,8 +2647,8 @@ function Groups({ layout, zoom, flowId }) {
     const placed = g.nodes.some(x => x.pos);
     return (
       <div key={g.flow.id} data-canvas-bg="1" data-group-id={g.flow.id} className="ac-group" style={{ position: 'absolute', left: g.x, top: g.y, width: g.w, height: g.h, border: `${1 * k}px dashed ${on ? V : '#D2CFC7'}`, borderRadius: 16 * k, background: 'rgba(255,255,255,.28)' }}>
-        <div style={{ position: 'absolute', left: 14 * k, top: -9 * k, height: 0 }}>
-          <div className="ac-group-head" style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${k})`, transformOrigin: '0 50%', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: on ? V : CH.muted }}
+        <div style={{ position: 'absolute', left: 14 * k, top: -4 * k, height: 0 }}>
+          <div className="ac-group-head" style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${k})`, transformOrigin: '0 100%', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: on ? V : CH.muted }}
             onPointerDown={e => e.stopPropagation()} onDoubleClick={e => { e.stopPropagation(); setRenaming(g.flow.id); }}>
             {renaming === g.flow.id
               ? <span style={{ textTransform: 'none', letterSpacing: 0, display: 'inline-flex', width: 160 }}><InlineRename value={g.flow.name} onDone={name => { setRenaming(null); act('upsert_flow', { id: g.flow.id, name }); }} onCancel={() => setRenaming(null)} /></span>
@@ -2980,6 +2983,8 @@ function Canvas({ spaceHeld }) {
   }, [viewport.onWheel]); // eslint-disable-line
   const sel = v.selection, entered = v.entered;
   const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
+  const inspectorShown = ui.inspectorOpen !== false && !!inspectorTarget(state, ui);
+  viewport.insetsRef.current = { left: ui.leftOpen ? 300 : 68, right: inspectorShown ? 380 : 72, top: 40, bottom: 48 };
   // entering fits the artboard and remembers the view; leaving restores it (also when an agent enters or leaves)
   const prevViewRef = useRef(null), enteredRef = useRef(entered);
   useEffect(() => {
@@ -3064,7 +3069,7 @@ function Canvas({ spaceHeld }) {
       <div ref={worldRef} className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
         <Groups layout={layout} zoom={view.zoom} flowId={ui.flowId} />
         <div data-canvas-bg="1" style={{ position: 'absolute', left: layout.diagramBox.x - ART.GROUP_PAD, top: layout.diagramBox.y - ART.GROUP_PAD, width: layout.diagramBox.w + 2 * ART.GROUP_PAD, height: layout.diagramBox.h + 2 * ART.GROUP_PAD, border: `${1 / view.zoom}px dashed #D2CFC7`, borderRadius: 16 / view.zoom, background: 'rgba(255,255,255,.28)' }}>
-          <div style={{ position: 'absolute', left: 14 / view.zoom, top: -9 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, top: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 50%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
+          <div style={{ position: 'absolute', left: 14 / view.zoom, top: -4 / view.zoom, height: 0 }}><div style={{ position: 'absolute', left: 0, bottom: 0, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', whiteSpace: 'nowrap', background: CH.backdrop, padding: '2px 8px', borderRadius: 6, font: '600 11px/16px Inter, sans-serif', letterSpacing: '.08em', textTransform: 'uppercase', color: CH.muted }}>Diagram <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', color: CH.faint }}>· {p.draw.shapes.length} shape{p.draw.shapes.length === 1 ? '' : 's'}</span></div></div>
         </div>
         <DrawLayer origin={layout.diagram} zoom={view.zoom} tokens={tokens} shapes={p.draw.shapes} sel={sel} tool={tool} draw={draw} />
         <div style={{ position: 'absolute', left: layout.diagram.x, top: layout.diagram.y, width: 0, height: 0, zIndex: 40 }}><PinsLayer items={drawPinItems} scale={1 / view.zoom} /></div>

@@ -1,6 +1,6 @@
 # AgentCanvas
 
-AgentCanvas is a local design studio in a single binary. One page lets you write a `DESIGN.md`, map connected web and mobile flows, edit web pages and phone screens, draw SVG diagrams, preview as a user, and pin review notes.
+AgentCanvas is a local design studio in a single binary. One infinite canvas holds your web pages, phone screens and diagrams as artboards grouped by flow, with the links between them drawn as connectors. Zoom into any artboard to edit it in place, preview as a user, write the `DESIGN.md` beside it, and pin review notes. A floating project panel shows the layers, a live feed of what you and your agents changed, and the review list.
 
 Any coding agent that speaks [MCP](https://modelcontextprotocol.io) can drive the same canvas you see in the browser. You and every connected agent edit one project, and each sees the other's changes live.
 
@@ -75,7 +75,9 @@ MCP: http://127.0.0.1:47321/mcp
 Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run "agent-canvas attach".
 ```
 
-Open the UI URL; `agent-canvas --open` does that for you. A new project starts **blank**: one web flow with an empty Home page, one mobile flow with no screens yet, an empty drawing, and a short `DESIGN.md` template. To explore first, start from the **Hearth** sample (two web flows, two mobile flows, a full `DESIGN.md`, and a few deliberate design flaws to fix) with `agent-canvas serve --sample` or `agent-canvas init --sample`, or choose **Export ▾ → Load the Hearth sample…** in the studio. **Export ▾ → Start over (blank)…** clears the project again.
+Open the UI URL; `agent-canvas --open` does that for you. A new project starts **blank**: one web flow with an empty Home page, one mobile flow with no screens yet, an empty diagram, and a short `DESIGN.md` template; an empty canvas offers to add a page or screen, load the sample, or set up an agent. To explore first, start from the **Hearth** sample (two web flows, two mobile flows, a full `DESIGN.md`, and a few deliberate design flaws to fix) with `agent-canvas serve --sample` or `agent-canvas init --sample`, or choose **Load the Hearth sample…** from the project menu next to the wordmark. **Start over (blank)…** in the same menu clears the project again.
+
+In the studio: drag empty canvas to pan, scroll or pinch to zoom, `⌘0` fits everything. Double-click a page or screen (or press Enter) to edit it in place; `Esc` leaves. Drag artboards to place them, or **Tidy** a flow to return to the automatic lanes. Drag from an artboard's right-hand port onto another to connect them. The rail on the right holds the drawing tools and the pin tool; the panel on the left holds **Layers**, **Activity** (what you and connected agents changed) and **Review**, plus an *Ask your agent* box that copies a prompt with project context for Claude Code or Codex.
 
 - The server binds `127.0.0.1` only. It starts at port 47321 and tries the next 20 ports. `--port N` uses exactly `N`.
 - Running `serve` again for a project that already has a server prints that server's URLs and exits with code 3.

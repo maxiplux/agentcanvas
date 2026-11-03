@@ -2,6 +2,31 @@
 
 Build: `make test` (go vet + go test, all packages green) and `make release`. Walked on 2026-11-02 with fresh seed projects. Rows 1–33 were re-run in one scripted Chrome session against the production binary, resetting to the seed before each row; rows 38, 41 and 44 against the same server with a second window and the CLI acting from outside the page. The script drives the real UI (clicks, pointer drags, key events, inspector inputs) and reads the result from the DOM and `/api/state`.
 
+## 0c. Infinite canvas pass (branch `feat/infinite-canvas`, 2026-11-03)
+
+The studio UI was rebuilt as one infinite canvas (spec §8.1 to §8.5 as amended on this branch; design note in `docs/superpowers/specs/2026-11-03-infinite-canvas-redesign.md`). Every §17 row that the UI change touches was re-run in scripted headless Chrome 156 sessions against `serve --dev --sample` (React development builds, so React warnings would show), driving the real DOM with pointer and key events and reading results from the DOM and `/api/state`. Rows that only exercise the server and CLI were not re-run by hand: the Go model changed additively (`pos`, `canvas.view`, `entered`, four actions, four MCP tools) and `make test` is green with new tests for each addition.
+
+| Rows / steps | Result |
+|---|---|
+| §17 1, 13, 16, 17, 18, 19 | Pass. Home entered by double-click: the hero headline typed in Content updates the canvas on each keystroke; blur, ⌘Z restores, ⇧⌘Z re-applies. Layers row Home › Nav › Cart selects only that link (dashed). The second feature card alone is outlined and its title edits. Specs at 1280 read `52/56`, `12/16`, `8` (and the 24 px left pad); at 390 `32/38`, `12/16`, `16`. Grid draws 12 columns and a click beneath still selects the Quote block. |
+| §17 2, 9, 22 | Pass. `sc_welcome` entered as a 390×844 artboard; its hotspot is a dashed rectangle that drags (world delta −40, 60 at 55 % zoom) with the numeric fields following; Play Welcome → Pick your craft → Notifications → "Allow and finish" → Account › Home with 2 progress segments. Profile's Design panel lists "Sign out: 36px (min 44)". |
+| §17 3, 20 | Pass. The five seed shapes render in the diagram group. Rect by drag: `1752, 680, 152×96` (multiples of 8); with Alt: `1757.5, 683.5` (not snapped). |
+| §17 5, 10 | Pass. Layers lists Marketing (Home, Shop), Checkout (Cart, Confirm), Onboarding (3), Account (2) and the 5 shapes. + Flow → "Support" → + page (2 nodes) → delete: flows back to four, 0 orphan nodes, every edge endpoint exists. |
+| §17 6, 7, 8, 31, 32 | Pass. Fit-all shows 20 connectors, 12 of them vermillion (9 web, 3 mobile), `ed_w1…ed_w12` present; port drag Shop → Cart + "Buy now" ↵ creates a `cross` edge that the Edge panel shows read-only. Welcome's two outbound edges carry separate labels. Entering Home and pressing Esc returns to the same viewport. |
+| §17 11, 12, 21 | Pass. accent → `#0055FF`: hero CTA `rgb(0,85,255)`, cross edge and pins stay `#D8432A`. Hero Design shows typeRole display, weight, align, pad 8, gap 4 and the swatches. Shop CTA reads "Fails AA" with ⚠ in Layers. |
+| §17 14 | Pass. Preview is a full-viewport stage over every panel, the rail and the bar; nav "Cart" shows Cart; Esc returns with Home still entered. |
+| §17 23 | Pass. V/H/R/O/L/A/P/T/C switch tools, N adds a page, Enter enters the selected node, ⌘0 fits, ⌘1 fits the selection, ⌘\ and ⌘. toggle the panels, ⌘K focuses the prompt box, ⌘D duplicates, Delete removes a link child, Esc leaves then clears. Typing "hvr" into the Name field changes no tool and Space in a field is not swallowed. |
+| §17 24, 26, 27, 28 | Pass. Pins placed on the Cart artboard (board, `0.50, 0.25`, marker exactly under the cursor at 40 % zoom), in the diagram (draw, `1250, 801`), and on the entered Home hero; dragging a pin 100 screen px at 40 % moves it 250 world px. Review filter Question + Open lists only open questions; clicking a pin row zooms to it and selects it. The badge reads 2 on the seed. |
+| §17 38, 44 | Pass. An MCP `update_block` on the hero reached the canvas with the agent pill and a permanent Activity entry ("Agent · Set Home › Hero headline to …"). The Skills sheet lists name, version, description, renders SKILL.md and has no install, remove or edit control. |
+| §17 4, 29, 33; §18 1, 7, 8 | Pass. DESIGN.md edited in the Doc view and exported with the edit, the Flows section and both open issues; the page export has 5 sections and no pin markup; the SVG export opens with a fitted viewBox. `entered` and the canvas viewport persist in `ui.json` / `project.json` and restore on reopen (Go `TestEnteredPersists`). |
+| §18 9 Console | Pass. Every scripted session logged 0 errors and 0 React warnings with the development builds. |
+| Performance | Pan and zoom over the Hearth sample: 176 animation frames measured, p95 16.7 ms, max 16.8 ms, 0 frames over 20 ms; artboard selection round trip 18 ms. |
+| §17 34–37, 39–43; §18 10–15 | Not re-run on this branch (server, CLI and MCP transport unchanged apart from the additive tools, which `TestToolsListComplete` and `TestMoveNodeTool` cover). |
+
+New Go tests: `TestMoveNodeAndTidy`, `TestMoveNodeHistoryIsChannel`, `TestCanvasViewDefaults`, `TestEnteredClearedOnDelete`, `TestEnteredPersists`, `TestMoveNodeTool`. `web/index.html` is now 200 KB, 3,339 lines, still one Babel block in eight sections. `scripts/ui-shots.mjs` captures the main states for review (needs puppeteer-core outside the repo; not in CI).
+
+`// SPEC:` decisions on this branch: flat artboard cards below 12 % zoom (not 25 %) so fit-all on the sample still shows real pages; connector labels hidden below 30 % zoom unless hovered or selected; the empty-project card shows while the project is untouched (a blank project always has one Home page); `P` stays Pen and `N` adds a page; the canvas root uses inline geometry because Tailwind Play injects classes after React's commit.
+
 ## 0b. Complete pass on the shipped `v0.1.2`
 
 After the `v0.1.2` release, every §17 row (1–44) and every §18 step (1–15) was run again, unchanged, against the `v0.1.2` binary installed by the public one-liner (`agent-canvas version` → `agent-canvas v0.1.2`). Nothing was skipped or carried over from earlier runs.

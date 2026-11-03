@@ -438,7 +438,7 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
       <ol>
         <li>Open the <strong>UI</strong> URL in your browser, or start with <code>agent-canvas --open</code>.</li>
         <li>A new project starts <strong>blank</strong>: one web flow with an empty Home page, one mobile flow with no screens yet, an empty drawing and a short <code>DESIGN.md</code> template.</li>
-        <li>To explore first, load <strong>Hearth</strong>, a sample ceramics shop with two web flows, two mobile flows, a full <code>DESIGN.md</code> and a few flaws to fix: start with <code>agent-canvas serve --sample</code> (or <code>init --sample</code>), or choose <em>Export ▾ → Load the Hearth sample…</em>. <em>Start over (blank)…</em> clears it again.</li>
+        <li>To explore first, load <strong>Hearth</strong>, a sample ceramics shop with two web flows, two mobile flows, a full <code>DESIGN.md</code> and a few flaws to fix: start with <code>agent-canvas serve --sample</code> (or <code>init --sample</code>), or choose <em>Load the Hearth sample…</em> from the project menu next to the wordmark. <em>Start over (blank)…</em> in the same menu clears it again.</li>
         <li>Press <kbd>Ctrl</kbd> + <kbd>C</kbd> in the terminal to stop. Unsaved changes are flushed first; everything is saved in <code>.agentcanvas/</code> as you work.</li>
       </ol>
       <div class="note"><strong>Local only.</strong> The server listens on <code>127.0.0.1</code> and nothing else. It starts at port 47321 and tries the next 20 if that one is taken; <code>--port 8080</code> uses exactly that port.</div>
@@ -448,18 +448,19 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
     <section id="studio" aria-labelledby="h-studio">
       <div class="num"><big>03</big>the studio</div>
       <h2 id="h-studio">What you can do in the browser</h2>
+      <p>Everything lives on <strong>one infinite canvas</strong>: web pages, phone screens and diagram shapes are artboards grouped by flow, with the links between them drawn as connectors. Drag empty canvas to pan, scroll or pinch to zoom, press <kbd>⌘0</kbd> to fit everything. Double-click an artboard to edit it in place; <kbd>Esc</kbd> leaves. A floating panel on the left holds <strong>Layers</strong>, an <strong>Activity</strong> feed of every change by you or an agent, and <strong>Review</strong>; a rail on the right holds the tools.</p>
       <div class="grid2">
-        <div class="card"><span class="tag">Web</span><h4>Pages</h4><p>Edit blocks (nav, hero, features, quote, CTA band, footer) at 1280, 768 or 390 px, with a 12-column grid and px specs.</p></div>
-        <div class="card"><span class="tag">Story</span><h4>Mobile flows</h4><p>Phone screens in named flows, with CTAs and hotspots that link screens together. Press Play to tap through them.</p></div>
-        <div class="card"><span class="tag">Draw</span><h4>Diagrams</h4><p>Rectangles, ellipses, lines, arrows, text and pen strokes on an SVG canvas that snaps to an 8 px grid.</p></div>
-        <div class="card"><span class="tag">Doc</span><h4>DESIGN.md</h4><p>Write intent and decisions beside a live preview. The export appends your flows and open issues.</p></div>
+        <div class="card"><span class="tag">Web</span><h4>Pages</h4><p>Edit blocks (nav, hero, features, quote, CTA band, footer) at 1280, 768 or 390 px, with a 12-column grid and px specs, right on the canvas.</p></div>
+        <div class="card"><span class="tag">Mobile</span><h4>Screens</h4><p>Phone screens in named flows, with CTAs and hotspots that link screens together. Press Play to tap through them.</p></div>
+        <div class="card"><span class="tag">Diagram</span><h4>Shapes</h4><p>Rectangles, ellipses, lines, arrows, text and pen strokes in the diagram group of the canvas, snapping to an 8 px grid.</p></div>
+        <div class="card"><span class="tag">DESIGN.md</span><h4>The document</h4><p>Write intent and decisions beside a live preview. The export appends your flows and open issues.</p></div>
       </div>
-      <h3>Storyboard and flows</h3>
-      <p>Switch any Web or Story tab to <strong>Storyboard</strong> to see every flow as a lane of thumbnails. Drag from a thumbnail's right-hand port onto another page to connect them. Links between different flows are drawn in vermillion.</p>
+      <h3>Flows and connectors</h3>
+      <p>Each flow is a group on the canvas. Drag from an artboard's right-hand port onto another to connect them; links between different flows are drawn in vermillion. Drag artboards to place them, or <strong>Tidy</strong> a flow to return to the automatic lanes.</p>
       <h3>Preview and Play</h3>
       <p><strong>Preview</strong> (web) and <strong>Play</strong> (mobile) hide the studio and let you click through the design the way a user would, following its links across flows. Press <kbd>Esc</kbd> to come back.</p>
       <h3>Review pins and checks</h3>
-      <p>Turn on <strong>Annotate</strong>, pick Issue, Suggestion or Question, and click anywhere to leave a numbered pin. The <strong>Review</strong> tab lists pins with filters, plus automatic checks for text contrast (WCAG AA) and mobile tap targets under 44 px.</p>
+      <p>Pick the <strong>Pin</strong> tool (<kbd>C</kbd>), choose Issue, Suggestion or Question, and click anywhere to leave a numbered pin. The <strong>Review</strong> tab lists pins with filters, plus automatic checks for text contrast (WCAG AA) and mobile tap targets under 44 px.</p>
       <h3>Exports</h3>
       <p>The <strong>Export</strong> menu downloads the current page as HTML, all web flows as one HTML file, a playable mobile flow, the drawing as SVG, and <code>DESIGN.md</code>. <em>Save DESIGN.md to project</em> writes the file into your repository.</p>
     </section>
@@ -468,7 +469,7 @@ Any streamable-HTTP MCP client can connect to the MCP URL; stdio clients can run
     <section id="agents" aria-labelledby="h-agents">
       <div class="num"><big>04</big>agents</div>
       <h2 id="h-agents">Connect an agent</h2>
-      <p>Any client that speaks the Model Context Protocol can drive the studio. Agent edits appear in open browsers immediately, with a short <code>Agent · …</code> note in the top bar.</p>
+      <p>Any client that speaks the Model Context Protocol can drive the studio. Agent edits appear in open browsers immediately, with a short note in the top bar and a permanent entry in the <strong>Activity</strong> feed. Agents can also place artboards (<code>move_node</code>), enter a page for the designer (<code>set_entered</code>) and move the shared viewport (<code>set_canvas_view</code>).</p>
 
       <h3>One command: <code>agent-canvas init</code></h3>
       <p>Run it in a project and every supported agent is ready. It is safe to re-run; it refreshes the skills and config in place and keeps everything else in those files.</p>
