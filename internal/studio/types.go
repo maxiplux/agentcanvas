@@ -47,15 +47,16 @@ var (
 )
 
 type Project struct {
-	Version    int     `json:"version"`
-	Tokens     Tokens  `json:"tokens"`
-	Flows      []*Flow `json:"flows"`
-	Nodes      []*Node `json:"nodes"`
-	Edges      []*Edge `json:"edges"`
-	Draw       Draw    `json:"draw"`
-	Doc        Doc     `json:"doc"`
-	Pins       []*Pin  `json:"pins"`
-	PinCounter int     `json:"pinCounter"`
+	Version    int         `json:"version"`
+	Tokens     Tokens      `json:"tokens"`
+	Flows      []*Flow     `json:"flows"`
+	Nodes      []*Node     `json:"nodes"`
+	Edges      []*Edge     `json:"edges"`
+	Draw       Draw        `json:"draw"`
+	Canvas     CanvasState `json:"canvas"`
+	Doc        Doc         `json:"doc"`
+	Pins       []*Pin      `json:"pins"`
+	PinCounter int         `json:"pinCounter"`
 }
 
 type Tokens struct {
@@ -327,6 +328,18 @@ type DrawView struct {
 	Zoom float64 `json:"zoom"`
 }
 
+// CanvasState holds the shared infinite-canvas state (§8.2).
+type CanvasState struct {
+	View CanvasView `json:"view"`
+}
+
+// CanvasView is the persisted viewport; Zoom 0 means "unset: fit everything on open".
+type CanvasView struct {
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+	Zoom float64 `json:"zoom"`
+}
+
 // ShapeTypes accepted by add_shape.
 var ShapeTypes = []string{"rect", "ellipse", "line", "arrow", "text", "pen"}
 
@@ -460,6 +473,7 @@ type SharedView struct {
 	ShowPins      bool         `json:"showPins"`
 	ShowGrid      bool         `json:"showGrid"`
 	ShowSpecs     bool         `json:"showSpecs"`
+	Entered       Ref          `json:"entered"` // node being edited in place on the canvas, or null
 }
 
 // DefaultView is the view state for a fresh project.

@@ -250,6 +250,7 @@ func index(p *Project) []*idJSON {
 	misc.add("tokens", p.Tokens)
 	misc.add("doc", p.Doc)
 	misc.add("draw.view", p.Draw.View)
+	misc.add("canvas.view", p.Canvas.View)
 	return []*idJSON{&flows, &nodes, &children, &edges, &shapes, &pins, &misc}
 }
 

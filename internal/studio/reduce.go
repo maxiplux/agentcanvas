@@ -106,6 +106,8 @@ func init() {
 		"set_toggles":      (*reducer).setToggles,
 		"set_preview":      (*reducer).setPreview,
 		"set_draw_view":    (*reducer).setDrawView,
+		"set_canvas_view":  (*reducer).setCanvasView,
+		"set_entered":      (*reducer).setEntered,
 		"update_tokens":    (*reducer).updateTokens,
 		"upsert_flow":      (*reducer).upsertFlow,
 		"delete_flow":      (*reducer).deleteFlowA,
@@ -675,6 +677,60 @@ func (r *reducer) setDrawView() error {
 	z = math.Max(0.25, math.Min(4, z))
 	r.p.Draw.View = DrawView{X: pl.X, Y: pl.Y, Zoom: z}
 	r.out.Summary = fmt.Sprintf("Draw view at %d%%", int(math.Round(z*100)))
+	return nil
+}
+
+// setCanvasView pans/zooms the shared canvas (§8.2); zoom 0 keeps "fit all on open".
+func (r *reducer) setCanvasView() error {
+	var pl struct {
+		X    float64 `json:"x"`
+		Y    float64 `json:"y"`
+		Zoom float64 `json:"zoom"`
+	}
+	if err := r.decode(&pl); err != nil {
+		return err
+	}
+	if math.IsNaN(pl.X) || math.IsInf(pl.X, 0) || math.IsNaN(pl.Y) || math.IsInf(pl.Y, 0) || math.IsNaN(pl.Zoom) || math.IsInf(pl.Zoom, 0) {
+		return errInvalid("x, y and zoom must be finite numbers", "send screen px for x/y and a zoom between 0.1 and 4")
+	}
+	z := pl.Zoom
+	if z != 0 {
+		z = math.Max(0.1, math.Min(4, z))
+	}
+	r.p.Canvas.View = CanvasView{X: pl.X, Y: pl.Y, Zoom: z}
+	if z == 0 {
+		r.out.Summary = "Canvas view reset (fit all)"
+	} else {
+		r.out.Summary = fmt.Sprintf("Canvas view at %d%%", int(math.Round(z*100)))
+	}
+	return nil
+}
+
+// setEntered enters a node for in-place editing (§8.3) or leaves with an empty nodeId.
+func (r *reducer) setEntered() error {
+	var pl struct {
+		NodeID string `json:"nodeId"`
+	}
+	if err := r.decode(&pl); err != nil {
+		return err
+	}
+	if pl.NodeID == "" {
+		was := r.v.Entered
+		r.v.Entered = ""
+		if was == "" {
+			r.out.Summary = "Nothing entered"
+		} else {
+			r.out.Summary = "Left " + r.nodeName(string(was))
+		}
+		return nil
+	}
+	n, err := r.node(pl.NodeID)
+	if err != nil {
+		return err
+	}
+	r.makeCurrent(n)
+	r.v.Entered = Ref(n.ID)
+	r.out.Summary = "Entered " + n.Name
 	return nil
 }
 
@@ -2756,6 +2812,9 @@ func fixView(p *Project, v *SharedView, tabSel map[string]*Selection) {
 	}
 	fix(&v.CurrentNodeID.Web, ChanWeb)
 	fix(&v.CurrentNodeID.Mobile, ChanMobile)
+	if v.Entered != "" && p.Node(string(v.Entered)) == nil {
+		v.Entered = ""
+	}
 	if !selectionValid(p, v.Selection) {
 		v.Selection = nil
 	}

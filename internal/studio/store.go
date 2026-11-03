@@ -27,6 +27,7 @@ type HistoryFlags struct {
 // State is what the browser renders (§12.2).
 type State struct {
 	Rev        int64                   `json:"rev"`
+	Name       string                  `json:"name"` // project directory name
 	Project    *Project                `json:"project"`
 	View       SharedView              `json:"view"`
 	History    map[string]HistoryFlags `json:"history"`
@@ -239,6 +240,7 @@ type persistedView struct {
 	ShowPins      bool         `json:"showPins"`
 	ShowGrid      bool         `json:"showGrid"`
 	ShowSpecs     bool         `json:"showSpecs"`
+	Entered       Ref          `json:"entered"`
 }
 
 func (s *Store) loadUI() {
@@ -261,7 +263,7 @@ func (s *Store) loadUI() {
 	}
 	pv := env.View
 	s.view = SharedView{Tab: pv.Tab, View: pv.View, Breakpoint: pv.Breakpoint, CurrentNodeID: pv.CurrentNodeID,
-		ShowPins: pv.ShowPins, ShowGrid: pv.ShowGrid, ShowSpecs: pv.ShowSpecs}
+		ShowPins: pv.ShowPins, ShowGrid: pv.ShowGrid, ShowSpecs: pv.ShowSpecs, Entered: pv.Entered}
 }
 
 func writeAtomic(path string, v any) error {
@@ -295,7 +297,7 @@ func (s *Store) writeFiles() error {
 	}
 	v := s.view
 	pv := persistedView{Tab: v.Tab, View: v.View, Breakpoint: v.Breakpoint, CurrentNodeID: v.CurrentNodeID,
-		ShowPins: v.ShowPins, ShowGrid: v.ShowGrid, ShowSpecs: v.ShowSpecs}
+		ShowPins: v.ShowPins, ShowGrid: v.ShowGrid, ShowSpecs: v.ShowSpecs, Entered: v.Entered}
 	return writeAtomic(filepath.Join(s.data, "ui.json"), map[string]any{"key": uiKey, "view": pv})
 }
 
@@ -360,6 +362,7 @@ func (s *Store) skillList() []SkillInfo {
 func (s *Store) stateLocked() State {
 	return State{
 		Rev:        s.rev,
+		Name:       filepath.Base(s.dir),
 		Project:    s.project,
 		View:       s.view,
 		History:    s.historyFlags(),

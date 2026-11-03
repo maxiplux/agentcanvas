@@ -697,3 +697,67 @@ func TestMoveNodeHistoryIsChannel(t *testing.T) {
 		t.Fatal("undo did not restore pos")
 	}
 }
+
+func TestCanvasViewDefaults(t *testing.T) {
+	s, _ := newMem(t)
+	if s.project.Canvas.View.Zoom != 0 {
+		t.Fatal("fresh canvas view must be unset (zoom 0)")
+	}
+	act(t, s, "set_canvas_view", map[string]any{"x": 10, "y": 20, "zoom": 9})
+	if v := s.project.Canvas.View; v.X != 10 || v.Y != 20 || v.Zoom != 4 {
+		t.Fatalf("view %+v", v)
+	}
+	if s.historyFlags()["web"].CanUndo || s.historyFlags()["draw"].CanUndo {
+		t.Fatal("view must not be undoable")
+	}
+	// a project.json written before the canvas existed has no "canvas" key
+	raw, _ := json.Marshal(MakeSeed())
+	var keys map[string]json.RawMessage
+	_ = json.Unmarshal(raw, &keys)
+	delete(keys, "canvas")
+	inner, _ := json.Marshal(keys)
+	old := []byte(`{"key":"` + projectKey + `","project":` + string(inner) + `}`)
+	p, err := parseProject(old)
+	if err != nil || p.Canvas.View.Zoom != 0 {
+		t.Fatalf("old project: %v %+v", err, p.Canvas)
+	}
+}
+
+func TestEnteredClearedOnDelete(t *testing.T) {
+	s, _ := newMem(t)
+	act(t, s, "set_entered", map[string]any{"nodeId": "pg_shop"})
+	if s.view.Entered != "pg_shop" || s.view.CurrentNodeID.Web != "pg_shop" {
+		t.Fatalf("view %+v", s.view)
+	}
+	act(t, s, "delete_node", map[string]any{"nodeId": "pg_shop"})
+	if s.view.Entered != "" {
+		t.Fatal("entered must clear when the node is deleted")
+	}
+	act(t, s, "set_entered", map[string]any{"nodeId": "sc_welcome"})
+	act(t, s, "set_entered", map[string]any{"nodeId": ""})
+	if s.view.Entered != "" {
+		t.Fatal("empty nodeId must leave")
+	}
+	if !strings.Contains(string(s.StateJSON("ui", "")), `"name":`) {
+		t.Fatal("state must carry the project name")
+	}
+}
+
+func TestEnteredPersists(t *testing.T) {
+	dir := t.TempDir()
+	c := &clock{t: time.Unix(1_800_000_000, 0)}
+	s, err := Open(dir, Options{Sample: true, Now: c.now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	act(t, s, "set_entered", map[string]any{"nodeId": "pg_cart"})
+	act(t, s, "set_canvas_view", map[string]any{"x": 1, "y": 2, "zoom": 0.5})
+	s.Flush()
+	s2, err := Open(dir, Options{Sample: true, Now: c.now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s2.view.Entered != "pg_cart" || s2.project.Canvas.View.Zoom != 0.5 {
+		t.Fatalf("after reopen: entered=%q view=%+v", s2.view.Entered, s2.project.Canvas.View)
+	}
+}
