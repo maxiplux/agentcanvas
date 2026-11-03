@@ -2329,6 +2329,154 @@ function PreviewStage({ navRef }) {
 // ===== Section 7: Editors =====
 function useLatest(v) { const r = useRef(v); r.current = v; return r; }
 
+// ---- Canvas (§8.2): viewport, auto layout, shell ----
+const ART = { GROUP_PAD: 40, GAP_X: 120, GAP_Y: 160, COL_GAP: 400, DIAGRAM_GAP: 200, DEFAULT_PAGE_H: 800, EMPTY_W: 400, EMPTY_H: 200 };
+const ZOOM_MIN = 0.1, ZOOM_MAX = 4, LOD_FLAT = 0.25;
+
+function nodeSize(n, bp, heights) {
+  if (n.kind === 'screen') return { w: PHONE_W, h: PHONE_H };
+  return { w: BREAKPOINTS[bp] || 1280, h: (heights && heights[n.id]) || ART.DEFAULT_PAGE_H };
+}
+function bboxOf(boxes) {
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  boxes.forEach(b => { x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h); });
+  return boxes.length ? { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } : null;
+}
+// layoutCanvas(project, breakpoint, measuredHeights) → { pos, groups, diagram, bounds }
+// Web groups stack from (0,0); mobile groups in a column right of the widest web group; the diagram below the web groups.
+// Nodes with pos keep it; the rest fill left-to-right in lane order after the right-most placed node.
+function layoutCanvas(p, bp, heights) {
+  const pos = {}, groups = [];
+  const PAD = ART.GROUP_PAD;
+  const place = (flows, x0, y0) => {
+    let y = y0, right = x0;
+    flows.forEach(f => {
+      const nodes = laneOrder(f, p.nodes, p.edges);
+      const innerX = x0 + PAD, innerY = y + PAD;
+      let cursor = innerX, placedRight = -Infinity;
+      nodes.forEach(n => {
+        if (n.pos) { const s = nodeSize(n, bp, heights); pos[n.id] = { x: n.pos.x, y: n.pos.y, w: s.w, h: s.h }; placedRight = Math.max(placedRight, n.pos.x + s.w); }
+      });
+      if (placedRight > -Infinity) cursor = Math.max(cursor, placedRight + ART.GAP_X);
+      nodes.forEach(n => {
+        if (!n.pos) { const s = nodeSize(n, bp, heights); pos[n.id] = { x: cursor, y: innerY, w: s.w, h: s.h }; cursor += s.w + ART.GAP_X; }
+      });
+      const bb = bboxOf(nodes.map(n => pos[n.id]));
+      const g = bb ? { x: bb.x - PAD, y: bb.y - PAD, w: bb.w + 2 * PAD, h: bb.h + 2 * PAD } : { x: x0, y, w: ART.EMPTY_W, h: ART.EMPTY_H };
+      groups.push({ flow: f, nodes, x: g.x, y: g.y, w: g.w, h: g.h });
+      y = g.y + g.h + ART.GAP_Y;
+      right = Math.max(right, g.x + g.w);
+    });
+    return { bottom: y - ART.GAP_Y, right };
+  };
+  const webFlows = p.flows.filter(f => f.channel === 'web'), mobileFlows = p.flows.filter(f => f.channel === 'mobile');
+  const web = place(webFlows, 0, 0);
+  const mobile = place(mobileFlows, (webFlows.length ? web.right : 0) + ART.COL_GAP, 0);
+  const diagram = { x: 0, y: (webFlows.length ? web.bottom : 0) + ART.DIAGRAM_GAP };
+  const shapeBoxes = p.draw.shapes.map(s => { const b = shapeBox(s, p.tokens); return { x: b.x + diagram.x, y: b.y + diagram.y, w: b.w, h: b.h }; });
+  const diagramBox = bboxOf(shapeBoxes) || { x: diagram.x, y: diagram.y, w: 600, h: 400 };
+  const bounds = bboxOf([...groups, diagramBox]) || { x: 0, y: 0, w: 1280, h: 800 };
+  return { pos, groups, diagram, diagramBox, bounds };
+}
+
+// useViewport(ref, serverView, commit): pan/zoom state for the canvas element at ref.
+// Wheel pans; ctrl/meta+wheel (and trackpad pinch) zooms around the cursor. Commits go through a 250 ms debounce.
+function useViewport(ref, serverView, commit) {
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+  const [anim, setAnim] = useState(false);
+  const vRef = useRef(view), lastSent = useRef(null), timer = useRef(0), animT = useRef(0);
+  useEffect(() => {
+    if (!serverView || !serverView.zoom) return;
+    if (!lastSent.current || JSON.stringify(serverView) !== JSON.stringify(lastSent.current)) { vRef.current = serverView; setView(serverView); lastSent.current = serverView; }
+  }, [serverView]);
+  const set = useCallback((fn, doCommit) => {
+    const n = fn(vRef.current);
+    const next = { x: n.x, y: n.y, zoom: clamp(n.zoom, ZOOM_MIN, ZOOM_MAX) };
+    vRef.current = next; setView(next);
+    if (doCommit) { clearTimeout(timer.current); timer.current = setTimeout(() => { lastSent.current = next; commit(next); }, 250); }
+    return next;
+  }, [commit]);
+  const rect = () => (ref.current ? ref.current.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
+  const toWorld = useCallback((cx, cy) => { const r = rect(), v = vRef.current; return { x: (cx - r.left - v.x) / v.zoom, y: (cy - r.top - v.y) / v.zoom }; }, []); // eslint-disable-line
+  const toScreen = useCallback((wx, wy) => { const v = vRef.current; return { x: v.x + wx * v.zoom, y: v.y + wy * v.zoom }; }, []);
+  const zoomAt = useCallback((f, mx, my) => set(v => { const z = clamp(v.zoom * f, ZOOM_MIN, ZOOM_MAX); return { x: mx - (mx - v.x) * z / v.zoom, y: my - (my - v.y) * z / v.zoom, zoom: z }; }, true), [set]);
+  const zoomBy = useCallback(f => { const r = rect(); return zoomAt(f, r.width / 2, r.height / 2); }, [zoomAt]); // eslint-disable-line
+  const panBy = useCallback((dx, dy, doCommit) => set(v => ({ ...v, x: v.x + dx, y: v.y + dy }), doCommit), [set]);
+  const animate = useCallback(() => { setAnim(true); clearTimeout(animT.current); animT.current = setTimeout(() => setAnim(false), 240); }, []);
+  const fitTo = useCallback((box, pad, doAnimate) => {
+    if (!box) return;
+    const r = rect();
+    const z = clamp(Math.min((r.width - 2 * pad) / Math.max(1, box.w), (r.height - 2 * pad) / Math.max(1, box.h)), ZOOM_MIN, ZOOM_MAX);
+    const x = (r.width - box.w * z) / 2 - box.x * z, y = (r.height - box.h * z) / 2 - box.y * z;
+    if (doAnimate) animate();
+    return set(() => ({ x, y, zoom: z }), true);
+  }, [set, animate]); // eslint-disable-line
+  const setZoom = useCallback(z => { const r = rect(); return zoomAt(z / vRef.current.zoom, r.width / 2, r.height / 2); }, [zoomAt]); // eslint-disable-line
+  // the canvas element attaches this with { passive: false } once it exists
+  const onWheel = useCallback(e => {
+    e.preventDefault();
+    const r = rect();
+    if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.006), e.clientX - r.left, e.clientY - r.top);
+    else panBy(-e.deltaX, -e.deltaY, true);
+  }, [zoomAt, panBy]); // eslint-disable-line
+  return { view, anim, set, toWorld, toScreen, zoomAt, zoomBy, setZoom, panBy, fitTo, animate, onWheel, ref: vRef };
+}
+
+// The infinite canvas: dot grid, world transform, groups and artboards.
+function Canvas({ spaceHeld }) {
+  const { state, act, ui, setUi, viewport, canvasRef } = useS();
+  const p = state.project, v = state.view, tokens = p.tokens;
+  const bp = v.breakpoint;
+  const [heights, setHeights] = useState({});
+  const layout = useMemo(() => layoutCanvas(p, bp, heights), [p, bp, heights]);
+  const { view } = viewport;
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current) return;
+    fitted.current = true;
+    // next frame: Tailwind Play injects classes after the commit, so measure once the root has its real box
+    if (!p.canvas.view || !p.canvas.view.zoom) requestAnimationFrame(() => viewport.fitTo(layout.bounds, 80, false));
+  }, [layout.bounds]); // eslint-disable-line
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', viewport.onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', viewport.onWheel);
+  }, [viewport.onWheel]); // eslint-disable-line
+  const tool = spaceHeld ? 'hand' : (ui.tool || 'select');
+  const onDown = e => {
+    if (e.button !== 0) return;
+    const bg = e.target === e.currentTarget || e.target.closest('[data-canvas-bg]');
+    if (tool === 'hand' || (tool === 'select' && bg)) {
+      e.preventDefault();
+      const sx = e.clientX, sy = e.clientY, o = viewport.ref.current;
+      let moved = false;
+      const move = ev => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 3) return; moved = true; viewport.set(() => ({ ...o, x: o.x + ev.clientX - sx, y: o.y + ev.clientY - sy }), false); };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); if (moved) viewport.set(x => x, true); else if (bg && v.selection && tool === 'select') act('set_selection', { selection: null }); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    }
+  };
+  let step = 24 * view.zoom; while (step < 14) step *= 2;
+  const gridOpacity = clamp((view.zoom - 0.2) / 0.15, 0, 1);
+  const cursor = tool === 'hand' ? 'grab' : 'default';
+  return (
+    <div ref={canvasRef} data-canvas="1" style={{ position: 'absolute', inset: 0, overflow: 'hidden', userSelect: 'none', background: CH.backdrop, cursor, touchAction: 'none' }} onPointerDown={onDown}>
+      <div data-canvas-bg="1" style={{ position: 'absolute', inset: 0, opacity: gridOpacity, backgroundImage: 'radial-gradient(var(--ac-dot) 1px, transparent 1.2px)', backgroundSize: `${step}px ${step}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
+      <div className={viewport.anim ? 'ac-zoomanim' : ''} style={{ position: 'absolute', left: 0, top: 0, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', willChange: 'transform' }}>
+        {layout.groups.map(g => (
+          <div key={g.flow.id} data-canvas-bg="1" className="absolute" style={{ left: g.x, top: g.y, width: g.w, height: g.h, border: '1px dashed #D2CFC7', borderRadius: 16, background: 'rgba(255,255,255,.28)' }} />
+        ))}
+        {p.nodes.map(n => { const b = layout.pos[n.id]; if (!b) return null; return (
+          <div key={n.id} className="ac-art" style={{ left: b.x, top: b.y, width: b.w, height: b.h, borderRadius: n.kind === 'screen' ? 18 : 0 }}>
+            <div className="absolute left-0 font-ui" style={{ top: -22 / view.zoom, transform: `scale(${1 / view.zoom})`, transformOrigin: '0 100%', fontSize: 12, color: CH.muted, whiteSpace: 'nowrap' }}>{n.name}</div>
+          </div>
+        ); })}
+      </div>
+    </div>
+  );
+}
+window.__ac = Object.assign(window.__ac || {}, { layoutCanvas, laneOrder });
+
 function WebEditor() {
   const { state } = useS();
   const v = state.view;
@@ -2819,6 +2967,11 @@ function App() {
     }
   }, [act]);
 
+  // canvas viewport: local while interacting, persisted with set_canvas_view (debounced)
+  const canvasRef = useRef(null);
+  const commitView = useCallback(next => act('set_canvas_view', next), [act]);
+  const viewport = useViewport(canvasRef, state ? state.project.canvas.view : null, commitView);
+
   // leaving the draw tab or a mode resets transient local UI
   const tab = state ? state.view.tab : 'web';
   useEffect(() => { setUi(u => (u.annotate ? { ...u, annotate: false } : u)); }, [tab]);
@@ -2903,9 +3056,9 @@ function App() {
   if (!state) {
     return <div className="h-full flex items-center justify-center font-ui text-[#6B665C]">{conn === 'reconnecting' ? 'Reconnecting to the AgentCanvas server…' : 'Connecting…'}</div>;
   }
-  const ctx = { ...studio, ui, setUi, docRef, drawView, setDrawView };
+  const ctx = { ...studio, ui, setUi, docRef, drawView, setDrawView, viewport, canvasRef };
   const v = state.view;
-  const editor = v.tab === 'web' ? <WebEditor /> : v.tab === 'story' ? <StoryEditor /> : v.tab === 'draw' ? <DrawEditor spaceHeld={spaceHeld} /> : <DesignDoc />;
+  const editor = v.tab === 'doc' ? <DesignDoc /> : <Canvas spaceHeld={spaceHeld} />;
   return (
     <Studio.Provider value={ctx}>
       <div className="h-full flex flex-col font-ui">
