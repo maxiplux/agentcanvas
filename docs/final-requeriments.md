@@ -642,7 +642,7 @@ Footer: **Ask your agent** composer (`Cmd/Ctrl+K`): typing a request and pressin
 
 **Hint strip (bottom center).** One line of context (`Drag to pan · scroll to zoom · double-click a page to edit it`; `Esc leaves <name>` when entered); hidden after five sessions.
 
-**Empty project.** When there are no nodes and no shapes, a centered card offers `Add a web page`, `Add a mobile screen`, `Load the Hearth sample`, `Set up an agent` (copies the README agent prompt).
+**Empty project.** While the project is untouched (at most one page with no blocks, and no shapes, pins or edges), a centered card offers `Add a web page`, `Add a mobile screen`, `Load the Hearth sample`, `Set up an agent` (copies the README agent prompt).
 
 **Open-issue badge**: count of pins where `kind === 'issue' && !resolved` across the whole project. Clicking it opens the Review tab of the left panel filtered to Issues/Open.
 

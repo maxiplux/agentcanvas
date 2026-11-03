@@ -941,6 +941,156 @@ function SkillsDrawer() {
 }
 
 // ---- Left panel ----
+// ---- Tool rail, zoom pill, hint strip, empty state (§8.1) ----
+const ICONS = {
+  select: <path d="M5 3l14 8-7 1-3 7z" />,
+  hand: <path d="M8 13V6a2 2 0 014 0v6m0-4a2 2 0 014 0v4m0-2a2 2 0 014 0v5a6 6 0 01-6 6h-2a6 6 0 01-5-3l-3-5a2 2 0 013-2l2 2" />,
+  page: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></>,
+  screen: <><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></>,
+  rect: <rect x="4" y="4" width="16" height="16" />,
+  ellipse: <circle cx="12" cy="12" r="8" />,
+  line: <path d="M4 20L20 4" />,
+  arrow: <path d="M4 20L20 4m0 0h-6m6 0v6" />,
+  pen: <path d="M4 20c4-8 8-12 16-16M4 20l4-1" />,
+  text: <path d="M5 6h14M12 6v14" />,
+  pin: <><path d="M12 21s-7-5-7-11a7 7 0 0114 0c0 6-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></>,
+  tidy: <path d="M4 7h16M4 12h16M4 17h16" />,
+  fit: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
+};
+const Icon = ({ name }) => <svg className="ac-icon" viewBox="0 0 24 24">{ICONS[name]}</svg>;
+
+function useAddNode() {
+  const { state, act } = useS();
+  return async channel => {
+    const p = state.project, v = state.view;
+    const selNode = v.selection && v.selection.nodeId ? findNode(p, v.selection.nodeId) : null;
+    let flow = selNode && nodeChannel(selNode) === channel ? findFlow(p, selNode.flowId) : null;
+    if (!flow) flow = p.flows.find(f => f.channel === channel);
+    if (!flow) { await act('upsert_flow', { channel }); return; } // a new flow comes with one node
+    const res = await act('upsert_node', { flowId: flow.id, afterId: selNode && selNode.flowId === flow.id ? selNode.id : undefined });
+    return res;
+  };
+}
+
+function ToolRail() {
+  const { state, act, ui, setUi, showToast } = useS();
+  const addNode = useAddNode();
+  const p = state.project, v = state.view;
+  const setTool = t => setUi(u => ({ ...u, tool: t }));
+  const tidy = () => {
+    const selNode = v.selection && v.selection.nodeId ? findNode(p, v.selection.nodeId) : null;
+    const placed = fid => p.nodes.some(n => n.flowId === fid && n.pos);
+    if (selNode && placed(selNode.flowId)) { act('tidy_flow', { flowId: selNode.flowId }); return; }
+    const flows = p.flows.filter(f => placed(f.id));
+    if (!flows.length) { showToast('Nothing to tidy: every artboard is already in its lane.'); return; }
+    if (window.confirm(`Tidy ${flows.length} flow${flows.length === 1 ? '' : 's'}? Every artboard returns to the automatic layout.`)) flows.forEach(f => act('tidy_flow', { flowId: f.id }));
+  };
+  const groups = [
+    [['select', 'Select', 'V', () => setTool('select')], ['hand', 'Hand', 'H', () => setTool('hand')]],
+    [['page', 'Add web page', 'N', () => addNode('web')], ['screen', 'Add mobile screen', 'M', () => addNode('mobile')]],
+    [['rect', 'Rectangle', 'R', () => setTool('rect')], ['ellipse', 'Ellipse', 'O', () => setTool('ellipse')], ['line', 'Line', 'L', () => setTool('line')], ['arrow', 'Arrow', 'A', () => setTool('arrow')], ['pen', 'Pen', 'P', () => setTool('pen')], ['text', 'Text', 'T', () => setTool('text')]],
+    [['pin', 'Pin a note', 'C', () => setTool(ui.tool === 'pin' ? 'select' : 'pin')], ['tidy', 'Tidy layout', '⇧T', tidy]],
+  ];
+  const tools = new Set(['select', 'hand', 'rect', 'ellipse', 'line', 'arrow', 'pen', 'text', 'pin']);
+  return (
+    <>
+      <nav className="ac-float" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', width: 44, padding: 6, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 30 }}>
+        {groups.map((g, gi) => (
+          <Fragment key={gi}>
+            {gi > 0 && <hr className="border-0 border-t border-hair my-1 mx-0.5" />}
+            {g.map(([name, label, key, fn]) => (
+              <button key={name} type="button" data-tool={name} onClick={fn} className={'ac-ibtn ac-tip-host' + (tools.has(name) && ui.tool === name ? ' on' : '')}>
+                <Icon name={name} />
+                <span className="ac-tip" style={{ right: 42, top: '50%', transform: 'translateY(-50%)' }}>{label}<kbd>{key}</kbd></span>
+              </button>
+            ))}
+          </Fragment>
+        ))}
+      </nav>
+      {ui.tool === 'pin' && (
+        <div className="ac-float font-ui" style={{ position: 'absolute', right: 66, top: '50%', transform: 'translateY(-50%)', padding: 4, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 30 }}>
+          {PIN_KINDS.map(k => (
+            <button key={k} type="button" onClick={() => setUi(u => ({ ...u, pinKind: k }))}
+              className={'h-7 px-2.5 rounded-md text-[12px] text-left inline-flex items-center gap-2 ' + (ui.pinKind === k ? 'bg-ink text-white' : 'text-ink hover:bg-[#F3F2EF]')}>
+              <span className="w-4 text-center font-semibold">{PIN_GLYPH[k]}</span>{PIN_NAME[k]}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ZoomPill() {
+  const { viewport, canvasApi } = useS();
+  const [help, setHelp] = useState(false);
+  const ref = useOutsideClose(help, setHelp);
+  const z = Math.round(viewport.view.zoom * 100);
+  const keys = [
+    ['Drag empty canvas · Space + drag', 'pan'], ['Scroll · pinch · ' + MOD + 'wheel', 'pan · zoom'], [MOD + '0', 'fit everything'], [MOD + '1', 'fit the selection / enter it'],
+    ['Double-click · Enter', 'enter a page or screen'], ['Esc', 'leave · Select tool · clear selection'], ['V H', 'Select · Hand'], ['N M', 'add page · add screen'],
+    ['R O L A P T', 'rect · ellipse · line · arrow · pen · text'], ['C', 'pin a note'], ['Alt (hold)', 'disable 8 px snap'], ['⇧T', 'tidy the flow'],
+    [MOD + 'Z · ' + MOD + '⇧Z', 'undo · redo'], [MOD + 'D', 'duplicate block or shape'], ['Delete', 'delete the selection'], [MOD + '\\ · ' + MOD + '.', 'left panel · inspector'], [MOD + 'K', 'ask your agent'],
+  ];
+  return (
+    <div ref={ref} className="ac-float font-ui" style={{ position: 'absolute', right: 14, bottom: 14, height: 36, display: 'flex', alignItems: 'center', padding: '0 4px', zIndex: 30 }}>
+      <button type="button" className="ac-ibtn ac-tip-host" style={{ width: 28, height: 28 }} onClick={() => canvasApi.current.fitAll && canvasApi.current.fitAll()}><Icon name="fit" /><span className="ac-tip" style={{ right: 0, bottom: 34 }}>Fit everything<kbd>{MOD}0</kbd></span></button>
+      <span className="w-px h-[18px] bg-hair mx-1" />
+      <button type="button" className="ac-ibtn" style={{ width: 28, height: 28 }} title="Zoom out" onClick={() => viewport.zoomBy(1 / 1.25)}>−</button>
+      <button type="button" className="text-[12px] font-medium tabular-nums text-ink min-w-[48px] text-center h-7 rounded-md hover:bg-[#F3F2EF]" title="Reset to 100%" onClick={() => viewport.setZoom(1)}>{z}%</button>
+      <button type="button" className="ac-ibtn" style={{ width: 28, height: 28 }} title="Zoom in" onClick={() => viewport.zoomBy(1.25)}>+</button>
+      <span className="w-px h-[18px] bg-hair mx-1" />
+      <button type="button" className={'ac-ibtn' + (help ? ' on' : '')} style={{ width: 28, height: 28 }} title="Keyboard shortcuts" onClick={() => setHelp(h => !h)}>?</button>
+      {help && (
+        <div className="ac-float text-[12px] text-ink" style={{ position: 'absolute', right: 0, bottom: 44, width: 360, padding: 12 }}>
+          <div className="ac-label mb-2">Keyboard</div>
+          <table className="w-full"><tbody>
+            {keys.map(([k, what]) => <tr key={k}><td className="py-0.5 pr-3 whitespace-nowrap"><kbd className="font-ui text-[11px] text-muted border border-hair rounded px-1 py-px">{k}</kbd></td><td className="py-0.5 text-muted">{what}</td></tr>)}
+          </tbody></table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HintStrip() {
+  const { state } = useS();
+  const [show] = useState(() => { try { const n = Number(localStorage.getItem('ac-hints') || 0) + 1; localStorage.setItem('ac-hints', String(n)); return n <= 5; } catch (e) { return true; } });
+  if (!show) return null;
+  const entered = findNode(state.project, state.view.entered);
+  return (
+    <div className="font-ui" style={{ position: 'absolute', left: '50%', bottom: 14, transform: 'translateX(-50%)', zIndex: 30, fontSize: 12, color: CH.muted, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(6px)', border: `1px solid ${CH.hair}`, padding: '6px 12px', borderRadius: 999, display: 'flex', gap: 14, alignItems: 'center', pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+      {entered ? <span>Editing <b className="font-medium text-ink">{entered.name}</b> · <kbd className="text-[11px] text-faint border border-hair rounded px-1">Esc</kbd> leaves it</span>
+        : <><span>Drag to pan · scroll to zoom</span><kbd className="text-[11px] text-faint border border-hair rounded px-1">Space</kbd><span>Double-click a page to edit it in place</span></>}
+    </div>
+  );
+}
+
+// SPEC: a blank project ships with one empty Home page, so "empty" means untouched: at most one page with no blocks, nothing else.
+const isUntouched = p => p.nodes.length <= 1 && p.nodes.every(n => n.kind === 'page' && !n.blocks.length) && !p.draw.shapes.length && !p.pins.length && !p.edges.length;
+
+const AGENT_PROMPT = 'Install AgentCanvas with `curl -fsSL https://maxiplux.github.io/agentcanvas/install.sh | sh` (Windows: `irm https://maxiplux.github.io/agentcanvas/install.ps1 | iex`), then run `agent-canvas init` in this project. Run `agent-canvas open` to start the studio and show me the UI. Use the `agentcanvas` MCP server it configures (after a reload), and call `get_canvas` first.';
+
+function EmptyCanvas() {
+  const { act, showToast } = useS();
+  const addNode = useAddNode();
+  const Btn = ({ onClick, children, primary }) => (
+    <button type="button" onClick={onClick} className={'h-9 px-3.5 rounded-lg text-[12px] font-medium text-left ' + (primary ? 'bg-ink text-white hover:bg-black' : 'border border-hair text-ink hover:border-ink')}>{children}</button>
+  );
+  return (
+    <div className="ac-float font-ui" style={{ position: 'absolute', left: '50%', top: '64%', transform: 'translate(-50%, -50%)', width: 420, padding: 24, zIndex: 20 }}>
+      <div className="font-serif text-[22px] font-semibold text-ink mb-1">An empty canvas</div>
+      <p className="text-[13px] leading-5 text-muted mb-4">Add the first page or screen, load the sample to look around, or hand the project to a coding agent.</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Btn primary onClick={() => addNode('web')}>+ Add a web page</Btn>
+        <Btn primary onClick={() => addNode('mobile')}>+ Add a mobile screen</Btn>
+        <Btn onClick={() => { if (window.confirm('Load the Hearth sample? It replaces this empty project.')) act('reset_project', { template: 'sample' }); }}>Load the Hearth sample</Btn>
+        <Btn onClick={async () => { try { await navigator.clipboard.writeText(AGENT_PROMPT); showToast('Copied. Paste it into Claude Code or Codex.'); } catch (e) { showToast('Could not copy the prompt.'); } }}>Set up an agent</Btn>
+      </div>
+    </div>
+  );
+}
+
 // ---- Left project panel (§8.1): Layers, Activity, Review, prompt composer ----
 const ago = ts => { const s = Math.max(0, (Date.now() - ts) / 1000); if (s < 5) return 'just now'; if (s < 60) return `${Math.round(s)}s ago`; if (s < 3600) return `${Math.round(s / 60)} min ago`; if (s < 86400) return `${Math.round(s / 3600)} h ago`; return `${Math.round(s / 86400)} d ago`; };
 
@@ -2984,6 +3134,13 @@ function DesignDoc() {
   );
 }
 
+// KeyboardBridge: exposes context-bound helpers to App's single keydown listener.
+function KeyboardBridge({ addNodeRef }) {
+  const addNode = useAddNode();
+  addNodeRef.current = addNode;
+  return null;
+}
+
 // ===== Section 8: App =====
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -3016,6 +3173,7 @@ function App() {
   const { state, conn, act, toast } = studio;
   const [ui, setUi] = useState({ tool: 'select', pinKind: 'issue', inspectorTab: 'content', reviewFilter: { kind: 'all', status: 'open' }, skillsOpen: false, leftTab: 'layers', leftOpen: true, flowId: null });
   const canvasApi = useRef({});
+  const addNodeRef = useRef(() => {});
   const [spaceHeld, setSpaceHeld] = useState(false);
   const docRef = useRef({});
   const navRef = useRef(null);
@@ -3069,7 +3227,12 @@ function App() {
         if (mod && e.key === '0') { e.preventDefault(); if (canvasApi.current.fitAll) canvasApi.current.fitAll(); return; }
         const keyTool = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', t: 'text', p: 'pen', c: 'pin' }[e.key];
         if (keyTool && !mod && !e.altKey) { setUi(x => ({ ...x, tool: keyTool })); return; }
+        if ((e.key === 'n' || e.key === 'm') && !mod && !e.altKey) { e.preventDefault(); addNodeRef.current(e.key === 'n' ? 'web' : 'mobile'); return; }
+        if (e.key === 'T' && e.shiftKey && !mod) { e.preventDefault(); const rail = document.querySelector('[data-tool="tidy"]'); if (rail) rail.click(); return; }
+        if (mod && e.key === '1') { e.preventDefault(); const c = canvasApi.current; if (sel && sel.nodeId) { if (v.entered !== sel.nodeId) act('set_entered', { nodeId: sel.nodeId }); if (c.fitNode) c.fitNode(sel.nodeId); } else if (sel && sel.kind === 'shape' && c.fitDiagram) c.fitDiagram(); else if (c.fitAll) c.fitAll(); return; }
+        if (e.key === 'Enter' && sel && sel.kind === 'node' && v.entered !== sel.nodeId) { e.preventDefault(); act('set_entered', { nodeId: sel.nodeId }); if (canvasApi.current.fitNode) canvasApi.current.fitNode(sel.nodeId); return; }
       }
+      if (mod && e.key === '.') { e.preventDefault(); setUi(x => ({ ...x, inspectorOpen: x.inspectorOpen === false })); return; }
       if (mod && e.key === '\\') { e.preventDefault(); setUi(x => ({ ...x, leftOpen: !x.leftOpen })); return; }
       if (mod && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); setUi(x => ({ ...x, leftOpen: true })); requestAnimationFrame(() => { const el = document.querySelector('[data-prompt]'); if (el) el.focus(); }); return; }
       if (mod && (e.key === 'd' || e.key === 'D')) {
@@ -3118,12 +3281,15 @@ function App() {
   const editor = v.tab === 'doc' ? <DesignDoc /> : <Canvas spaceHeld={spaceHeld} />;
   return (
     <Studio.Provider value={ctx}>
+      <KeyboardBridge addNodeRef={addNodeRef} />
       <div className="h-full flex flex-col font-ui">
         <TopBar />
         <div className="flex-1 min-h-0 flex relative">
           <main className="flex-1 min-w-0 relative" style={{ background: CH.backdrop }}>
             {v.tab === 'doc' ? <div style={{ position: 'absolute', inset: 0, left: ui.leftOpen ? 300 : 68 }}>{editor}</div> : editor}
+            {v.tab !== 'doc' && isUntouched(state.project) && <EmptyCanvas />}
             <LeftPanel />
+            {v.tab !== 'doc' && <><ToolRail /><ZoomPill /><HintStrip /></>}
             {toast && <Toast msg={toast.msg} />}
           </main>
           <div className="relative flex-none flex">
